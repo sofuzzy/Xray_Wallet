@@ -27,14 +27,20 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  
+  // In development, allow insecure cookies
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   return session({
+    name: 'sessionId',
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: isProduction, // Only secure in production
+      sameSite: isProduction ? 'strict' : 'lax',
       maxAge: sessionTtl,
     },
   });
@@ -120,9 +126,14 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth:${req.hostname}`, {
       failureRedirect: "/api/login",
     })(req, res, (err?: any) => {
-      if (err) return next(err);
-      // Always redirect to home after successful auth
-      res.redirect("/");
+      if (err) {
+        console.error("Auth callback error:", err);
+        return next(err);
+      }
+      // Save session explicitly before redirecting
+      req.session.save(() => {
+        res.redirect("/");
+      });
     });
   });
 

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated as authMiddleware } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
 
 export async function registerRoutes(
@@ -11,22 +11,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Initialize Replit Auth
+  // Initialize Replit Auth FIRST (before any routes)
   await setupAuth(app);
+  registerAuthRoutes(app);
 
-  app.get(api.users.me.path, async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
+  app.get(api.users.me.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
     
-    // Ensure user exists in our DB (Auth module handles this, but let's be safe)
-    let user = await storage.getUser(userId);
+    // Get user from auth database
+    let user = await authStorage.getUser(userId);
     if (!user) {
-      // Should have been created by auth callback, but if not:
-      // return 404 or try to sync?
-      // Auth module upserts on login.
       return res.status(404).json({ message: "User not initialized" });
     }
 
@@ -47,9 +41,7 @@ export async function registerRoutes(
     });
   });
 
-  app.post(api.wallets.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send();
-    
+  app.post(api.wallets.create.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
     // Check if already has wallet
     const existing = await storage.getWallet(userId);
@@ -67,15 +59,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.transactions.list.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send();
+  app.get(api.transactions.list.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
     const txs = await storage.getTransactions(userId);
     res.json(txs);
   });
 
-  app.post(api.transactions.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send();
+  app.post(api.transactions.create.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
 
     try {
