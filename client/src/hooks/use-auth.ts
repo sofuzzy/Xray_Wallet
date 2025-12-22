@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
@@ -23,11 +24,11 @@ async function logout(): Promise<void> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, refetch } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always fetch fresh on mount to catch post-login state
   });
 
   const logoutMutation = useMutation({
@@ -36,6 +37,11 @@ export function useAuth() {
       queryClient.setQueryData(["/api/auth/user"], null);
     },
   });
+
+  // Refetch on component mount to ensure fresh session after callback redirect
+  useEffect(() => {
+    refetch();
+  }, []);
 
   return {
     user,
