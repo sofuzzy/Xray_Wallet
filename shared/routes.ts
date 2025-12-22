@@ -70,6 +70,50 @@ export const api = {
       },
     },
   },
+  swaps: {
+    quote: {
+      method: 'GET' as const,
+      path: '/api/swaps/quote',
+      responses: {
+        200: z.object({
+          outputAmount: z.number(),
+          priceImpact: z.number(),
+        }),
+        400: errorSchemas.validation,
+      },
+    },
+    execute: {
+      method: 'POST' as const,
+      path: '/api/swaps',
+      input: z.object({
+        inputMint: z.string(),
+        outputMint: z.string(),
+        amount: z.number(),
+        slippage: z.number(),
+      }),
+      responses: {
+        200: z.object({
+          signature: z.string(),
+          inputAmount: z.number(),
+          outputAmount: z.number(),
+          priceImpact: z.number(),
+        }),
+        400: errorSchemas.validation,
+      },
+    },
+    tokens: {
+      method: 'GET' as const,
+      path: '/api/swaps/tokens',
+      responses: {
+        200: z.array(z.object({
+          mint: z.string(),
+          name: z.string(),
+          symbol: z.string(),
+          decimals: z.number(),
+        })),
+      },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
