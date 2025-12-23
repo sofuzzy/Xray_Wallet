@@ -6,6 +6,7 @@ import { useTransactions } from "@/hooks/use-transactions";
 import { WalletCard } from "@/components/WalletCard";
 import { ActionButtons } from "@/components/ActionButtons";
 import { TransactionList } from "@/components/TransactionList";
+import { TokenBalances } from "@/components/TokenBalances";
 import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
@@ -25,7 +26,6 @@ export default function Home() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isSwapOpen, setIsSwapOpen] = useState(false);
 
-  // Sync wallet public key to backend if needed
   useEffect(() => {
     if (dbUser && address && dbUser.walletPublicKey !== address) {
       updateUser({ walletPublicKey: address });
@@ -50,11 +50,9 @@ export default function Home() {
     );
   }
 
-  // Login Screen
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
-        {/* Background Effects */}
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-background to-background" />
         
         <div className="relative z-10 text-center space-y-8 max-w-md w-full">
@@ -87,10 +85,8 @@ export default function Home() {
     );
   }
 
-  // Dashboard
   return (
     <div className="min-h-screen bg-background pb-10 relative overflow-hidden">
-      {/* Subtle Background */}
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,_rgba(120,119,198,0.1),_rgba(255,255,255,0))]" />
 
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/5 px-6 py-4 flex items-center justify-between">
@@ -127,6 +123,10 @@ export default function Home() {
           onSwap={() => setIsSwapOpen(true)}
           onTopUp={handleTopUp}
         />
+
+        <div className="px-6">
+          <TokenBalances />
+        </div>
 
         <TransactionList 
           transactions={transactions || []} 
