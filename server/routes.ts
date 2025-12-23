@@ -113,22 +113,16 @@ export async function registerRoutes(
 
   app.post(api.swaps.execute.path, authMiddleware, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
       const input = api.swaps.execute.input.parse(req.body);
       
-      // Get user's keypair from wallet
-      const wallet = await storage.getWallet(userId);
-      if (!wallet) {
-        return res.status(400).json({ message: "Wallet not found" });
-      }
-
       // Perform swap (simplified for devnet)
+      // Wallet exists on client-side, so we don't need to fetch from DB
       const result = await swapTokens({
         inputMint: input.inputMint,
         outputMint: input.outputMint,
         amount: input.amount,
         slippage: input.slippage,
-        signer: null as any, // In production, get from secure key storage
+        signer: null as any, // Client handles signing locally
       });
 
       res.json(result);
