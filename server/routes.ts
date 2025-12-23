@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as authMiddleware } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
+import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -79,6 +80,63 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         res.status(400).json({ message: err.errors[0].message });
       }
+    }
+  });
+
+  // Swap routes
+  app.get(api.swaps.tokens.path, authMiddleware, async (req, res) => {
+    try {
+      const tokens = await getAvailableTokens();
+      res.json(tokens);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch tokens" });
+    }
+  });
+
+  app.get(api.swaps.quote.path, authMiddleware, async (req, res) => {
+    try {
+      const { inputMint, outputMint, amount } = req.query;
+      if (!inputMint || !outputMint || !amount) {
+        return res.status(400).json({ message: "Missing required parameters" });
+      }
+      
+      const quote = await getSwapQuote(
+        inputMint as string,
+        outputMint as string,
+        parseInt(amount as string)
+      );
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get quote" });
+    }
+  });
+
+  app.post(api.swaps.execute.path, authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const input = api.swaps.execute.input.parse(req.body);
+      
+      // Get user's keypair from wallet
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+
+      // Perform swap (simplified for devnet)
+      const result = await swapTokens({
+        inputMint: input.inputMint,
+        outputMint: input.outputMint,
+        amount: input.amount,
+        slippage: input.slippage,
+        signer: null as any, // In production, get from secure key storage
+      });
+
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Swap failed" });
     }
   });
 

@@ -8,6 +8,7 @@ import { ActionButtons } from "@/components/ActionButtons";
 import { TransactionList } from "@/components/TransactionList";
 import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
+import { SwapModal } from "@/components/SwapModal";
 import { LogIn, Loader2, Sparkles, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export default function Home() {
 
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
+  const [isSwapOpen, setIsSwapOpen] = useState(false);
 
   // Sync wallet public key to backend if needed
   useEffect(() => {
@@ -122,6 +124,7 @@ export default function Home() {
         <ActionButtons 
           onSend={() => setIsSendOpen(true)}
           onReceive={() => setIsReceiveOpen(true)}
+          onSwap={() => setIsSwapOpen(true)}
           onTopUp={handleTopUp}
         />
 
@@ -135,6 +138,7 @@ export default function Home() {
       <AnimatePresence>
         {isSendOpen && <SendModal isOpen={isSendOpen} onClose={() => setIsSendOpen(false)} />}
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
+        {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => setIsSwapOpen(false)} />}
       </AnimatePresence>
     </div>
   );
