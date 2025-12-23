@@ -38,7 +38,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
         outputMint,
         amount: Math.floor(parseFloat(inputAmount) * 1e9), // Convert to lamports
       });
-      return response as { outputAmount: number; priceImpact: number };
+      return response;
     },
     enabled: isOpen && !!inputAmount && parseFloat(inputAmount) > 0,
   });

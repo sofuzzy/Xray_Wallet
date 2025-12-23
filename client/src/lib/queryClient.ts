@@ -11,16 +11,29 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
-  const res = await fetch(url, {
+): Promise<any> {
+  let fullUrl = url;
+  let body: string | undefined;
+
+  if (method === "GET" && data) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      params.append(key, String(value));
+    }
+    fullUrl = url + "?" + params.toString();
+  } else if (method !== "GET" && data) {
+    body = JSON.stringify(data);
+  }
+
+  const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body,
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
-  return res;
+  return await res.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
