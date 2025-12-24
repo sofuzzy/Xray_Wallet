@@ -4,6 +4,7 @@ import {
   wallets,
   transactions,
   tokenLaunches,
+  autoTradeRules,
   type User,
   type Wallet,
   type InsertWallet,
@@ -11,8 +12,10 @@ import {
   type InsertTransaction,
   type TokenLaunch,
   type InsertTokenLaunch,
+  type AutoTradeRule,
+  type InsertAutoTradeRule,
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -27,6 +30,11 @@ export interface IStorage {
 
   getTokenLaunches(userId: string): Promise<TokenLaunch[]>;
   createTokenLaunch(launch: InsertTokenLaunch): Promise<TokenLaunch>;
+
+  getAutoTradeRules(userId: string): Promise<AutoTradeRule[]>;
+  createAutoTradeRule(rule: InsertAutoTradeRule): Promise<AutoTradeRule>;
+  updateAutoTradeRule(id: number, userId: string, updates: Partial<InsertAutoTradeRule>): Promise<AutoTradeRule | undefined>;
+  deleteAutoTradeRule(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -88,6 +96,35 @@ export class DatabaseStorage implements IStorage {
   async createTokenLaunch(launch: InsertTokenLaunch): Promise<TokenLaunch> {
     const [tokenLaunch] = await db.insert(tokenLaunches).values(launch).returning();
     return tokenLaunch;
+  }
+
+  async getAutoTradeRules(userId: string): Promise<AutoTradeRule[]> {
+    return await db
+      .select()
+      .from(autoTradeRules)
+      .where(eq(autoTradeRules.userId, userId))
+      .orderBy(desc(autoTradeRules.createdAt));
+  }
+
+  async createAutoTradeRule(rule: InsertAutoTradeRule): Promise<AutoTradeRule> {
+    const [autoTradeRule] = await db.insert(autoTradeRules).values(rule).returning();
+    return autoTradeRule;
+  }
+
+  async updateAutoTradeRule(id: number, userId: string, updates: Partial<InsertAutoTradeRule>): Promise<AutoTradeRule | undefined> {
+    const [updated] = await db
+      .update(autoTradeRules)
+      .set(updates)
+      .where(and(eq(autoTradeRules.id, id), eq(autoTradeRules.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteAutoTradeRule(id: number, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(autoTradeRules)
+      .where(and(eq(autoTradeRules.id, id), eq(autoTradeRules.userId, userId)));
+    return true;
   }
 }
 

@@ -36,9 +36,24 @@ export const tokenLaunches = pgTable("token_launches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const autoTradeRules = pgTable("auto_trade_rules", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tokenMint: text("token_mint").notNull(),
+  tokenSymbol: text("token_symbol").notNull(),
+  entryPrice: text("entry_price").notNull(),
+  stopLossPercent: integer("stop_loss_percent"),
+  takeProfitPercent: integer("take_profit_percent"),
+  targetToken: text("target_token").notNull().default("SOL"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  triggeredAt: timestamp("triggered_at"),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });
+export const insertAutoTradeRuleSchema = createInsertSchema(autoTradeRules).omit({ id: true, createdAt: true, triggeredAt: true });
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
@@ -46,3 +61,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type TokenLaunch = typeof tokenLaunches.$inferSelect;
 export type InsertTokenLaunch = z.infer<typeof insertTokenLaunchSchema>;
+export type AutoTradeRule = typeof autoTradeRules.$inferSelect;
+export type InsertAutoTradeRule = z.infer<typeof insertAutoTradeRuleSchema>;

@@ -190,5 +190,106 @@ export async function registerRoutes(
     }
   });
 
+  // Auto-trade rules routes
+  app.get("/api/auto-trade-rules", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const rules = await storage.getAutoTradeRules(userId);
+      res.json(rules);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch auto-trade rules" });
+    }
+  });
+
+  app.post("/api/auto-trade-rules", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      
+      const ruleInput = z.object({
+        tokenMint: z.string().min(32).max(64),
+        tokenSymbol: z.string().min(1).max(10),
+        entryPrice: z.string(),
+        stopLossPercent: z.number().int().min(1).max(100).optional(),
+        takeProfitPercent: z.number().int().min(1).max(1000).optional(),
+        targetToken: z.string().default("SOL"),
+        isActive: z.boolean().default(true),
+      });
+      
+      const parsed = ruleInput.parse(req.body);
+      
+      if (!parsed.stopLossPercent && !parsed.takeProfitPercent) {
+        return res.status(400).json({ message: "Must set at least stop loss or take profit" });
+      }
+
+      const rule = await storage.createAutoTradeRule({
+        userId,
+        tokenMint: parsed.tokenMint,
+        tokenSymbol: parsed.tokenSymbol,
+        entryPrice: parsed.entryPrice,
+        stopLossPercent: parsed.stopLossPercent ?? null,
+        takeProfitPercent: parsed.takeProfitPercent ?? null,
+        targetToken: parsed.targetToken,
+        isActive: parsed.isActive,
+      });
+      
+      res.status(201).json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Failed to create auto-trade rule:", error);
+      res.status(500).json({ message: "Failed to create auto-trade rule" });
+    }
+  });
+
+  app.patch("/api/auto-trade-rules/:id", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const ruleId = parseInt(req.params.id);
+      
+      const updateInput = z.object({
+        stopLossPercent: z.number().int().min(1).max(100).optional(),
+        takeProfitPercent: z.number().int().min(1).max(1000).optional(),
+        isActive: z.boolean().optional(),
+      });
+      
+      const parsed = updateInput.parse(req.body);
+      
+      const updates: Record<string, any> = {};
+      if (parsed.stopLossPercent !== undefined) updates.stopLossPercent = parsed.stopLossPercent;
+      if (parsed.takeProfitPercent !== undefined) updates.takeProfitPercent = parsed.takeProfitPercent;
+      if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      const updated = await storage.updateAutoTradeRule(ruleId, userId, updates);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Rule not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to update auto-trade rule" });
+    }
+  });
+
+  app.delete("/api/auto-trade-rules/:id", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const ruleId = parseInt(req.params.id);
+      
+      await storage.deleteAutoTradeRule(ruleId, userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete auto-trade rule" });
+    }
+  });
+
   return httpServer;
 }

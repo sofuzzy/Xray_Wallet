@@ -43,7 +43,8 @@ The server follows a modular pattern:
   - `sessions` - Session storage for auth
   - `wallets` - Solana wallet public keys linked to users
   - `transactions` - Transaction history records
-  - `tokenLaunches` - User-created SPL tokens with mint addresses
+  - `tokenLaunches` - User-created SPL tokens with mint addresses and images
+  - `autoTradeRules` - User-defined stop loss and take profit rules for tokens
 
 ### Wallet Implementation
 - Keypairs are generated client-side using `@solana/web3.js`
