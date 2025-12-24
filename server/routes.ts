@@ -7,6 +7,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated as authMiddleware } from
 import { authStorage } from "./replit_integrations/auth/storage";
 import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
 import { registerStripeRoutes } from "./stripeRoutes";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -19,6 +20,9 @@ export async function registerRoutes(
   
   // Register Stripe routes for Apple Pay / card payments
   registerStripeRoutes(app);
+  
+  // Register Object Storage routes for file uploads
+  registerObjectStorageRoutes(app);
 
   app.get(api.users.me.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
@@ -150,6 +154,7 @@ export async function registerRoutes(
         decimals: z.number().int().min(0).max(9),
         totalSupply: z.string().regex(/^\d+$/).max(30),
         creatorAddress: z.string().min(32).max(64),
+        imageUrl: z.string().optional(),
       });
       
       const parsed = tokenLaunchInput.parse(req.body);
@@ -162,6 +167,7 @@ export async function registerRoutes(
         decimals: parsed.decimals,
         totalSupply: parsed.totalSupply,
         creatorAddress: parsed.creatorAddress,
+        imageUrl: parsed.imageUrl || null,
       });
       
       res.status(201).json(launch);

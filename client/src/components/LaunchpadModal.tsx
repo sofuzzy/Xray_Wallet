@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins } from "lucide-react";
+import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useUpload } from "@/hooks/use-upload";
 
 interface LaunchpadModalProps {
   isOpen: boolean;
@@ -27,21 +28,26 @@ interface TokenFormData {
   symbol: string;
   decimals: number;
   totalSupply: string;
+  imageUrl: string;
 }
 
 export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   const { address, balance } = useWallet();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading } = useUpload();
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<TokenFormData>({
     name: "",
     symbol: "",
     decimals: 9,
     totalSupply: "1000000",
+    imageUrl: "",
   });
   const [step, setStep] = useState<"form" | "creating" | "success" | "error">("form");
-  const [createdToken, setCreatedToken] = useState<{ mintAddress: string; name: string; symbol: string } | null>(null);
+  const [createdToken, setCreatedToken] = useState<{ mintAddress: string; name: string; symbol: string; imageUrl?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   const saveLaunchMutation = useMutation({
@@ -52,6 +58,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       decimals: number;
       totalSupply: string;
       creatorAddress: string;
+      imageUrl?: string;
     }) => {
       return apiRequest("POST", "/api/token-launches", data);
     },
@@ -62,6 +69,33 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
   const handleInputChange = (field: keyof TokenFormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Error", description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Error", description: "Image must be less than 5MB", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    const result = await uploadFile(file);
+    if (result) {
+      setFormData(prev => ({ ...prev, imageUrl: result.objectPath }));
+      toast({ title: "Success", description: "Image uploaded successfully" });
+    }
   };
 
   const createToken = async () => {
@@ -140,12 +174,14 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         decimals: formData.decimals,
         totalSupply: formData.totalSupply,
         creatorAddress: address,
+        imageUrl: formData.imageUrl || undefined,
       });
 
       setCreatedToken({
         mintAddress: mint.toBase58(),
         name: formData.name,
         symbol: formData.symbol.toUpperCase(),
+        imageUrl: formData.imageUrl || undefined,
       });
       setStep("success");
       
@@ -160,9 +196,10 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
   const handleClose = () => {
     setStep("form");
-    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000" });
+    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "" });
     setCreatedToken(null);
     setErrorMessage("");
+    setImagePreview(null);
     onClose();
   };
 
@@ -211,6 +248,35 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
           {step === "form" && (
             <div className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Token Image</Label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                  data-testid="input-token-image"
+                />
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-32 bg-white/5 border border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-colors"
+                  data-testid="button-upload-image"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                  ) : imagePreview ? (
+                    <img src={imagePreview} alt="Token preview" className="w-20 h-20 object-cover rounded-lg" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">Click to upload image</span>
+                      <span className="text-xs text-muted-foreground/60">PNG, JPG up to 5MB</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="token-name" className="text-sm text-muted-foreground">Token Name</Label>
                 <Input
@@ -294,9 +360,17 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
           {step === "success" && createdToken && (
             <div className="py-8 text-center space-y-6">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
-                <CheckCircle className="w-10 h-10 text-green-400" />
-              </div>
+              {createdToken.imageUrl ? (
+                <img 
+                  src={createdToken.imageUrl} 
+                  alt={createdToken.name} 
+                  className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-green-500/50"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-10 h-10 text-green-400" />
+                </div>
+              )}
               <div>
                 <p className="text-xl font-bold text-white">Token Created!</p>
                 <p className="text-muted-foreground">{createdToken.name} ({createdToken.symbol})</p>

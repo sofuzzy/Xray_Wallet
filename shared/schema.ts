@@ -32,6 +32,7 @@ export const tokenLaunches = pgTable("token_launches", {
   decimals: integer("decimals").notNull().default(9),
   totalSupply: text("total_supply").notNull(),
   creatorAddress: text("creator_address").notNull(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
