@@ -68,7 +68,7 @@ export default function Home() {
           
           <div className="space-y-2">
             <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-white">
-              Silver <span className="text-primary">Wallet</span>
+              <span className="text-primary">Xray</span>
             </h1>
             <p className="text-muted-foreground text-lg">
               The premium Solana experience. Fast, secure, and beautiful.
@@ -96,7 +96,7 @@ export default function Home() {
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,_rgba(120,119,198,0.1),_rgba(255,255,255,0))]" />
 
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-display font-bold text-white">Silver</h1>
+        <h1 className="text-xl font-display font-bold text-primary">Xray</h1>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-white">{user?.firstName || "User"}</p>

@@ -1,8 +1,8 @@
-# Solana Wallet Application
+# Xray - Solana Wallet Application
 
 ## Overview
 
-This is a Solana devnet wallet application that allows users to manage SOL tokens with a modern, mobile-friendly interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and purchasing SOL via Stripe payments. It uses Replit Auth for user authentication and stores wallet data in a PostgreSQL database.
+Xray is a Solana devnet wallet application that allows users to manage SOL tokens with a modern, mobile-friendly interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and purchasing SOL via Stripe payments. It uses Replit Auth for user authentication and stores wallet data in a PostgreSQL database.
 
 ## User Preferences
 
