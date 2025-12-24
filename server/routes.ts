@@ -6,6 +6,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as authMiddleware } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
+import { registerStripeRoutes } from "./stripeRoutes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -15,6 +16,9 @@ export async function registerRoutes(
   // Initialize Replit Auth FIRST (before any routes)
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Register Stripe routes for Apple Pay / card payments
+  registerStripeRoutes(app);
 
   app.get(api.users.me.path, authMiddleware, async (req, res) => {
     const userId = (req.user as any).claims.sub;
