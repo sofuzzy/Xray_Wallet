@@ -43,6 +43,7 @@ The server follows a modular pattern:
   - `sessions` - Session storage for auth
   - `wallets` - Solana wallet public keys linked to users
   - `transactions` - Transaction history records
+  - `tokenLaunches` - User-created SPL tokens with mint addresses
 
 ### Wallet Implementation
 - Keypairs are generated client-side using `@solana/web3.js`
@@ -54,7 +55,9 @@ The server follows a modular pattern:
 
 ### Blockchain
 - **Solana Web3.js**: Core Solana blockchain interaction
+- **@solana/spl-token**: SPL token creation and management
 - **bs58**: Base58 encoding for key serialization
+- **Buffer polyfill**: CDN-loaded buffer for browser SPL token compatibility
 - **Network**: Solana Devnet (clusterApiUrl)
 
 ### Payments
