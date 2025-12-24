@@ -128,7 +128,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SOL">SOL</SelectItem>
-                  {tokens.map((token) => (
+                  {tokens.filter((t) => t.symbol !== "SOL").map((token) => (
                     <SelectItem key={token.mint} value={token.symbol}>
                       {token.symbol}
                     </SelectItem>
@@ -172,7 +172,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USDC">USDC</SelectItem>
-                  {tokens.map((token) => (
+                  {tokens.filter((t) => t.symbol !== "USDC").map((token) => (
                     <SelectItem key={token.mint} value={token.symbol}>
                       {token.symbol}
                     </SelectItem>
