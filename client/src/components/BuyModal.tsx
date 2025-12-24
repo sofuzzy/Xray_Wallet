@@ -164,13 +164,13 @@ export function BuyModal({ isOpen, onClose }: BuyModalProps) {
   const { toast } = useToast();
 
   // Fetch Stripe publishable key
-  const { data: stripeConfig } = useQuery({
+  const { data: stripeConfig } = useQuery<{ publishableKey: string }>({
     queryKey: ["/api/stripe/publishable-key"],
     enabled: isOpen,
   });
 
   // Fetch SOL price
-  const { data: solPriceData } = useQuery({
+  const { data: solPriceData } = useQuery<{ price: number; currency: string }>({
     queryKey: ["/api/stripe/sol-price"],
     enabled: isOpen,
   });
