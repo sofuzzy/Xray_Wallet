@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownLeft, Shuffle, CreditCard, Rocket } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Shuffle, CreditCard, Rocket, Coins } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ActionButtonsProps {
@@ -8,15 +8,17 @@ interface ActionButtonsProps {
   onTopUp: () => void;
   onBuy?: () => void;
   onLaunch?: () => void;
+  onStake?: () => void;
 }
 
-export function ActionButtons({ onSend, onReceive, onSwap, onTopUp, onBuy, onLaunch }: ActionButtonsProps) {
+export function ActionButtons({ onSend, onReceive, onSwap, onTopUp, onBuy, onLaunch, onStake }: ActionButtonsProps) {
   const buttons = [
     { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-white text-black hover:bg-white/90", testId: "button-send" },
     { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-white/10 text-white hover:bg-white/20 backdrop-blur-md", testId: "button-receive" },
     { label: "Swap", icon: Shuffle, onClick: onSwap, color: "bg-white/10 text-white hover:bg-white/20 backdrop-blur-md", testId: "button-swap" },
     { label: "Buy", icon: CreditCard, onClick: onBuy || onTopUp, color: "bg-primary/90 text-white hover:bg-primary backdrop-blur-md", testId: "button-buy" },
     { label: "Launch", icon: Rocket, onClick: onLaunch || (() => {}), color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600", testId: "button-launch" },
+    { label: "Stake", icon: Coins, onClick: onStake || (() => {}), color: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600", testId: "button-stake" },
   ];
 
   return (
