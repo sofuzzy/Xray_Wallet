@@ -3,11 +3,14 @@ import {
   users,
   wallets,
   transactions,
+  tokenLaunches,
   type User,
   type Wallet,
   type InsertWallet,
   type Transaction,
   type InsertTransaction,
+  type TokenLaunch,
+  type InsertTokenLaunch,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -21,6 +24,9 @@ export interface IStorage {
 
   getTransactions(userId: string): Promise<Transaction[]>;
   createTransaction(tx: InsertTransaction): Promise<Transaction>;
+
+  getTokenLaunches(userId: string): Promise<TokenLaunch[]>;
+  createTokenLaunch(launch: InsertTokenLaunch): Promise<TokenLaunch>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -69,6 +75,19 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(tx: InsertTransaction): Promise<Transaction> {
     const [transaction] = await db.insert(transactions).values(tx).returning();
     return transaction;
+  }
+
+  async getTokenLaunches(userId: string): Promise<TokenLaunch[]> {
+    return await db
+      .select()
+      .from(tokenLaunches)
+      .where(eq(tokenLaunches.userId, userId))
+      .orderBy(desc(tokenLaunches.createdAt));
+  }
+
+  async createTokenLaunch(launch: InsertTokenLaunch): Promise<TokenLaunch> {
+    const [tokenLaunch] = await db.insert(tokenLaunches).values(launch).returning();
+    return tokenLaunch;
   }
 }
 

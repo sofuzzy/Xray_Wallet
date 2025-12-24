@@ -138,5 +138,51 @@ export async function registerRoutes(
     }
   });
 
+  // Token Launchpad routes
+  app.post("/api/token-launches", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      
+      const tokenLaunchInput = z.object({
+        name: z.string().min(1).max(50),
+        symbol: z.string().min(1).max(10),
+        mintAddress: z.string().min(32).max(64),
+        decimals: z.number().int().min(0).max(9),
+        totalSupply: z.string().regex(/^\d+$/).max(30),
+        creatorAddress: z.string().min(32).max(64),
+      });
+      
+      const parsed = tokenLaunchInput.parse(req.body);
+
+      const launch = await storage.createTokenLaunch({
+        userId,
+        name: parsed.name,
+        symbol: parsed.symbol,
+        mintAddress: parsed.mintAddress,
+        decimals: parsed.decimals,
+        totalSupply: parsed.totalSupply,
+        creatorAddress: parsed.creatorAddress,
+      });
+      
+      res.status(201).json(launch);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Failed to save token launch:", error);
+      res.status(500).json({ message: "Failed to save token launch" });
+    }
+  });
+
+  app.get("/api/token-launches", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const launches = await storage.getTokenLaunches(userId);
+      res.json(launches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch token launches" });
+    }
+  });
+
   return httpServer;
 }

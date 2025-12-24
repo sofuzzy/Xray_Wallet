@@ -11,6 +11,7 @@ import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
 import { BuyModal } from "@/components/BuyModal";
+import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { LogIn, Loader2, Sparkles, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,7 @@ export default function Home() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isSwapOpen, setIsSwapOpen] = useState(false);
   const [isBuyOpen, setIsBuyOpen] = useState(false);
+  const [isLaunchOpen, setIsLaunchOpen] = useState(false);
 
   useEffect(() => {
     if (dbUser && address && dbUser.walletPublicKey !== address) {
@@ -125,6 +127,7 @@ export default function Home() {
           onSwap={() => setIsSwapOpen(true)}
           onTopUp={handleTopUp}
           onBuy={() => setIsBuyOpen(true)}
+          onLaunch={() => setIsLaunchOpen(true)}
         />
 
         <div className="px-6">
@@ -143,6 +146,7 @@ export default function Home() {
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
         {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => setIsSwapOpen(false)} />}
         {isBuyOpen && <BuyModal isOpen={isBuyOpen} onClose={() => setIsBuyOpen(false)} />}
+        {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
       </AnimatePresence>
     </div>
   );
