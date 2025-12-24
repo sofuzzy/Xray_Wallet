@@ -52,6 +52,13 @@ The server follows a modular pattern:
 - Public keys synced to server database for user lookups
 - Connects to Solana devnet for all operations
 
+### Staking Implementation
+- Native Solana staking using `StakeProgram` from web3.js
+- Stake accounts created client-side with wallet keypair as authority
+- Supports delegation to top validators by activated stake
+- Stake lifecycle: create → delegate → deactivate → withdraw
+- Activation/deactivation takes 2-3 epochs (~4-6 days on devnet)
+
 ## External Dependencies
 
 ### Blockchain

@@ -7,7 +7,6 @@ import {
   StakeProgram,
   Authorized,
   Transaction,
-  sendAndConfirmTransaction,
   Lockup
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -139,11 +138,8 @@ export async function createStakeAccount(
 
   const transaction = new Transaction().add(createStakeAccountIx, delegateIx);
   
-  const signature = await sendAndConfirmTransaction(
-    connection,
-    transaction,
-    [wallet, stakeAccount]
-  );
+  const signature = await connection.sendTransaction(transaction, [wallet, stakeAccount]);
+  await connection.confirmTransaction(signature, "confirmed");
 
   return signature;
 }
@@ -159,11 +155,8 @@ export async function deactivateStake(
 
   const transaction = new Transaction().add(deactivateIx);
   
-  const signature = await sendAndConfirmTransaction(
-    connection,
-    transaction,
-    [wallet]
-  );
+  const signature = await connection.sendTransaction(transaction, [wallet]);
+  await connection.confirmTransaction(signature, "confirmed");
 
   return signature;
 }
@@ -182,11 +175,8 @@ export async function withdrawStake(
 
   const transaction = new Transaction().add(withdrawIx);
   
-  const signature = await sendAndConfirmTransaction(
-    connection,
-    transaction,
-    [wallet]
-  );
+  const signature = await connection.sendTransaction(transaction, [wallet]);
+  await connection.confirmTransaction(signature, "confirmed");
 
   return signature;
 }
