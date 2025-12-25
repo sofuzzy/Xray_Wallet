@@ -12,15 +12,26 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useWallet() {
   const [keypair, setKeypair] = useState<Keypair | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
 
   // Initialize wallet on mount
   useEffect(() => {
-    let kp = getLocalKeypair();
-    if (!kp) {
-      kp = createNewKeypair();
-    }
-    setKeypair(kp);
+    const initWallet = async () => {
+      setIsLoading(true);
+      try {
+        let kp = await getLocalKeypair();
+        if (!kp) {
+          kp = await createNewKeypair();
+        }
+        setKeypair(kp);
+      } catch (e) {
+        console.error("Failed to initialize wallet:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initWallet();
   }, []);
 
   // Poll for balance
@@ -57,8 +68,8 @@ export function useWallet() {
   }, []);
 
   // Import wallet from seed phrase
-  const importWallet = useCallback((mnemonic: string): boolean => {
-    const newKeypair = importFromMnemonic(mnemonic);
+  const importWallet = useCallback(async (mnemonic: string): Promise<boolean> => {
+    const newKeypair = await importFromMnemonic(mnemonic);
     if (newKeypair) {
       setKeypair(newKeypair);
       queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
@@ -68,9 +79,9 @@ export function useWallet() {
   }, [queryClient]);
 
   // Reset wallet (create new one)
-  const resetWallet = useCallback(() => {
+  const resetWallet = useCallback(async () => {
     clearWallet();
-    const newKeypair = createNewKeypair();
+    const newKeypair = await createNewKeypair();
     setKeypair(newKeypair);
     queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
   }, [queryClient]);
@@ -80,6 +91,7 @@ export function useWallet() {
     publicKey: keypair?.publicKey,
     address: keypair?.publicKey.toString(),
     balance: balance || 0,
+    isLoading,
     refreshBalance,
     requestAirdrop,
     getSeedPhrase,

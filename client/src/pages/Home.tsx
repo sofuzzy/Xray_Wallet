@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
-  const { balance, address, requestAirdrop } = useWallet();
+  const { balance, address, requestAirdrop, isLoading: walletLoading } = useWallet();
   const { mutate: updateUser } = useUpdateUser();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
@@ -50,7 +50,7 @@ export default function Home() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || walletLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

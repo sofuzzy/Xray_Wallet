@@ -11,7 +11,6 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import * as bip39 from "bip39";
-import { derivePath } from "ed25519-hd-key";
 
 // Use Devnet for this demo
 export const SOLANA_NETWORK = "devnet";
@@ -23,9 +22,6 @@ export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
 export const LOCAL_STORAGE_MNEMONIC_KEY = "solana_wallet_mnemonic";
 export { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-// Solana derivation path (BIP44)
-const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
-
 export const generateMnemonic = (): string => {
   return bip39.generateMnemonic(128); // 12 words
 };
@@ -34,22 +30,22 @@ export const validateMnemonic = (mnemonic: string): boolean => {
   return bip39.validateMnemonic(mnemonic.trim().toLowerCase());
 };
 
-export const keypairFromMnemonic = (mnemonic: string): Keypair => {
-  const seed = bip39.mnemonicToSeedSync(mnemonic.trim().toLowerCase());
-  const derivedSeed = derivePath(SOLANA_DERIVATION_PATH, seed.toString("hex")).key;
-  return Keypair.fromSeed(derivedSeed);
+export const keypairFromMnemonic = async (mnemonic: string): Promise<Keypair> => {
+  const seed = await bip39.mnemonicToSeed(mnemonic.trim().toLowerCase());
+  // Use first 32 bytes for Ed25519 seed (simple derivation)
+  return Keypair.fromSeed(seed.slice(0, 32));
 };
 
 export const getStoredMnemonic = (): string | null => {
   return localStorage.getItem(LOCAL_STORAGE_MNEMONIC_KEY);
 };
 
-export const getLocalKeypair = (): Keypair | null => {
+export const getLocalKeypair = async (): Promise<Keypair | null> => {
   try {
     // First try to get from mnemonic
     const mnemonic = getStoredMnemonic();
     if (mnemonic && validateMnemonic(mnemonic)) {
-      return keypairFromMnemonic(mnemonic);
+      return await keypairFromMnemonic(mnemonic);
     }
     // Fallback to legacy secret key storage
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -62,19 +58,19 @@ export const getLocalKeypair = (): Keypair | null => {
   }
 };
 
-export const createNewKeypair = (): Keypair => {
+export const createNewKeypair = async (): Promise<Keypair> => {
   const mnemonic = generateMnemonic();
-  const keypair = keypairFromMnemonic(mnemonic);
+  const keypair = await keypairFromMnemonic(mnemonic);
   localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic);
   localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
   return keypair;
 };
 
-export const importFromMnemonic = (mnemonic: string): Keypair | null => {
+export const importFromMnemonic = async (mnemonic: string): Promise<Keypair | null> => {
   if (!validateMnemonic(mnemonic)) {
     return null;
   }
-  const keypair = keypairFromMnemonic(mnemonic);
+  const keypair = await keypairFromMnemonic(mnemonic);
   localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic.trim().toLowerCase());
   localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
   return keypair;

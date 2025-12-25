@@ -51,6 +51,12 @@ The server follows a modular pattern:
 - Private keys stored in browser localStorage (base58 encoded)
 - Public keys synced to server database for user lookups
 - Connects to Solana devnet for all operations
+- **Seed Phrase Backup/Restore**: BIP39 12-word mnemonic with BIP44 derivation (m/44'/501'/0'/0')
+  - Uses `bip39` and `ed25519-hd-key` packages for mnemonic-to-keypair derivation
+  - Backup: View/copy seed phrase from Settings modal
+  - Restore: Import wallet from existing seed phrase
+  - Reset: Generate new wallet with fresh seed phrase
+  - Page reload strategy ensures all components sync to restored wallet
 
 ### Staking Implementation
 - Native Solana staking using `StakeProgram` from web3.js

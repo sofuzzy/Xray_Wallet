@@ -45,7 +45,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
 
     setIsImporting(true);
     try {
-      const success = importWallet(trimmed);
+      const success = await importWallet(trimmed);
       if (success) {
         toast({ title: "Wallet Imported", description: "Reloading to apply changes..." });
         setImportPhrase("");
@@ -59,12 +59,12 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!confirmReset) {
       setConfirmReset(true);
       return;
     }
-    resetWallet();
+    await resetWallet();
     toast({ title: "New Wallet Created", description: "Reloading to apply changes..." });
     setTimeout(() => window.location.reload(), 500);
   };
