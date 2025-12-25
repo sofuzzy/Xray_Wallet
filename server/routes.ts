@@ -22,6 +22,14 @@ import {
   revokeToken, 
   revokeAllUserTokens 
 } from "./services/tokenService";
+import {
+  generateRegistrationChallenge,
+  generateAuthenticationChallenge,
+  verifyRegistration,
+  verifyAuthentication,
+  getCredentialsForUser,
+  deleteCredential
+} from "./services/webauthnService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -117,6 +125,141 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Token revocation failed:", error);
       res.status(500).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
+    }
+  });
+
+  app.get("/api/webauthn/credentials", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const credentials = await getCredentialsForUser(userId);
+      res.json(credentials.map(c => ({
+        id: c.id,
+        deviceType: c.deviceType,
+        createdAt: c.createdAt,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "FETCH_FAILED", message: "Failed to fetch credentials" });
+    }
+  });
+
+  app.post("/api/webauthn/register/options", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const options = generateRegistrationChallenge(userId);
+      res.json(options);
+    } catch (error) {
+      res.status(500).json({ error: "OPTIONS_FAILED", message: "Failed to generate registration options" });
+    }
+  });
+
+  app.post("/api/webauthn/register/verify", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const { id, response, transports } = req.body;
+
+      if (!id || !response?.clientDataJSON || !response?.attestationObject) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: "Missing required fields" });
+      }
+
+      const success = await verifyRegistration(
+        userId,
+        id,
+        response.clientDataJSON,
+        response.attestationObject,
+        transports
+      );
+
+      if (!success) {
+        return res.status(400).json({ error: "VERIFICATION_FAILED", message: "Failed to verify registration" });
+      }
+
+      res.json({ success: true, message: "Face ID registered successfully" });
+    } catch (error) {
+      console.error("WebAuthn registration failed:", error);
+      res.status(500).json({ error: "REGISTRATION_FAILED", message: "Failed to register biometric" });
+    }
+  });
+
+  app.post("/api/webauthn/authenticate/options", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const credentials = await getCredentialsForUser(userId);
+      
+      if (credentials.length === 0) {
+        return res.status(400).json({ error: "NO_CREDENTIALS", message: "No biometric credentials registered" });
+      }
+
+      const options = generateAuthenticationChallenge(userId);
+      res.json({
+        ...options,
+        allowCredentials: credentials.map(c => ({
+          type: "public-key",
+          id: c.credentialId,
+          transports: c.transports?.split(",") || ["internal"],
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "OPTIONS_FAILED", message: "Failed to generate authentication options" });
+    }
+  });
+
+  app.post("/api/webauthn/authenticate/verify", strictRateLimiter, async (req, res) => {
+    try {
+      const { userId, id, response } = req.body;
+
+      if (!userId || !id || !response?.clientDataJSON || !response?.authenticatorData || !response?.signature) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: "Missing required fields" });
+      }
+
+      const success = await verifyAuthentication(
+        userId,
+        id,
+        response.clientDataJSON,
+        response.authenticatorData,
+        response.signature
+      );
+
+      if (!success) {
+        return res.status(401).json({ error: "AUTH_FAILED", message: "Biometric authentication failed" });
+      }
+
+      const user = await authStorage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "USER_NOT_FOUND", message: "User not found" });
+      }
+
+      const tokens = await generateTokenPair(
+        userId,
+        { email: user.email || undefined, firstName: user.firstName || undefined, lastName: user.lastName || undefined },
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      res.json({
+        success: true,
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error) {
+      console.error("WebAuthn authentication failed:", error);
+      res.status(500).json({ error: "AUTH_FAILED", message: "Failed to authenticate" });
+    }
+  });
+
+  app.delete("/api/webauthn/credentials/:id", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const credentialId = parseInt(req.params.id);
+      
+      await deleteCredential(credentialId, userId);
+      res.json({ success: true, message: "Credential deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "DELETE_FAILED", message: "Failed to delete credential" });
     }
   });
   

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2 } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2 } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
+import { useBiometric } from "@/hooks/use-biometric";
 import { validateMnemonic } from "@/lib/solana";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,11 +16,13 @@ interface SeedPhraseModalProps {
 export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const { getSeedPhrase, importWallet, resetWallet } = useWallet();
   const { toast } = useToast();
-  const [tab, setTab] = useState<"backup" | "restore">("backup");
+  const biometric = useBiometric();
+  const [tab, setTab] = useState<"backup" | "restore" | "security">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [importPhrase, setImportPhrase] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
 
   const seedPhrase = getSeedPhrase();
   const words = seedPhrase?.split(" ") || [];
@@ -69,6 +72,31 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
     setTimeout(() => window.location.reload(), 500);
   };
 
+  const handleEnableBiometric = async () => {
+    setIsEnabling(true);
+    try {
+      const success = await biometric.register();
+      if (success) {
+        toast({ title: "Face ID Enabled", description: "You can now unlock with Face ID" });
+      } else {
+        toast({ title: "Setup Failed", description: biometric.error || "Could not enable Face ID", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Setup Failed", description: e.message || "Could not enable Face ID", variant: "destructive" });
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
+  const handleRemoveBiometric = async (id: number) => {
+    const success = await biometric.remove(id);
+    if (success) {
+      toast({ title: "Face ID Removed", description: "Biometric unlock has been disabled" });
+    } else {
+      toast({ title: "Remove Failed", description: "Could not remove Face ID", variant: "destructive" });
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -97,10 +125,10 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
         </button>
 
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold font-display">Wallet Backup</h2>
+          <h2 className="text-2xl font-bold font-display">Wallet Settings</h2>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore")}>
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security")}>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="backup" data-testid="tab-backup">
                 <Download className="w-4 h-4 mr-2" />
                 Backup
@@ -108,6 +136,10 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
               <TabsTrigger value="restore" data-testid="tab-restore">
                 <Upload className="w-4 h-4 mr-2" />
                 Restore
+              </TabsTrigger>
+              <TabsTrigger value="security" data-testid="tab-security">
+                <Shield className="w-4 h-4 mr-2" />
+                Security
               </TabsTrigger>
             </TabsList>
 
@@ -238,6 +270,79 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   </p>
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="security" className="space-y-4 mt-4">
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex gap-3">
+                <Fingerprint className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div className="text-sm text-foreground/80">
+                  <p className="font-medium text-foreground">Face ID / Biometric Unlock</p>
+                  <p className="mt-1">Use Face ID or Touch ID to quickly unlock your wallet.</p>
+                </div>
+              </div>
+
+              {!biometric.isSupported ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Fingerprint className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Biometric authentication is not available on this device.</p>
+                  <p className="text-sm mt-2">Try using Safari on an iPhone or Mac with Touch ID.</p>
+                </div>
+              ) : biometric.isLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground" />
+                </div>
+              ) : biometric.isEnabled ? (
+                <div className="space-y-3">
+                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500" />
+                    <span className="text-green-200">Face ID is enabled</span>
+                  </div>
+                  
+                  {biometric.credentials.map((cred) => (
+                    <div 
+                      key={cred.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Fingerprint className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{cred.deviceType || "Face ID"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Added {new Date(cred.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleRemoveBiometric(cred.id)}
+                        data-testid={`button-remove-biometric-${cred.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Button
+                  onClick={handleEnableBiometric}
+                  disabled={isEnabling}
+                  className="w-full"
+                  data-testid="button-enable-faceid"
+                >
+                  {isEnabling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="w-4 h-4 mr-2" />
+                      Enable Face ID
+                    </>
+                  )}
+                </Button>
+              )}
             </TabsContent>
           </Tabs>
         </div>

@@ -90,10 +90,17 @@ The server follows a modular pattern:
   - Hybrid auth supporting both sessions and tokens
   - Rate limiting (global/strict/auth tiers)
   - Basic anomaly detection for suspicious patterns
+- **Face ID / Biometric Unlock**: WebAuthn-based biometric authentication
+  - Platform authenticator (Face ID, Touch ID) for quick unlock
+  - Credential registration stores public key server-side
+  - Authentication issues new JWT tokens upon successful biometric verification
+  - Feature detection for unsupported browsers with graceful fallback
 - **Key Files**:
   - `server/services/tokenService.ts` - JWT token generation/validation
   - `server/middleware/zeroTrust.ts` - Auth middleware, rate limiting, anomaly detection
+  - `server/services/webauthnService.ts` - WebAuthn registration/authentication
   - `client/src/lib/tokenManager.ts` - Frontend token management with auto-refresh
+  - `client/src/hooks/use-biometric.ts` - WebAuthn frontend integration
 
 ### UI Components
 - **shadcn/ui**: Full component library (Radix UI primitives)
