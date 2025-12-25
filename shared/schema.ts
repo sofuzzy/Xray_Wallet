@@ -61,6 +61,17 @@ export const refreshTokens = pgTable("refresh_tokens", {
   revokedAt: timestamp("revoked_at"),
 });
 
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  credentialId: text("credential_id").notNull(),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  deviceType: text("device_type"),
+  transports: text("transports"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });

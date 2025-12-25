@@ -5,6 +5,7 @@ import {
   transactions,
   tokenLaunches,
   autoTradeRules,
+  webauthnCredentials,
   type User,
   type Wallet,
   type InsertWallet,
@@ -16,6 +17,17 @@ import {
   type InsertAutoTradeRule,
 } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
+
+export interface WebAuthnCredential {
+  id: number;
+  userId: string;
+  credentialId: string;
+  publicKey: string;
+  counter: number;
+  deviceType: string | null;
+  transports: string | null;
+  createdAt: Date;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -35,6 +47,12 @@ export interface IStorage {
   createAutoTradeRule(rule: InsertAutoTradeRule): Promise<AutoTradeRule>;
   updateAutoTradeRule(id: number, userId: string, updates: Partial<InsertAutoTradeRule>): Promise<AutoTradeRule | undefined>;
   deleteAutoTradeRule(id: number, userId: string): Promise<boolean>;
+
+  getWebAuthnCredentials(userId: string): Promise<WebAuthnCredential[]>;
+  getWebAuthnCredentialById(credentialId: string): Promise<WebAuthnCredential | undefined>;
+  createWebAuthnCredential(credential: Omit<WebAuthnCredential, 'id' | 'createdAt'>): Promise<WebAuthnCredential>;
+  updateWebAuthnCounter(credentialId: string, counter: number): Promise<void>;
+  deleteWebAuthnCredential(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -124,6 +142,40 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(autoTradeRules)
       .where(and(eq(autoTradeRules.id, id), eq(autoTradeRules.userId, userId)));
+    return true;
+  }
+
+  async getWebAuthnCredentials(userId: string): Promise<WebAuthnCredential[]> {
+    return await db
+      .select()
+      .from(webauthnCredentials)
+      .where(eq(webauthnCredentials.userId, userId));
+  }
+
+  async getWebAuthnCredentialById(credentialId: string): Promise<WebAuthnCredential | undefined> {
+    const [credential] = await db
+      .select()
+      .from(webauthnCredentials)
+      .where(eq(webauthnCredentials.credentialId, credentialId));
+    return credential;
+  }
+
+  async createWebAuthnCredential(credential: Omit<WebAuthnCredential, 'id' | 'createdAt'>): Promise<WebAuthnCredential> {
+    const [created] = await db.insert(webauthnCredentials).values(credential).returning();
+    return created;
+  }
+
+  async updateWebAuthnCounter(credentialId: string, counter: number): Promise<void> {
+    await db
+      .update(webauthnCredentials)
+      .set({ counter })
+      .where(eq(webauthnCredentials.credentialId, credentialId));
+  }
+
+  async deleteWebAuthnCredential(id: number, userId: string): Promise<boolean> {
+    await db
+      .delete(webauthnCredentials)
+      .where(and(eq(webauthnCredentials.id, id), eq(webauthnCredentials.userId, userId)));
     return true;
   }
 }
