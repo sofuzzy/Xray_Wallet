@@ -51,6 +51,12 @@ The server follows a modular pattern:
 - Private keys stored in browser localStorage (base58 encoded)
 - Public keys synced to server database for user lookups
 - Connects to Solana devnet for all operations
+- **Multi-Wallet Support**: Create and manage multiple wallets
+  - Wallet data stored in localStorage as JSON array
+  - Each wallet has id, name, mnemonic, publicKey, and createdAt
+  - WalletSwitcher component in header for quick switching
+  - Create, rename, and delete wallets (minimum 1 required)
+  - Legacy single-wallet storage auto-migrated to multi-wallet format
 - **Seed Phrase Backup/Restore**: BIP39 12-word mnemonic with BIP44 derivation (m/44'/501'/0'/0')
   - Uses `bip39` and `ed25519-hd-key` packages for mnemonic-to-keypair derivation
   - Backup: View/copy seed phrase from Settings modal

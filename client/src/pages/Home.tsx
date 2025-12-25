@@ -14,13 +14,25 @@ import { BuyModal } from "@/components/BuyModal";
 import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { StakingModal } from "@/components/StakingModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
+import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { LogIn, Loader2, Sparkles, LogOut, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
-  const { balance, address, requestAirdrop, isLoading: walletLoading } = useWallet();
+  const { 
+    balance, 
+    address, 
+    requestAirdrop, 
+    isLoading: walletLoading,
+    wallets,
+    activeWallet,
+    switchWallet,
+    addWallet,
+    removeWallet,
+    editWalletName
+  } = useWallet();
   const { mutate: updateUser } = useUpdateUser();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
@@ -35,7 +47,7 @@ export default function Home() {
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
 
   useEffect(() => {
-    if (dbUser && address && dbUser.walletPublicKey !== address) {
+    if (dbUser && address && dbUser.wallet?.publicKey !== address) {
       updateUser({ walletPublicKey: address });
     }
   }, [dbUser, address, updateUser]);
@@ -97,12 +109,22 @@ export default function Home() {
     <div className="min-h-screen bg-background pb-10 relative overflow-hidden">
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,_rgba(120,119,198,0.1),_rgba(255,255,255,0))]" />
 
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-display font-bold text-primary">Xray</h1>
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/5 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-display font-bold text-primary">Xray</h1>
+          <WalletSwitcher
+            wallets={wallets}
+            activeWallet={activeWallet}
+            onSwitch={switchWallet}
+            onAdd={addWallet}
+            onRemove={removeWallet}
+            onRename={editWalletName}
+          />
+        </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-white">{user?.firstName || "User"}</p>
-            <p className="text-xs text-muted-foreground">@{dbUser?.username || "loading..."}</p>
+            <p className="text-xs text-muted-foreground">@{user?.email?.split("@")[0] || "user"}</p>
           </div>
           {user?.profileImageUrl && (
             <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-white/10" />
@@ -128,7 +150,7 @@ export default function Home() {
           <WalletCard 
             balance={balance} 
             address={address} 
-            username={dbUser?.displayName || dbUser?.username} 
+            username={activeWallet?.name || "Wallet"} 
           />
         </div>
 

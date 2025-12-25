@@ -88,16 +88,18 @@ export function useWallet() {
   }, [activeWallet]);
 
   const switchWallet = useCallback(async (walletId: string) => {
-    const wallet = wallets.find(w => w.id === walletId);
+    const currentWallets = getStoredWallets();
+    const wallet = currentWallets.find(w => w.id === walletId);
     if (!wallet) return false;
     
     setActiveWalletId(walletId);
     setActiveWallet(wallet);
+    setWallets(currentWallets);
     const kp = await getKeypairForWallet(wallet);
     setKeypair(kp);
     queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
     return true;
-  }, [wallets, queryClient]);
+  }, [queryClient]);
 
   const addWallet = useCallback(async (name: string): Promise<StoredWallet> => {
     const newWallet = await createWallet(name);
