@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { tokenManager } from "@/lib/tokenManager";
 
 async function fetchUser(): Promise<User | null> {
   const response = await fetch("/api/auth/user", {
@@ -14,10 +15,17 @@ async function fetchUser(): Promise<User | null> {
     throw new Error(`${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const user = await response.json();
+  
+  if (user && !tokenManager.getAccessToken()) {
+    await tokenManager.requestTokens();
+  }
+  
+  return user;
 }
 
 async function logout(): Promise<void> {
+  await tokenManager.revokeTokens();
   window.location.href = "/api/logout";
 }
 

@@ -3,11 +3,25 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes, isAuthenticated as authMiddleware } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated as sessionAuth } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { 
+  extractClientInfo, 
+  hybridAuth, 
+  globalRateLimiter, 
+  strictRateLimiter,
+  authRateLimiter,
+  anomalyDetection 
+} from "./middleware/zeroTrust";
+import { 
+  generateTokenPair, 
+  refreshAccessToken, 
+  revokeToken, 
+  revokeAllUserTokens 
+} from "./services/tokenService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -17,6 +31,94 @@ export async function registerRoutes(
   // Initialize Replit Auth FIRST (before any routes)
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // Apply global zero-trust middleware
+  app.use(extractClientInfo);
+  app.use(globalRateLimiter);
+  app.use(anomalyDetection);
+
+  // Token management endpoints
+  app.post("/api/auth/token", authRateLimiter, sessionAuth, async (req, res) => {
+    try {
+      const sessionUser = req.user as any;
+      const userId = sessionUser.claims.sub;
+      
+      const user = await authStorage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "USER_NOT_FOUND", message: "User not found" });
+      }
+
+      const tokens = await generateTokenPair(
+        userId,
+        { email: user.email || undefined, firstName: user.firstName || undefined, lastName: user.lastName || undefined },
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      res.json({
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error) {
+      console.error("Token generation failed:", error);
+      res.status(500).json({ error: "TOKEN_GENERATION_FAILED", message: "Failed to generate tokens" });
+    }
+  });
+
+  app.post("/api/auth/refresh", authRateLimiter, async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      
+      if (!refreshToken) {
+        return res.status(400).json({ error: "MISSING_TOKEN", message: "Refresh token required" });
+      }
+
+      const tokens = await refreshAccessToken(
+        refreshToken,
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      if (!tokens) {
+        return res.status(401).json({ error: "INVALID_REFRESH_TOKEN", message: "Invalid or expired refresh token" });
+      }
+
+      res.json(tokens);
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      res.status(500).json({ error: "TOKEN_REFRESH_FAILED", message: "Failed to refresh tokens" });
+    }
+  });
+
+  app.post("/api/auth/revoke", hybridAuth, async (req, res) => {
+    try {
+      const { refreshToken, revokeAll } = req.body;
+      
+      if (revokeAll && req.tokenUser) {
+        await revokeAllUserTokens(req.tokenUser.sub);
+        return res.json({ success: true, message: "All tokens revoked" });
+      }
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: "MISSING_TOKEN", message: "Refresh token required" });
+      }
+
+      const success = await revokeToken(refreshToken);
+      if (!success) {
+        return res.status(400).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
+      }
+
+      res.json({ success: true, message: "Token revoked" });
+    } catch (error) {
+      console.error("Token revocation failed:", error);
+      res.status(500).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
+    }
+  });
   
   // Register Stripe routes for Apple Pay / card payments
   registerStripeRoutes(app);
@@ -24,8 +126,8 @@ export async function registerRoutes(
   // Register Object Storage routes for file uploads
   registerObjectStorageRoutes(app);
 
-  app.get(api.users.me.path, authMiddleware, async (req, res) => {
-    const userId = (req.user as any).claims.sub;
+  app.get(api.users.me.path, hybridAuth, async (req, res) => {
+    const userId = req.tokenUser!.sub;
     
     // Get user from auth database
     let user = await authStorage.getUser(userId);
@@ -37,9 +139,9 @@ export async function registerRoutes(
     res.json({ user, wallet: wallet || null });
   });
 
-  app.get(api.users.lookup.path, async (req, res) => {
+  app.get(api.users.lookup.path, hybridAuth, async (req, res) => {
     const { username } = req.params;
-    // Looking up by email/username
+    // Looking up by email/username - now requires authentication
     const user = await storage.getUserByUsername(username);
     if (!user) return res.status(404).json({ message: "User not found" });
     
@@ -50,8 +152,8 @@ export async function registerRoutes(
     });
   });
 
-  app.post(api.wallets.create.path, authMiddleware, async (req, res) => {
-    const userId = (req.user as any).claims.sub;
+  app.post(api.wallets.create.path, hybridAuth, strictRateLimiter, async (req, res) => {
+    const userId = req.tokenUser!.sub;
     // Check if already has wallet
     const existing = await storage.getWallet(userId);
     if (existing) return res.status(400).json({ message: "Wallet already exists" });
@@ -68,14 +170,14 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.transactions.list.path, authMiddleware, async (req, res) => {
-    const userId = (req.user as any).claims.sub;
+  app.get(api.transactions.list.path, hybridAuth, async (req, res) => {
+    const userId = req.tokenUser!.sub;
     const txs = await storage.getTransactions(userId);
     res.json(txs);
   });
 
-  app.post(api.transactions.create.path, authMiddleware, async (req, res) => {
-    const userId = (req.user as any).claims.sub;
+  app.post(api.transactions.create.path, hybridAuth, strictRateLimiter, async (req, res) => {
+    const userId = req.tokenUser!.sub;
 
     try {
       const input = api.transactions.create.input.parse(req.body);
@@ -92,7 +194,7 @@ export async function registerRoutes(
   });
 
   // Swap routes
-  app.get(api.swaps.tokens.path, authMiddleware, async (req, res) => {
+  app.get(api.swaps.tokens.path, hybridAuth, async (req, res) => {
     try {
       const tokens = await getAvailableTokens();
       res.json(tokens);
@@ -101,7 +203,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.swaps.quote.path, authMiddleware, async (req, res) => {
+  app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
       const { inputMint, outputMint, amount } = req.query;
       if (!inputMint || !outputMint || !amount) {
@@ -119,7 +221,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.swaps.execute.path, authMiddleware, async (req, res) => {
+  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const input = api.swaps.execute.input.parse(req.body);
       
@@ -143,9 +245,9 @@ export async function registerRoutes(
   });
 
   // Token Launchpad routes
-  app.post("/api/token-launches", authMiddleware, async (req, res) => {
+  app.post("/api/token-launches", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       
       const tokenLaunchInput = z.object({
         name: z.string().min(1).max(50),
@@ -180,9 +282,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/token-launches", authMiddleware, async (req, res) => {
+  app.get("/api/token-launches", hybridAuth, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       const launches = await storage.getTokenLaunches(userId);
       res.json(launches);
     } catch (error) {
@@ -191,9 +293,9 @@ export async function registerRoutes(
   });
 
   // Auto-trade rules routes
-  app.get("/api/auto-trade-rules", authMiddleware, async (req, res) => {
+  app.get("/api/auto-trade-rules", hybridAuth, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       const rules = await storage.getAutoTradeRules(userId);
       res.json(rules);
     } catch (error) {
@@ -201,9 +303,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auto-trade-rules", authMiddleware, async (req, res) => {
+  app.post("/api/auto-trade-rules", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       
       const ruleInput = z.object({
         tokenMint: z.string().min(32).max(64),
@@ -242,9 +344,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/auto-trade-rules/:id", authMiddleware, async (req, res) => {
+  app.patch("/api/auto-trade-rules/:id", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       const ruleId = parseInt(req.params.id);
       
       const updateInput = z.object({
@@ -279,9 +381,9 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/auto-trade-rules/:id", authMiddleware, async (req, res) => {
+  app.delete("/api/auto-trade-rules/:id", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const userId = req.tokenUser!.sub;
       const ruleId = parseInt(req.params.id);
       
       await storage.deleteAutoTradeRule(ruleId, userId);

@@ -50,6 +50,17 @@ export const autoTradeRules = pgTable("auto_trade_rules", {
   triggeredAt: timestamp("triggered_at"),
 });
 
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  deviceInfo: text("device_info"),
+  ipAddress: text("ip_address"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });

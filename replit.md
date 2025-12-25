@@ -79,10 +79,21 @@ The server follows a modular pattern:
 - **stripe-replit-sync**: Stripe webhook and schema management
 - Credentials fetched from Replit Connectors API
 
-### Authentication
+### Authentication & Security
 - **Replit Auth**: OpenID Connect authentication
 - **Passport.js**: Authentication middleware
-- **express-session**: Session management
+- **express-session**: Session management (backward compatibility)
+- **Zero-Trust Architecture**: JWT-based authentication with:
+  - Short-lived access tokens (15 min expiry)
+  - Refresh token rotation (7-day expiry, single-use)
+  - Per-request token validation
+  - Hybrid auth supporting both sessions and tokens
+  - Rate limiting (global/strict/auth tiers)
+  - Basic anomaly detection for suspicious patterns
+- **Key Files**:
+  - `server/services/tokenService.ts` - JWT token generation/validation
+  - `server/middleware/zeroTrust.ts` - Auth middleware, rate limiting, anomaly detection
+  - `client/src/lib/tokenManager.ts` - Frontend token management with auto-refresh
 
 ### UI Components
 - **shadcn/ui**: Full component library (Radix UI primitives)
