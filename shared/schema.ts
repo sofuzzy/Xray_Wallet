@@ -9,6 +9,8 @@ export const wallets = pgTable("wallets", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   publicKey: text("public_key").notNull(),
+  name: text("name").notNull().default("Main Wallet"),
+  isActive: boolean("is_active").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

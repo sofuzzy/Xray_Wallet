@@ -20,7 +20,128 @@ export const connection = new Connection(SOLANA_RPC_URL, "confirmed");
 // Constants
 export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
 export const LOCAL_STORAGE_MNEMONIC_KEY = "solana_wallet_mnemonic";
+export const LOCAL_STORAGE_WALLETS_KEY = "solana_wallets";
+export const LOCAL_STORAGE_ACTIVE_WALLET_KEY = "solana_active_wallet";
 export { LAMPORTS_PER_SOL } from "@solana/web3.js";
+
+// Wallet interface for multi-wallet support
+export interface StoredWallet {
+  id: string;
+  name: string;
+  mnemonic: string;
+  publicKey: string;
+  createdAt: number;
+}
+
+export const getStoredWallets = (): StoredWallet[] => {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_WALLETS_KEY);
+    if (!stored) return [];
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+};
+
+export const saveWallets = (wallets: StoredWallet[]): void => {
+  localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(wallets));
+};
+
+export const getActiveWalletId = (): string | null => {
+  return localStorage.getItem(LOCAL_STORAGE_ACTIVE_WALLET_KEY);
+};
+
+export const setActiveWalletId = (id: string): void => {
+  localStorage.setItem(LOCAL_STORAGE_ACTIVE_WALLET_KEY, id);
+};
+
+export const createWallet = async (name: string): Promise<StoredWallet> => {
+  const mnemonic = generateMnemonic();
+  const keypair = await keypairFromMnemonic(mnemonic);
+  const wallet: StoredWallet = {
+    id: crypto.randomUUID(),
+    name,
+    mnemonic,
+    publicKey: keypair.publicKey.toString(),
+    createdAt: Date.now(),
+  };
+  const wallets = getStoredWallets();
+  wallets.push(wallet);
+  saveWallets(wallets);
+  return wallet;
+};
+
+export const importWalletWithName = async (mnemonic: string, name: string): Promise<StoredWallet | null> => {
+  if (!validateMnemonic(mnemonic)) return null;
+  const normalizedMnemonic = mnemonic.trim().toLowerCase();
+  const keypair = await keypairFromMnemonic(normalizedMnemonic);
+  const wallet: StoredWallet = {
+    id: crypto.randomUUID(),
+    name,
+    mnemonic: normalizedMnemonic,
+    publicKey: keypair.publicKey.toString(),
+    createdAt: Date.now(),
+  };
+  const wallets = getStoredWallets();
+  wallets.push(wallet);
+  saveWallets(wallets);
+  return wallet;
+};
+
+export const deleteWallet = (id: string): boolean => {
+  const wallets = getStoredWallets();
+  const filtered = wallets.filter(w => w.id !== id);
+  if (filtered.length === wallets.length) return false;
+  saveWallets(filtered);
+  if (getActiveWalletId() === id && filtered.length > 0) {
+    setActiveWalletId(filtered[0].id);
+  }
+  return true;
+};
+
+export const renameWallet = (id: string, newName: string): boolean => {
+  const wallets = getStoredWallets();
+  const wallet = wallets.find(w => w.id === id);
+  if (!wallet) return false;
+  wallet.name = newName;
+  saveWallets(wallets);
+  return true;
+};
+
+export const getActiveWallet = (): StoredWallet | null => {
+  const wallets = getStoredWallets();
+  if (wallets.length === 0) return null;
+  const activeId = getActiveWalletId();
+  if (activeId) {
+    const active = wallets.find(w => w.id === activeId);
+    if (active) return active;
+  }
+  return wallets[0];
+};
+
+export const getKeypairForWallet = async (wallet: StoredWallet): Promise<Keypair> => {
+  return keypairFromMnemonic(wallet.mnemonic);
+};
+
+// Migrate from legacy single wallet to multi-wallet system
+export const migrateLegacyWallet = async (): Promise<void> => {
+  const wallets = getStoredWallets();
+  if (wallets.length > 0) return; // Already migrated
+  
+  const legacyMnemonic = localStorage.getItem(LOCAL_STORAGE_MNEMONIC_KEY);
+  if (legacyMnemonic && validateMnemonic(legacyMnemonic)) {
+    const keypair = await keypairFromMnemonic(legacyMnemonic);
+    const wallet: StoredWallet = {
+      id: crypto.randomUUID(),
+      name: "Main Wallet",
+      mnemonic: legacyMnemonic,
+      publicKey: keypair.publicKey.toString(),
+      createdAt: Date.now(),
+    };
+    saveWallets([wallet]);
+    setActiveWalletId(wallet.id);
+  }
+};
 
 export const generateMnemonic = (): string => {
   return bip39.generateMnemonic(128); // 12 words

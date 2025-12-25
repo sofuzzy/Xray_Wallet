@@ -2,29 +2,52 @@ import { useState, useEffect, useCallback } from "react";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { 
   connection, 
-  getLocalKeypair, 
-  createNewKeypair, 
-  getStoredMnemonic,
-  importFromMnemonic,
-  clearWallet
+  getStoredWallets,
+  getActiveWallet,
+  setActiveWalletId,
+  getKeypairForWallet,
+  createWallet,
+  deleteWallet as deleteStoredWallet,
+  renameWallet as renameStoredWallet,
+  importWalletWithName,
+  migrateLegacyWallet,
+  type StoredWallet,
 } from "@/lib/solana";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useWallet() {
   const [keypair, setKeypair] = useState<Keypair | null>(null);
+  const [activeWallet, setActiveWallet] = useState<StoredWallet | null>(null);
+  const [wallets, setWallets] = useState<StoredWallet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
 
-  // Initialize wallet on mount
+  const refreshWallets = useCallback(() => {
+    setWallets(getStoredWallets());
+  }, []);
+
   useEffect(() => {
     const initWallet = async () => {
       setIsLoading(true);
       try {
-        let kp = await getLocalKeypair();
-        if (!kp) {
-          kp = await createNewKeypair();
+        await migrateLegacyWallet();
+        
+        let storedWallets = getStoredWallets();
+        
+        if (storedWallets.length === 0) {
+          const newWallet = await createWallet("Main Wallet");
+          setActiveWalletId(newWallet.id);
+          storedWallets = [newWallet];
         }
-        setKeypair(kp);
+        
+        setWallets(storedWallets);
+        
+        const active = getActiveWallet();
+        if (active) {
+          setActiveWallet(active);
+          const kp = await getKeypairForWallet(active);
+          setKeypair(kp);
+        }
       } catch (e) {
         console.error("Failed to initialize wallet:", e);
       } finally {
@@ -34,7 +57,6 @@ export function useWallet() {
     initWallet();
   }, []);
 
-  // Poll for balance
   const { data: balance, refetch: refreshBalance } = useQuery({
     queryKey: ["wallet-balance", keypair?.publicKey.toString()],
     queryFn: async () => {
@@ -43,10 +65,9 @@ export function useWallet() {
       return bal / LAMPORTS_PER_SOL;
     },
     enabled: !!keypair,
-    refetchInterval: 10000, // Poll every 10s
+    refetchInterval: 10000,
   });
 
-  // Airdrop function for devnet
   const requestAirdrop = useCallback(async () => {
     if (!keypair) return;
     try {
@@ -62,29 +83,71 @@ export function useWallet() {
     }
   }, [keypair, refreshBalance]);
 
-  // Get current seed phrase
   const getSeedPhrase = useCallback((): string | null => {
-    return getStoredMnemonic();
-  }, []);
+    return activeWallet?.mnemonic || null;
+  }, [activeWallet]);
 
-  // Import wallet from seed phrase
-  const importWallet = useCallback(async (mnemonic: string): Promise<boolean> => {
-    const newKeypair = await importFromMnemonic(mnemonic);
-    if (newKeypair) {
-      setKeypair(newKeypair);
-      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+  const switchWallet = useCallback(async (walletId: string) => {
+    const wallet = wallets.find(w => w.id === walletId);
+    if (!wallet) return false;
+    
+    setActiveWalletId(walletId);
+    setActiveWallet(wallet);
+    const kp = await getKeypairForWallet(wallet);
+    setKeypair(kp);
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+    return true;
+  }, [wallets, queryClient]);
+
+  const addWallet = useCallback(async (name: string): Promise<StoredWallet> => {
+    const newWallet = await createWallet(name);
+    refreshWallets();
+    await switchWallet(newWallet.id);
+    return newWallet;
+  }, [refreshWallets, switchWallet]);
+
+  const importWallet = useCallback(async (mnemonic: string, name?: string): Promise<boolean> => {
+    const walletName = name || `Wallet ${wallets.length + 1}`;
+    const newWallet = await importWalletWithName(mnemonic, walletName);
+    if (newWallet) {
+      refreshWallets();
+      await switchWallet(newWallet.id);
       return true;
     }
     return false;
-  }, [queryClient]);
+  }, [wallets.length, refreshWallets, switchWallet]);
 
-  // Reset wallet (create new one)
+  const removeWallet = useCallback(async (walletId: string): Promise<boolean> => {
+    if (wallets.length <= 1) return false;
+    
+    const success = deleteStoredWallet(walletId);
+    if (success) {
+      const updatedWallets = getStoredWallets();
+      setWallets(updatedWallets);
+      
+      if (activeWallet?.id === walletId && updatedWallets.length > 0) {
+        await switchWallet(updatedWallets[0].id);
+      }
+    }
+    return success;
+  }, [wallets.length, activeWallet, switchWallet]);
+
+  const editWalletName = useCallback((walletId: string, newName: string): boolean => {
+    const success = renameStoredWallet(walletId, newName);
+    if (success) {
+      refreshWallets();
+      if (activeWallet?.id === walletId) {
+        setActiveWallet(prev => prev ? { ...prev, name: newName } : null);
+      }
+    }
+    return success;
+  }, [refreshWallets, activeWallet]);
+
   const resetWallet = useCallback(async () => {
-    clearWallet();
-    const newKeypair = await createNewKeypair();
-    setKeypair(newKeypair);
-    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
-  }, [queryClient]);
+    const newWallet = await createWallet("New Wallet");
+    refreshWallets();
+    await switchWallet(newWallet.id);
+  }, [refreshWallets, switchWallet]);
 
   return {
     keypair,
@@ -97,5 +160,11 @@ export function useWallet() {
     getSeedPhrase,
     importWallet,
     resetWallet,
+    wallets,
+    activeWallet,
+    switchWallet,
+    addWallet,
+    removeWallet,
+    editWalletName,
   };
 }
