@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { connection, getLocalKeypair, createNewKeypair } from "@/lib/solana";
-import { useQuery } from "@tanstack/react-query";
+import { 
+  connection, 
+  getLocalKeypair, 
+  createNewKeypair, 
+  getStoredMnemonic,
+  importFromMnemonic,
+  clearWallet
+} from "@/lib/solana";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useWallet() {
   const [keypair, setKeypair] = useState<Keypair | null>(null);
+  const queryClient = useQueryClient();
 
   // Initialize wallet on mount
   useEffect(() => {
@@ -43,6 +51,30 @@ export function useWallet() {
     }
   }, [keypair, refreshBalance]);
 
+  // Get current seed phrase
+  const getSeedPhrase = useCallback((): string | null => {
+    return getStoredMnemonic();
+  }, []);
+
+  // Import wallet from seed phrase
+  const importWallet = useCallback((mnemonic: string): boolean => {
+    const newKeypair = importFromMnemonic(mnemonic);
+    if (newKeypair) {
+      setKeypair(newKeypair);
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+      return true;
+    }
+    return false;
+  }, [queryClient]);
+
+  // Reset wallet (create new one)
+  const resetWallet = useCallback(() => {
+    clearWallet();
+    const newKeypair = createNewKeypair();
+    setKeypair(newKeypair);
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+  }, [queryClient]);
+
   return {
     keypair,
     publicKey: keypair?.publicKey,
@@ -50,5 +82,8 @@ export function useWallet() {
     balance: balance || 0,
     refreshBalance,
     requestAirdrop,
+    getSeedPhrase,
+    importWallet,
+    resetWallet,
   };
 }

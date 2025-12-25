@@ -13,7 +13,8 @@ import { SwapModal } from "@/components/SwapModal";
 import { BuyModal } from "@/components/BuyModal";
 import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { StakingModal } from "@/components/StakingModal";
-import { LogIn, Loader2, Sparkles, LogOut } from "lucide-react";
+import { SeedPhraseModal } from "@/components/SeedPhraseModal";
+import { LogIn, Loader2, Sparkles, LogOut, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,6 +32,7 @@ export default function Home() {
   const [isBuyOpen, setIsBuyOpen] = useState(false);
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
   const [isStakeOpen, setIsStakeOpen] = useState(false);
+  const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
 
   useEffect(() => {
     if (dbUser && address && dbUser.walletPublicKey !== address) {
@@ -106,8 +108,15 @@ export default function Home() {
             <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-white/10" />
           )}
           <button 
+            onClick={() => setIsSeedPhraseOpen(true)}
+            className="p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+            data-testid="button-settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          <button 
             onClick={() => logout()}
-            className="ml-2 p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+            className="p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -151,6 +160,7 @@ export default function Home() {
         {isBuyOpen && <BuyModal isOpen={isBuyOpen} onClose={() => setIsBuyOpen(false)} />}
         {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
         {isStakeOpen && <StakingModal isOpen={isStakeOpen} onClose={() => setIsStakeOpen(false)} />}
+        {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
       </AnimatePresence>
     </div>
   );

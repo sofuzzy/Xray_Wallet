@@ -10,6 +10,8 @@ import {
   Lockup
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import * as bip39 from "bip39";
+import { derivePath } from "ed25519-hd-key";
 
 // Use Devnet for this demo
 export const SOLANA_NETWORK = "devnet";
@@ -18,10 +20,38 @@ export const connection = new Connection(SOLANA_RPC_URL, "confirmed");
 
 // Constants
 export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
+export const LOCAL_STORAGE_MNEMONIC_KEY = "solana_wallet_mnemonic";
 export { LAMPORTS_PER_SOL } from "@solana/web3.js";
+
+// Solana derivation path (BIP44)
+const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
+
+export const generateMnemonic = (): string => {
+  return bip39.generateMnemonic(128); // 12 words
+};
+
+export const validateMnemonic = (mnemonic: string): boolean => {
+  return bip39.validateMnemonic(mnemonic.trim().toLowerCase());
+};
+
+export const keypairFromMnemonic = (mnemonic: string): Keypair => {
+  const seed = bip39.mnemonicToSeedSync(mnemonic.trim().toLowerCase());
+  const derivedSeed = derivePath(SOLANA_DERIVATION_PATH, seed.toString("hex")).key;
+  return Keypair.fromSeed(derivedSeed);
+};
+
+export const getStoredMnemonic = (): string | null => {
+  return localStorage.getItem(LOCAL_STORAGE_MNEMONIC_KEY);
+};
 
 export const getLocalKeypair = (): Keypair | null => {
   try {
+    // First try to get from mnemonic
+    const mnemonic = getStoredMnemonic();
+    if (mnemonic && validateMnemonic(mnemonic)) {
+      return keypairFromMnemonic(mnemonic);
+    }
+    // Fallback to legacy secret key storage
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!stored) return null;
     const secretKey = bs58.decode(stored);
@@ -33,9 +63,26 @@ export const getLocalKeypair = (): Keypair | null => {
 };
 
 export const createNewKeypair = (): Keypair => {
-  const keypair = Keypair.generate();
+  const mnemonic = generateMnemonic();
+  const keypair = keypairFromMnemonic(mnemonic);
+  localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic);
   localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
   return keypair;
+};
+
+export const importFromMnemonic = (mnemonic: string): Keypair | null => {
+  if (!validateMnemonic(mnemonic)) {
+    return null;
+  }
+  const keypair = keypairFromMnemonic(mnemonic);
+  localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic.trim().toLowerCase());
+  localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
+  return keypair;
+};
+
+export const clearWallet = (): void => {
+  localStorage.removeItem(LOCAL_STORAGE_KEY);
+  localStorage.removeItem(LOCAL_STORAGE_MNEMONIC_KEY);
 };
 
 export const shortenAddress = (address: string, chars = 4) => {
