@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Copy } from "lucide-react";
+import { Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { shortenAddress } from "@/lib/solana";
+import { shortenAddress, getTokenAccounts } from "@/lib/solana";
+import { useQuery } from "@tanstack/react-query";
 
 interface WalletCardProps {
   balance: number;
@@ -9,8 +10,58 @@ interface WalletCardProps {
   username?: string | null;
 }
 
+interface TokenWithPrice {
+  mint: string;
+  symbol: string;
+  priceUsd?: number;
+}
+
 export function WalletCard({ balance, address, username }: WalletCardProps) {
   const { toast } = useToast();
+
+  // Fetch SOL price
+  const { data: solPrice } = useQuery<number>({
+    queryKey: ["sol-price"],
+    queryFn: async () => {
+      try {
+        const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+        const data = await response.json();
+        return data.solana?.usd || 0;
+      } catch {
+        return 0;
+      }
+    },
+    staleTime: 60000,
+    refetchInterval: 60000,
+  });
+
+  // Fetch wallet token accounts
+  const { data: walletTokens = [] } = useQuery({
+    queryKey: ["wallet-tokens", address],
+    queryFn: () => address ? getTokenAccounts(address) : Promise.resolve([]),
+    enabled: !!address,
+    staleTime: 30000,
+  });
+
+  // Fetch token prices from our backend
+  const { data: tokenPrices = [] } = useQuery<TokenWithPrice[]>({
+    queryKey: ["/api/swaps/tokens"],
+    staleTime: 30000,
+  });
+
+  // Calculate total USD balance
+  const solUsdValue = balance * (solPrice || 0);
+  
+  const tokensUsdValue = walletTokens.reduce((total, wt: { mint: string; balance: number }) => {
+    const tokenInfo = tokenPrices.find((t: TokenWithPrice) => t.mint === wt.mint);
+    if (tokenInfo?.priceUsd && wt.balance) {
+      return total + (wt.balance * tokenInfo.priceUsd);
+    }
+    return total;
+  }, 0);
+
+  const totalUsdBalance = solUsdValue + tokensUsdValue;
+  const isLoadingPrice = solPrice === undefined;
 
   const handleCopy = () => {
     if (address) {
@@ -52,10 +103,22 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
 
         <div className="space-y-1">
           <p className="text-sm text-white/60 font-medium tracking-wide uppercase">Total Balance</p>
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight font-display">
-            {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-            <span className="text-lg md:text-xl text-white/50 ml-2 font-normal">SOL</span>
-          </h2>
+          {isLoadingPrice ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+              <span className="text-white/50">Loading...</span>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight font-display" data-testid="text-total-usd-balance">
+                ${totalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h2>
+              <p className="text-sm text-white/50 mt-1" data-testid="text-sol-balance">
+                {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
+                {tokensUsdValue > 0 && ` + $${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} in tokens`}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="flex justify-between items-end">
