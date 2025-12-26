@@ -19,6 +19,7 @@ interface Token {
   name: string;
   symbol: string;
   decimals: number;
+  logoURI?: string;
 }
 
 export function SwapModal({ isOpen, onClose }: SwapModalProps) {
@@ -188,18 +189,29 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  filteredTokens.map((token) => (
+                  filteredTokens.slice(0, 50).map((token) => (
                     <button
                       key={token.mint}
                       className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted/70 transition-colors text-left"
                       onClick={() => handleSelectToken(token)}
                       data-testid={`token-option-${token.symbol}`}
                     >
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                      {token.logoURI ? (
+                        <img 
+                          src={token.logoURI} 
+                          alt={token.symbol}
+                          className="w-8 h-8 rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold ${token.logoURI ? 'hidden' : ''}`}>
                         {token.symbol.slice(0, 2)}
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{token.name}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{token.name}</div>
                         <div className="text-sm text-muted-foreground">{token.symbol}</div>
                       </div>
                     </button>

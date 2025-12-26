@@ -52,27 +52,76 @@ export async function getSwapQuote(
   }
 }
 
+let cachedTokens: Array<{ mint: string; name: string; symbol: string; decimals: number; logoURI?: string }> | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export async function getAvailableTokens(): Promise<
-  Array<{ mint: string; name: string; symbol: string; decimals: number }>
+  Array<{ mint: string; name: string; symbol: string; decimals: number; logoURI?: string }>
 > {
-  return [
-    {
-      mint: "EPjFWaLb3odcccccccccccccccccccccccccccccccc",
-      name: "USD Coin",
-      symbol: "USDC",
-      decimals: 6,
-    },
-    {
-      mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenErt",
-      name: "Tether USD",
-      symbol: "USDT",
-      decimals: 6,
-    },
-    {
-      mint: "mSoLzYCxHdgqP47TZGU2rPfV7jAmWjthzbiXc3czJ8m",
-      name: "Marinade staked SOL",
-      symbol: "mSOL",
-      decimals: 9,
-    },
-  ];
+  const now = Date.now();
+  
+  // Return cached tokens if still valid
+  if (cachedTokens && (now - cacheTimestamp) < CACHE_DURATION) {
+    return cachedTokens;
+  }
+  
+  try {
+    // Fetch from Jupiter's verified token list (includes meme coins)
+    const response = await fetch("https://token.jup.ag/strict");
+    if (!response.ok) {
+      throw new Error(`Jupiter API error: ${response.status}`);
+    }
+    
+    const tokens = await response.json();
+    
+    // Map to our format and cache
+    const mappedTokens = tokens.map((token: any) => ({
+      mint: token.address,
+      name: token.name,
+      symbol: token.symbol,
+      decimals: token.decimals,
+      logoURI: token.logoURI,
+    }));
+    cachedTokens = mappedTokens;
+    cacheTimestamp = now;
+    
+    return mappedTokens;
+  } catch (error) {
+    console.error("Failed to fetch tokens from Jupiter:", error);
+    
+    // Return fallback tokens if API fails
+    return [
+      {
+        mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        name: "USD Coin",
+        symbol: "USDC",
+        decimals: 6,
+      },
+      {
+        mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenErt",
+        name: "Tether USD",
+        symbol: "USDT",
+        decimals: 6,
+      },
+      {
+        mint: "mSoLzYCxHdYgqP47TZGU2rPfV7jAmWjthzbiXc3czJ8m",
+        name: "Marinade staked SOL",
+        symbol: "mSOL",
+        decimals: 9,
+      },
+      {
+        mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        name: "Bonk",
+        symbol: "BONK",
+        decimals: 5,
+      },
+      {
+        mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        name: "Jupiter",
+        symbol: "JUP",
+        decimals: 6,
+      },
+    ];
+  }
 }
