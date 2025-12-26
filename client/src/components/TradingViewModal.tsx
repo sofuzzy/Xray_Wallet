@@ -60,16 +60,25 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  const { data: priceHistory = [], isLoading: chartLoading } = useQuery<{ timestamp: number; price: number }[]>({
+  interface PriceHistoryResponse {
+    mint: string;
+    currentPrice: number;
+    priceChange24h: number;
+    history: { timestamp: number; price: number }[];
+  }
+
+  const { data: priceHistoryData, isLoading: chartLoading } = useQuery<PriceHistoryResponse | null>({
     queryKey: ["/api/price-history", token.mint],
     queryFn: async () => {
-      const response = await fetch(`/api/price-history/${token.mint}?timeframe=1h`, { credentials: "include" });
-      if (!response.ok) return [];
+      const response = await fetch(`/api/price-history/${token.mint}?timeframe=24h`, { credentials: "include" });
+      if (!response.ok) return null;
       return response.json();
     },
     enabled: isOpen && token.mint !== "SOL" && token.mint !== "So11111111111111111111111111111111111111112",
     staleTime: 60000,
   });
+
+  const priceHistory = priceHistoryData?.history || [];
 
   const { data: tokenDetails } = useQuery<Token>({
     queryKey: ["/api/swaps/tokens", token.mint],
