@@ -1,8 +1,8 @@
 import { Connection, PublicKey, Transaction, VersionedTransaction, ComputeBudgetProgram } from "@solana/web3.js";
 
-const JUPITER_API_BASE = "https://quote-api.jup.ag/v6";
+const JUPITER_API_BASE = "https://lite-api.jup.ag/swap/v1";
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-const JUPITER_TOKEN_LIST = "https://token.jup.ag/strict";
+const JUPITER_TOKEN_LIST = "https://lite-api.jup.ag/tokens/v1/strict";
 
 const RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.devnet.solana.com";
 
