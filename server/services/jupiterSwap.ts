@@ -4,7 +4,34 @@ const JUPITER_API_BASE = "https://lite-api.jup.ag/swap/v1";
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 const JUPITER_TOKEN_LIST = "https://lite-api.jup.ag/tokens/v1/strict";
 
-const RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.devnet.solana.com";
+const RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
+
+// Cache for token decimals fetched from chain
+const decimalsCache: Map<string, number> = new Map();
+
+// Fetch token decimals directly from Solana blockchain
+async function getTokenDecimals(mint: string): Promise<number> {
+  // Check cache first
+  if (decimalsCache.has(mint)) {
+    return decimalsCache.get(mint)!;
+  }
+  
+  try {
+    const connection = new Connection(RPC_URL, "confirmed");
+    const mintPubkey = new PublicKey(mint);
+    const mintInfo = await connection.getParsedAccountInfo(mintPubkey);
+    
+    if (mintInfo.value && 'parsed' in mintInfo.value.data) {
+      const decimals = mintInfo.value.data.parsed.info.decimals;
+      decimalsCache.set(mint, decimals);
+      return decimals;
+    }
+  } catch (error) {
+    console.error(`Failed to fetch decimals for ${mint}:`, error);
+  }
+  
+  return 9; // Default fallback
+}
 
 export interface Token {
   mint: string;
@@ -178,9 +205,15 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
   const cached = tokenCache.tokens.find(t => t.mint === mint);
   
   try {
+    // Fetch decimals from blockchain (most reliable source)
+    const decimals = await getTokenDecimals(mint);
+    
     const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
     if (!response.ok) {
-      return cached || null;
+      if (cached) {
+        return { ...cached, decimals };
+      }
+      return null;
     }
     const data = await response.json();
     
@@ -191,7 +224,7 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
         mint: baseToken.address,
         name: baseToken.name || "Unknown Token",
         symbol: baseToken.symbol || mint.slice(0, 6),
-        decimals: 9,
+        decimals, // Use actual decimals from chain
         logoURI: pair.info?.imageUrl,
         volume24h: pair.volume?.h24,
         liquidity: pair.liquidity?.usd,
@@ -202,18 +235,21 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
     }
     
     if (cached) {
-      return cached;
+      return { ...cached, decimals };
     }
     
     return {
       mint,
       name: `Token ${mint.slice(0, 6)}...`,
       symbol: mint.slice(0, 6).toUpperCase(),
-      decimals: 9,
+      decimals,
     };
   } catch (error) {
     console.error("Failed to fetch token by mint:", error);
-    return cached || null;
+    if (cached) {
+      return cached;
+    }
+    return null;
   }
 }
 
