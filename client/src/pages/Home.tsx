@@ -15,10 +15,24 @@ import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { StakingModal } from "@/components/StakingModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
 import { WalletSwitcher } from "@/components/WalletSwitcher";
+import { TokenSearch } from "@/components/TokenSearch";
+import { TradingViewModal } from "@/components/TradingViewModal";
 import { LogIn, Loader2, Sparkles, LogOut, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+
+interface Token {
+  mint: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  logoURI?: string;
+  priceUsd?: number;
+  marketCap?: number;
+  priceChange24h?: number;
+  volume24h?: number;
+}
 
 export default function Home() {
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
@@ -46,6 +60,7 @@ export default function Home() {
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
   const [isStakeOpen, setIsStakeOpen] = useState(false);
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
 
   useEffect(() => {
     if (dbUser && address && dbUser.wallet?.publicKey !== address) {
@@ -153,6 +168,10 @@ export default function Home() {
 
       <main className="max-w-2xl mx-auto pt-8 space-y-8 relative z-10">
         <div className="px-6">
+          <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
+        </div>
+
+        <div className="px-6">
           <WalletCard 
             balance={balance} 
             address={address} 
@@ -184,11 +203,19 @@ export default function Home() {
       <AnimatePresence>
         {isSendOpen && <SendModal isOpen={isSendOpen} onClose={() => setIsSendOpen(false)} />}
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
-        {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => setIsSwapOpen(false)} />}
+        {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => { setIsSwapOpen(false); setSelectedToken(null); }} initialOutputToken={selectedToken || undefined} />}
         {isBuyOpen && <BuyModal isOpen={isBuyOpen} onClose={() => setIsBuyOpen(false)} />}
         {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
         {isStakeOpen && <StakingModal isOpen={isStakeOpen} onClose={() => setIsStakeOpen(false)} />}
         {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
+        {selectedToken && !isSwapOpen && (
+          <TradingViewModal 
+            isOpen={!!selectedToken && !isSwapOpen} 
+            onClose={() => setSelectedToken(null)} 
+            token={selectedToken}
+            onTrade={() => setIsSwapOpen(true)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

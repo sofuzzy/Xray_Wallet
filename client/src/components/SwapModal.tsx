@@ -112,6 +112,7 @@ function TransactionProgress({ step, errorMessage }: { step: TransactionStep; er
 interface SwapModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialOutputToken?: Token;
 }
 
 interface Token {
@@ -160,19 +161,29 @@ function formatVolume(volume?: number): string {
   return `$${volume.toFixed(0)}`;
 }
 
-export function SwapModal({ isOpen, onClose }: SwapModalProps) {
+export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProps) {
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const [inputAmount, setInputAmount] = useState("");
   const [inputMint, setInputMint] = useState("SOL");
-  const [outputMint, setOutputMint] = useState("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const [outputMint, setOutputMint] = useState(initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
   const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">("medium");
   const [customPriorityFee, setCustomPriorityFee] = useState("");
-  const [customTokens, setCustomTokens] = useState<Token[]>([]);
+  const [customTokens, setCustomTokens] = useState<Token[]>(initialOutputToken ? [initialOutputToken] : []);
   const [txStep, setTxStep] = useState<TransactionStep>("idle");
   const [txError, setTxError] = useState<string>("");
+
+  useEffect(() => {
+    if (initialOutputToken && isOpen) {
+      setOutputMint(initialOutputToken.mint);
+      setCustomTokens(prev => {
+        if (prev.some(t => t.mint === initialOutputToken.mint)) return prev;
+        return [...prev, initialOutputToken];
+      });
+    }
+  }, [initialOutputToken, isOpen]);
 
   const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000, custom: 0 };
   
