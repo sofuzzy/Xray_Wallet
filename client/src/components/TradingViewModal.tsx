@@ -68,7 +68,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
   }
 
   const { data: priceHistoryData, isLoading: chartLoading } = useQuery<PriceHistoryResponse | null>({
-    queryKey: ["/api/price-history", token.mint],
+    queryKey: ["token-price-history", token.mint],
     queryFn: async () => {
       const response = await fetch(`/api/price-history/${token.mint}?timeframe=24h`, { credentials: "include" });
       if (!response.ok) return null;
@@ -81,18 +81,17 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
   const priceHistory = priceHistoryData?.history || [];
 
   const { data: tokenDetails } = useQuery<Token>({
-    queryKey: ["/api/swaps/tokens", token.mint],
+    queryKey: ["token-details", token.mint],
     queryFn: async () => {
       const response = await fetch(`/api/swaps/tokens/${token.mint}`, { credentials: "include" });
       if (!response.ok) return token;
       return response.json();
     },
     enabled: isOpen && token.mint !== "SOL" && token.mint !== "So11111111111111111111111111111111111111112",
-    initialData: token,
     staleTime: 30000,
   });
 
-  const currentToken = tokenDetails || token;
+  const currentToken = tokenDetails ?? token;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(token.mint);
