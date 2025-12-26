@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -54,6 +54,7 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [customTokens, setCustomTokens] = useState<Token[]>([]);
+  const autoLookupRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   const { data: trendingTokens = [], isLoading: trendingLoading } = useQuery<Token[]>({
@@ -104,6 +105,14 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
       toast({ title: "Token Not Found", description: "Could not find token information", variant: "destructive" });
     },
   });
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (isValidSolanaAddress(query) && query !== autoLookupRef.current && !isLookingUp) {
+      autoLookupRef.current = query;
+      lookupMint(query);
+    }
+  }, [searchQuery, isLookingUp]);
 
   const handleAddCustomToken = () => {
     const mintAddress = searchQuery.trim();
