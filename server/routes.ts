@@ -39,6 +39,7 @@ import {
   getCredentialsForUser,
   deleteCredential
 } from "./services/webauthnService";
+import { getOnChainTransactions } from "./services/solanaTransactions";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -324,8 +325,35 @@ export async function registerRoutes(
 
   app.get(api.transactions.list.path, hybridAuth, async (req, res) => {
     const userId = req.tokenUser!.sub;
-    const txs = await storage.getTransactions(userId);
-    res.json(txs);
+    const { address } = req.query;
+    
+    // Get database transactions
+    const dbTxs = await storage.getTransactions(userId);
+    
+    // If wallet address provided, also fetch on-chain transactions
+    if (address && typeof address === "string") {
+      try {
+        const onChainTxs = await getOnChainTransactions(address, 15);
+        
+        // Filter out on-chain transactions that already exist in database (by signature)
+        const dbSignatures = new Set(dbTxs.map(tx => tx.signature));
+        const newOnChainTxs = onChainTxs.filter(tx => !dbSignatures.has(tx.signature));
+        
+        // Merge and sort by timestamp (newest first)
+        const allTxs = [...dbTxs, ...newOnChainTxs].sort((a, b) => {
+          const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return timeB - timeA;
+        });
+        
+        return res.json(allTxs);
+      } catch (error) {
+        console.error("Error fetching on-chain transactions:", error);
+        // Fall back to just database transactions
+      }
+    }
+    
+    res.json(dbTxs);
   });
 
   app.post(api.transactions.create.path, hybridAuth, strictRateLimiter, async (req, res) => {
