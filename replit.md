@@ -71,6 +71,22 @@ The server follows a modular pattern:
 - Stake lifecycle: create → delegate → deactivate → withdraw
 - Activation/deactivation takes 2-3 epochs (~4-6 days on devnet)
 
+### Token Swap Implementation (Jupiter)
+- **Jupiter API Integration**: Server-side quote and swap transaction generation
+- **Token Discovery**: DexScreener trending tokens + fallback verified token list
+- **Swap Flow**:
+  1. Client fetches quote via `/api/swaps/quote`
+  2. Client requests transaction via `/api/swaps/transaction`
+  3. Client signs transaction locally with keypair
+  4. Client sends signed tx via `/api/swaps/send` for broadcast
+- **Priority Fee Tiers**: Low (5k), Medium (25k), High (100k) lamports
+- **Paste-to-Add**: Paste any token mint address to discover and swap
+- **Key Files**:
+  - `server/services/jupiterSwap.ts` - Jupiter API client, token caching, swap execution
+  - `client/src/components/SwapModal.tsx` - Swap UI with token selection and trending
+- **Note**: Jupiter token.jup.ag DNS is blocked on Replit, falls back to hardcoded popular tokens; DexScreener API works for trending discovery
+- **RPC**: Uses HELIUS_RPC_URL or QUICKNODE_RPC_URL env var, falls back to devnet
+
 ## External Dependencies
 
 ### Blockchain

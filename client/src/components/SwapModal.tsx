@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PublicKey } from "@solana/web3.js";
+import { Badge } from "@/components/ui/badge";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import bs58 from "bs58";
 
 interface SwapModalProps {
   isOpen: boolean;
@@ -21,53 +23,10 @@ interface Token {
   symbol: string;
   decimals: number;
   logoURI?: string;
-}
-
-const JUPITER_TOKEN_LIST_URL = "https://token.jup.ag/strict";
-const CACHE_KEY = "xray_token_list";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-function getCachedTokens(): Token[] | null {
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-    const { tokens, timestamp } = JSON.parse(cached);
-    if (Date.now() - timestamp > CACHE_TTL) return null;
-    return tokens;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedTokens(tokens: Token[]) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ tokens, timestamp: Date.now() }));
-  } catch {}
-}
-
-async function fetchTokensFromJupiter(): Promise<Token[]> {
-  const cached = getCachedTokens();
-  if (cached) return cached;
-
-  try {
-    const response = await fetch(JUPITER_TOKEN_LIST_URL);
-    if (!response.ok) throw new Error("Failed to fetch");
-    const data = await response.json();
-    const tokens: Token[] = data.map((t: any) => ({
-      mint: t.address,
-      name: t.name,
-      symbol: t.symbol,
-      decimals: t.decimals,
-      logoURI: t.logoURI,
-    }));
-    setCachedTokens(tokens);
-    return tokens;
-  } catch (error) {
-    console.error("Failed to fetch from Jupiter:", error);
-    // Return fallback from server
-    const response = await fetch("/api/swaps/tokens");
-    return response.json();
-  }
+  volume24h?: number;
+  liquidity?: number;
+  priceChange24h?: number;
+  isTrending?: boolean;
 }
 
 function isValidSolanaAddress(address: string): boolean {
@@ -79,77 +38,84 @@ function isValidSolanaAddress(address: string): boolean {
   }
 }
 
+function formatVolume(volume?: number): string {
+  if (!volume) return "";
+  if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
+  if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`;
+  return `$${volume.toFixed(0)}`;
+}
+
 export function SwapModal({ isOpen, onClose }: SwapModalProps) {
-  const { balance } = useWallet();
+  const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const [inputAmount, setInputAmount] = useState("");
   const [inputMint, setInputMint] = useState("SOL");
-  const [outputMint, setOutputMint] = useState("USDC");
+  const [outputMint, setOutputMint] = useState("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
-  const [customTokens, setCustomTokens] = useState<Token[]>(() => {
-    try {
-      const saved = localStorage.getItem("xray_custom_tokens");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high">("medium");
 
-  // Fetch tokens from Jupiter (client-side)
-  const { data: jupiterTokens = [], isLoading: tokensLoading } = useQuery<Token[]>({
-    queryKey: ["jupiter-tokens"],
-    queryFn: fetchTokensFromJupiter,
+  const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000 };
+
+  const { data: tokens = [], isLoading: tokensLoading } = useQuery<Token[]>({
+    queryKey: ["/api/swaps/tokens", searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("search", searchQuery);
+      params.set("limit", "100");
+      const response = await fetch(`/api/swaps/tokens?${params}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch tokens");
+      return response.json();
+    },
     enabled: isOpen,
-    staleTime: CACHE_TTL,
+    staleTime: 30000,
   });
 
-  // Combine Jupiter tokens with custom user-added tokens
-  const allTokens = useMemo(() => {
-    const tokenMap = new Map<string, Token>();
-    customTokens.forEach((t) => tokenMap.set(t.mint, t));
-    jupiterTokens.forEach((t) => tokenMap.set(t.mint, t));
-    return Array.from(tokenMap.values());
-  }, [jupiterTokens, customTokens]);
+  const { data: trendingTokens = [] } = useQuery<Token[]>({
+    queryKey: ["/api/swaps/trending"],
+    queryFn: async () => {
+      const response = await fetch("/api/swaps/trending", { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: isOpen && !searchQuery,
+    staleTime: 30000,
+  });
 
-  // Save custom tokens to localStorage
-  useEffect(() => {
-    localStorage.setItem("xray_custom_tokens", JSON.stringify(customTokens));
-  }, [customTokens]);
-
-  // Check if search query is a valid mint address not in the list
   const isSearchingMintAddress = useMemo(() => {
     const query = searchQuery.trim();
     if (!isValidSolanaAddress(query)) return false;
-    return !allTokens.some((t) => t.mint.toLowerCase() === query.toLowerCase());
-  }, [searchQuery, allTokens]);
+    return !tokens.some((t) => t.mint.toLowerCase() === query.toLowerCase());
+  }, [searchQuery, tokens]);
 
-  // Filter tokens based on search
-  const filteredTokens = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return allTokens;
-    return allTokens.filter(
-      (t) =>
-        t.symbol.toLowerCase().includes(query) ||
-        t.name.toLowerCase().includes(query) ||
-        t.mint.toLowerCase().includes(query)
-    );
-  }, [allTokens, searchQuery]);
+  const { mutate: lookupMint, isPending: isLookingUp } = useMutation({
+    mutationFn: async (mint: string) => {
+      const response = await fetch(`/api/swaps/tokens/${mint}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Token not found");
+      return response.json();
+    },
+    onSuccess: (token: Token) => {
+      handleSelectToken(token);
+      toast({ title: "Token Found", description: `Added ${token.symbol} to your list` });
+    },
+    onError: () => {
+      toast({ title: "Token Not Found", description: "Could not find token information", variant: "destructive" });
+    },
+  });
 
-  const getTokenBySymbolOrMint = (symbolOrMint: string) => {
-    if (symbolOrMint === "SOL") return { symbol: "SOL", name: "Solana", mint: "SOL", decimals: 9 };
-    return allTokens.find((t) => t.symbol === symbolOrMint || t.mint === symbolOrMint);
+  const getTokenByMint = (mint: string): Token | undefined => {
+    if (mint === "SOL") return { mint: "SOL", name: "Solana", symbol: "SOL", decimals: 9 };
+    return tokens.find((t) => t.mint === mint);
   };
 
-  const inputToken = getTokenBySymbolOrMint(inputMint);
-  const outputToken = getTokenBySymbolOrMint(outputMint);
+  const inputToken = getTokenByMint(inputMint);
+  const outputToken = getTokenByMint(outputMint);
 
-  const handleSelectToken = (token: Token | { symbol: string; name: string; mint?: string }) => {
-    const identifier = (token as Token).mint || token.symbol;
+  const handleSelectToken = (token: Token) => {
     if (selectingFor === "input") {
-      setInputMint(identifier);
+      setInputMint(token.mint);
     } else if (selectingFor === "output") {
-      setOutputMint(identifier);
+      setOutputMint(token.mint);
     }
     setSelectingFor(null);
     setSearchQuery("");
@@ -157,54 +123,72 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
 
   const handleAddCustomToken = () => {
     const mintAddress = searchQuery.trim();
-    if (!isValidSolanaAddress(mintAddress)) {
-      toast({ title: "Invalid Address", description: "Please enter a valid Solana token address", variant: "destructive" });
-      return;
+    if (isValidSolanaAddress(mintAddress)) {
+      lookupMint(mintAddress);
     }
-
-    const newToken: Token = {
-      mint: mintAddress,
-      name: `Token ${mintAddress.slice(0, 6)}...`,
-      symbol: mintAddress.slice(0, 6).toUpperCase(),
-      decimals: 9,
-    };
-
-    setCustomTokens((prev) => [...prev.filter((t) => t.mint !== mintAddress), newToken]);
-    handleSelectToken(newToken);
-    toast({ title: "Token Added", description: "Custom token has been added to your list" });
   };
 
-  // Get swap quote
-  const { data: quote, isLoading: quoteLoading } = useQuery({
+  const { data: quote, isLoading: quoteLoading, error: quoteError } = useQuery({
     queryKey: ["/api/swaps/quote", inputMint, outputMint, inputAmount],
     queryFn: async () => {
       if (!inputAmount || parseFloat(inputAmount) <= 0) return null;
-      const response = await apiRequest("GET", "/api/swaps/quote", {
-        inputMint,
-        outputMint,
-        amount: Math.floor(parseFloat(inputAmount) * 1e9),
+      const inputDecimals = inputToken?.decimals || 9;
+      const amount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputDecimals));
+      
+      const params = new URLSearchParams({
+        inputMint: inputMint === "SOL" ? "So11111111111111111111111111111111111111112" : inputMint,
+        outputMint: outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint,
+        amount: amount.toString(),
+        slippage: "50",
       });
-      return response;
+      
+      const response = await fetch(`/api/swaps/quote?${params}`, { credentials: "include" });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get quote");
+      }
+      return response.json();
     },
-    enabled: isOpen && !!inputAmount && parseFloat(inputAmount) > 0,
+    enabled: isOpen && !!inputAmount && parseFloat(inputAmount) > 0 && inputMint !== outputMint,
+    retry: false,
   });
 
-  // Execute swap mutation
   const { mutate: executeSwap, isPending: isSwapping } = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/swaps", {
-        inputMint,
-        outputMint,
-        amount: Math.floor(parseFloat(inputAmount) * 1e9),
-        slippage: 500,
+      if (!quote?.quote || !keypair || !address) {
+        throw new Error("Missing quote or wallet");
+      }
+
+      const txResponse = await apiRequest("POST", "/api/swaps/transaction", {
+        quote: quote.quote,
+        userPublicKey: address,
+        priorityFee: priorityFeeAmounts[priorityFee],
       });
+
+      if (!txResponse.swapTransaction) {
+        throw new Error("Failed to get swap transaction");
+      }
+
+      const swapTransactionBuf = Buffer.from(txResponse.swapTransaction, "base64");
+      const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+      transaction.sign([keypair]);
+      const signedTx = Buffer.from(transaction.serialize()).toString("base64");
+
+      const result = await apiRequest("POST", "/api/swaps/send", {
+        signedTransaction: signedTx,
+        skipPreflight: true,
+        lastValidBlockHeight: txResponse.lastValidBlockHeight,
+      });
+
+      return result;
     },
     onSuccess: (data: any) => {
       toast({
         title: "Swap Successful!",
-        description: `Swapped ${inputAmount} tokens. Signature: ${data.signature.slice(0, 8)}...`,
+        description: `Transaction: ${data.signature.slice(0, 8)}...`,
       });
       setInputAmount("");
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
       onClose();
     },
     onError: (error: any) => {
@@ -231,12 +215,16 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
       toast({ title: "Invalid Swap", description: "Input and output tokens must be different", variant: "destructive" });
       return;
     }
+    if (!quote) {
+      toast({ title: "No Quote", description: "Please wait for a quote", variant: "destructive" });
+      return;
+    }
     executeSwap();
   };
 
-  const outputAmount = quote ? (quote.outputAmount / 1e9).toFixed(4) : "0";
+  const outputDecimals = outputToken?.decimals || 9;
+  const outputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, outputDecimals)).toFixed(6) : "0";
 
-  // Token selector view
   if (selectingFor) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { setSelectingFor(null); setSearchQuery(""); onClose(); } }}>
@@ -268,46 +256,80 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
               )}
             </div>
 
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[350px]">
               <div className="space-y-1">
-                {/* Option to add custom token by mint address */}
                 {isSearchingMintAddress && (
                   <button
                     className="flex items-center gap-3 w-full p-3 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-left border border-primary/30"
                     onClick={handleAddCustomToken}
+                    disabled={isLookingUp}
                     data-testid="button-add-custom-token"
                   >
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Plus className="w-4 h-4 text-primary" />
+                      {isLookingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 text-primary" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-primary">Add Custom Token</div>
+                      <div className="font-medium text-primary">Add Token by Address</div>
                       <div className="text-sm text-muted-foreground truncate">{searchQuery.slice(0, 20)}...</div>
                     </div>
                   </button>
                 )}
 
-                {/* Always show SOL */}
                 <button
                   className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted/70 transition-colors text-left"
-                  onClick={() => handleSelectToken({ symbol: "SOL", name: "Solana", mint: "SOL" })}
+                  onClick={() => handleSelectToken({ mint: "SOL", name: "Solana", symbol: "SOL", decimals: 9 })}
                   data-testid="token-option-SOL"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                    S
-                  </div>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold">S</div>
                   <div className="flex-1">
                     <div className="font-medium">Solana</div>
                     <div className="text-sm text-muted-foreground">SOL</div>
                   </div>
                 </button>
 
+                {!searchQuery && trendingTokens.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                      <TrendingUp className="w-4 h-4" />
+                      Trending
+                    </div>
+                    {trendingTokens.slice(0, 5).map((token) => (
+                      <button
+                        key={token.mint}
+                        className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted/70 transition-colors text-left"
+                        onClick={() => handleSelectToken(token)}
+                        data-testid={`token-trending-${token.mint.slice(0, 8)}`}
+                      >
+                        {token.logoURI ? (
+                          <img src={token.logoURI} alt={token.symbol} className="w-8 h-8 rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">{token.symbol.slice(0, 2)}</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate flex items-center gap-2">
+                            {token.name}
+                            <Badge variant="secondary" className="text-xs">
+                              <TrendingUp className="w-3 h-3 mr-1" />
+                              {token.priceChange24h?.toFixed(1)}%
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            {token.symbol}
+                            {token.volume24h && <span className="text-xs">{formatVolume(token.volume24h)} vol</span>}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    <div className="border-t border-border my-2" />
+                  </>
+                )}
+
                 {tokensLoading ? (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  filteredTokens.slice(0, 100).map((token) => (
+                  tokens.slice(0, 50).map((token) => (
                     <button
                       key={token.mint}
                       className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted/70 transition-colors text-left"
@@ -315,28 +337,20 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                       data-testid={`token-option-${token.mint.slice(0, 8)}`}
                     >
                       {token.logoURI ? (
-                        <img 
-                          src={token.logoURI} 
-                          alt={token.symbol}
-                          className="w-8 h-8 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold ${token.logoURI ? 'hidden' : ''}`}>
-                        {token.symbol.slice(0, 2)}
-                      </div>
+                        <img src={token.logoURI} alt={token.symbol} className="w-8 h-8 rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">{token.symbol.slice(0, 2)}</div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{token.name}</div>
                         <div className="text-sm text-muted-foreground">{token.symbol}</div>
                       </div>
+                      {token.isTrending && <Badge variant="secondary"><TrendingUp className="w-3 h-3" /></Badge>}
                     </button>
                   ))
                 )}
 
-                {!tokensLoading && filteredTokens.length === 0 && searchQuery && !isSearchingMintAddress && (
+                {!tokensLoading && tokens.length === 0 && searchQuery && !isSearchingMintAddress && (
                   <div className="text-center py-8 text-muted-foreground">
                     <p className="text-sm">No tokens found for "{searchQuery}"</p>
                     <p className="text-xs mt-2">Try pasting a token mint address</p>
@@ -345,11 +359,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
               </div>
             </ScrollArea>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => { setSelectingFor(null); setSearchQuery(""); }}
-            >
+            <Button variant="outline" className="w-full" onClick={() => { setSelectingFor(null); setSearchQuery(""); }}>
               Cancel
             </Button>
           </div>
@@ -362,11 +372,16 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Swap Tokens</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Swap Tokens
+            <Badge variant="outline" className="text-xs">
+              <Zap className="w-3 h-3 mr-1" />
+              Jupiter
+            </Badge>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Input Section */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You send</label>
             <div className="flex gap-2">
@@ -381,7 +396,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
               />
               <Button
                 variant="outline"
-                className="w-28 justify-between"
+                className="w-32 justify-between"
                 onClick={() => setSelectingFor("input")}
                 disabled={isSwapping}
                 data-testid="select-input-token"
@@ -390,39 +405,29 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                 <Search className="w-3 h-3 ml-1 opacity-50" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Balance: {balance.toFixed(2)} SOL
-            </p>
+            <p className="text-xs text-muted-foreground">Balance: {balance.toFixed(4)} SOL</p>
           </div>
 
-          {/* Swap Button */}
           <div className="flex justify-center">
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={handleSwapTokens}
-              disabled={isSwapping}
-              data-testid="button-swap-reverse"
-            >
+            <Button size="icon" variant="outline" onClick={handleSwapTokens} disabled={isSwapping} data-testid="button-swap-reverse">
               <ArrowDownUp className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Output Section */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You receive</label>
             <div className="flex gap-2">
               <Input
                 type="text"
                 placeholder="0.0"
-                value={quoteLoading ? "Loading..." : outputAmount}
+                value={quoteLoading ? "Loading..." : quoteError ? "No route" : outputAmount}
                 readOnly
                 className="flex-1"
                 data-testid="output-swap-amount"
               />
               <Button
                 variant="outline"
-                className="w-28 justify-between"
+                className="w-32 justify-between"
                 onClick={() => setSelectingFor("output")}
                 disabled={isSwapping}
                 data-testid="select-output-token"
@@ -433,20 +438,42 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
             </div>
           </div>
 
-          {/* Price Impact */}
           {quote && (
-            <div className="flex justify-between text-sm p-3 rounded-lg bg-muted/50">
-              <span className="text-muted-foreground">Price Impact</span>
-              <span className={quote.priceImpact > 0.05 ? "text-destructive" : "text-foreground"}>
-                {(quote.priceImpact * 100).toFixed(2)}%
-              </span>
+            <div className="space-y-2 p-3 rounded-lg bg-muted/50 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Price Impact</span>
+                <span className={quote.priceImpact > 0.05 ? "text-destructive" : "text-foreground"}>
+                  {(quote.priceImpact * 100).toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Route</span>
+                <span>{quote.routePlan?.length || 1} hop{(quote.routePlan?.length || 1) > 1 ? "s" : ""}</span>
+              </div>
             </div>
           )}
 
-          {/* Action Button */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Priority Fee</label>
+            <div className="flex gap-2">
+              {(["low", "medium", "high"] as const).map((level) => (
+                <Button
+                  key={level}
+                  variant={priorityFee === level ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1 capitalize"
+                  onClick={() => setPriorityFee(level)}
+                  disabled={isSwapping}
+                >
+                  {level}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote}
             className="w-full"
             data-testid="button-execute-swap"
           >

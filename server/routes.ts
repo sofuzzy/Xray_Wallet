@@ -6,6 +6,14 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as sessionAuth } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
+import { 
+  getTokens, 
+  getTokenByMint, 
+  getJupiterQuote, 
+  getJupiterSwapTransaction,
+  sendTransaction,
+  type Token 
+} from "./services/jupiterSwap";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -336,46 +344,143 @@ export async function registerRoutes(
     }
   });
 
-  // Swap routes
+  // Swap routes - Token Discovery
   app.get(api.swaps.tokens.path, hybridAuth, async (req, res) => {
     try {
-      const tokens = await getAvailableTokens();
+      const { search, limit, trending } = req.query;
+      const tokens = await getTokens({
+        search: search as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        trending: trending === "true",
+      });
       res.json(tokens);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch tokens" });
     }
   });
 
+  // Get token by mint address (for paste-to-add)
+  app.get("/api/swaps/tokens/:mint", hybridAuth, async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const token = await getTokenByMint(mint);
+      if (!token) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+      res.json(token);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch token" });
+    }
+  });
+
+  // Get trending tokens
+  app.get("/api/swaps/trending", hybridAuth, async (req, res) => {
+    try {
+      const tokens = await getTokens({ trending: true, limit: 20 });
+      res.json(tokens);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch trending tokens" });
+    }
+  });
+
+  // Jupiter Quote
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
-      const { inputMint, outputMint, amount } = req.query;
+      const { inputMint, outputMint, amount, slippage } = req.query;
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
       }
       
-      const quote = await getSwapQuote(
+      const quote = await getJupiterQuote(
         inputMint as string,
         outputMint as string,
-        parseInt(amount as string)
+        parseInt(amount as string),
+        slippage ? parseInt(slippage as string) : 50
       );
-      res.json(quote);
+      
+      if (!quote) {
+        return res.status(400).json({ message: "No route found for this swap" });
+      }
+      
+      res.json({
+        inputMint: quote.inputMint,
+        outputMint: quote.outputMint,
+        inAmount: quote.inAmount,
+        outAmount: quote.outAmount,
+        outputAmount: parseInt(quote.outAmount),
+        priceImpact: parseFloat(quote.priceImpactPct),
+        routePlan: quote.routePlan,
+        quote,
+      });
     } catch (error) {
+      console.error("Quote error:", error);
       res.status(500).json({ message: "Failed to get quote" });
     }
   });
 
+  // Get swap transaction from Jupiter
+  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const { quote, userPublicKey, priorityFee } = req.body;
+      
+      if (!quote || !userPublicKey) {
+        return res.status(400).json({ message: "Missing quote or userPublicKey" });
+      }
+
+      const swapTx = await getJupiterSwapTransaction(
+        quote,
+        userPublicKey,
+        priorityFee || 10000
+      );
+
+      if (!swapTx) {
+        return res.status(400).json({ message: "Failed to create swap transaction" });
+      }
+
+      res.json(swapTx);
+    } catch (error) {
+      console.error("Swap transaction error:", error);
+      res.status(500).json({ message: "Failed to create swap transaction" });
+    }
+  });
+
+  // Send signed transaction
+  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const { signedTransaction, skipPreflight, lastValidBlockHeight } = req.body;
+      
+      if (!signedTransaction) {
+        return res.status(400).json({ message: "Missing signed transaction" });
+      }
+
+      const signature = await sendTransaction(
+        signedTransaction,
+        skipPreflight !== false,
+        lastValidBlockHeight
+      );
+
+      if (!signature) {
+        return res.status(400).json({ message: "Failed to send transaction" });
+      }
+
+      res.json({ signature, success: true });
+    } catch (error) {
+      console.error("Send transaction error:", error);
+      res.status(500).json({ message: "Failed to send transaction" });
+    }
+  });
+
+  // Legacy execute endpoint (backward compatibility)
   app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const input = api.swaps.execute.input.parse(req.body);
       
-      // Perform swap (simplified for devnet)
-      // Wallet exists on client-side, so we don't need to fetch from DB
       const result = await swapTokens({
         inputMint: input.inputMint,
         outputMint: input.outputMint,
         amount: input.amount,
         slippage: input.slippage,
-        signer: null as any, // Client handles signing locally
+        signer: null as any,
       });
 
       res.json(result);
