@@ -71,10 +71,19 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
   const [outputMint, setOutputMint] = useState("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
-  const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high">("medium");
+  const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">("medium");
+  const [customPriorityFee, setCustomPriorityFee] = useState("");
   const [customTokens, setCustomTokens] = useState<Token[]>([]);
 
-  const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000 };
+  const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000, custom: 0 };
+  
+  const getActivePriorityFee = () => {
+    if (priorityFee === "custom") {
+      const customLamports = Math.floor(parseFloat(customPriorityFee || "0") * 1_000_000_000);
+      return Math.max(0, customLamports);
+    }
+    return priorityFeeAmounts[priorityFee];
+  };
 
   const { data: tokens = [], isLoading: tokensLoading } = useQuery<Token[]>({
     queryKey: ["/api/swaps/tokens", searchQuery],
@@ -201,7 +210,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
       const txResponse = await apiRequest("POST", "/api/swaps/transaction", {
         quote: quote.quote,
         userPublicKey: address,
-        priorityFee: priorityFeeAmounts[priorityFee],
+        priorityFee: getActivePriorityFee(),
       });
 
       if (!txResponse.swapTransaction) {
@@ -532,7 +541,33 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                   </Button>
                 );
               })}
+              <Button
+                variant={priorityFee === "custom" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 flex-col h-auto py-2"
+                onClick={() => setPriorityFee("custom")}
+                disabled={isSwapping}
+              >
+                <span>Custom</span>
+                <span className="text-xs opacity-70">Set your own</span>
+              </Button>
             </div>
+            {priorityFee === "custom" && (
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="number"
+                  placeholder="0.0001"
+                  value={customPriorityFee}
+                  onChange={(e) => setCustomPriorityFee(e.target.value)}
+                  className="flex-1"
+                  step="0.000001"
+                  min="0"
+                  disabled={isSwapping}
+                  data-testid="input-custom-priority-fee"
+                />
+                <span className="text-sm text-muted-foreground">SOL</span>
+              </div>
+            )}
           </div>
 
           <Button
