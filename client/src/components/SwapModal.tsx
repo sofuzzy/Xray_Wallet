@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,104 @@ import { useWallet } from "@/hooks/use-wallet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { motion, AnimatePresence } from "framer-motion";
 import bs58 from "bs58";
+
+type TransactionStep = "idle" | "building" | "signing" | "sending" | "confirming" | "success" | "error";
+
+function TransactionProgress({ step, errorMessage }: { step: TransactionStep; errorMessage?: string }) {
+  const steps = [
+    { key: "building", label: "Building transaction" },
+    { key: "signing", label: "Signing transaction" },
+    { key: "sending", label: "Sending to network" },
+    { key: "confirming", label: "Confirming on chain" },
+  ];
+  
+  const stepOrder = ["building", "signing", "sending", "confirming", "success"];
+  const currentIndex = stepOrder.indexOf(step);
+  
+  if (step === "idle") return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 rounded-lg"
+    >
+      {step === "success" ? (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+            <Check className="w-8 h-8 text-green-500" />
+          </div>
+          <span className="text-lg font-medium">Swap Complete!</span>
+        </motion.div>
+      ) : step === "error" ? (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="flex flex-col items-center gap-4 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-destructive" />
+          </div>
+          <span className="text-lg font-medium">Transaction Failed</span>
+          {errorMessage && <span className="text-sm text-muted-foreground max-w-[250px]">{errorMessage}</span>}
+        </motion.div>
+      ) : (
+        <div className="flex flex-col items-center gap-6 w-full max-w-[280px]">
+          <div className="relative">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-primary" />
+            </div>
+          </div>
+          
+          <div className="space-y-3 w-full">
+            {steps.map((s, i) => {
+              const isActive = s.key === step;
+              const isComplete = currentIndex > stepOrder.indexOf(s.key);
+              
+              return (
+                <motion.div
+                  key={s.key}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className={`flex items-center gap-3 ${isActive ? "text-foreground" : isComplete ? "text-muted-foreground" : "text-muted-foreground/50"}`}
+                >
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isComplete ? "bg-primary" : isActive ? "bg-primary/20" : "bg-muted"}`}>
+                    {isComplete ? (
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    ) : isActive ? (
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className="w-2 h-2 rounded-full bg-primary"
+                      />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                    )}
+                  </div>
+                  <span className={`text-sm ${isActive ? "font-medium" : ""}`}>{s.label}</span>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
 
 interface SwapModalProps {
   isOpen: boolean;
@@ -74,6 +171,8 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
   const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">("medium");
   const [customPriorityFee, setCustomPriorityFee] = useState("");
   const [customTokens, setCustomTokens] = useState<Token[]>([]);
+  const [txStep, setTxStep] = useState<TransactionStep>("idle");
+  const [txError, setTxError] = useState<string>("");
 
   const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000, custom: 0 };
   
@@ -207,6 +306,9 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
         throw new Error("Missing quote or wallet");
       }
 
+      setTxStep("building");
+      setTxError("");
+      
       const txResponse = await apiRequest("POST", "/api/swaps/transaction", {
         quote: quote.quote,
         userPublicKey: address,
@@ -217,34 +319,51 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
         throw new Error("Failed to get swap transaction");
       }
 
+      setTxStep("signing");
       const swapTransactionBuf = Buffer.from(txResponse.swapTransaction, "base64");
       const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
       transaction.sign([keypair]);
       const signedTx = Buffer.from(transaction.serialize()).toString("base64");
 
+      setTxStep("sending");
       const result = await apiRequest("POST", "/api/swaps/send", {
         signedTransaction: signedTx,
         skipPreflight: true,
         lastValidBlockHeight: txResponse.lastValidBlockHeight,
       });
 
+      setTxStep("confirming");
+      // Brief delay to show confirming state
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       return result;
     },
     onSuccess: (data: any) => {
+      setTxStep("success");
       toast({
         title: "Swap Successful!",
         description: `Transaction: ${data.signature.slice(0, 8)}...`,
       });
-      setInputAmount("");
       queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
-      onClose();
+      // Show success state briefly before closing
+      setTimeout(() => {
+        setInputAmount("");
+        setTxStep("idle");
+        onClose();
+      }, 1500);
     },
     onError: (error: any) => {
+      setTxStep("error");
+      setTxError(error.message || "Failed to execute swap");
       toast({
         title: "Swap Failed",
         description: error.message || "Failed to execute swap",
         variant: "destructive",
       });
+      // Reset after showing error
+      setTimeout(() => {
+        setTxStep("idle");
+      }, 3000);
     },
   });
 
@@ -419,17 +538,22 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Swap Tokens
-            <Badge variant="outline" className="text-xs">
-              <Zap className="w-3 h-3 mr-1" />
-              Jupiter
-            </Badge>
-          </DialogTitle>
-        </DialogHeader>
+        <div className="relative">
+          <AnimatePresence>
+            {txStep !== "idle" && <TransactionProgress step={txStep} errorMessage={txError} />}
+          </AnimatePresence>
+          
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Swap Tokens
+              <Badge variant="outline" className="text-xs">
+                <Zap className="w-3 h-3 mr-1" />
+                Jupiter
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
+          <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">You send</label>
             <div className="flex gap-2">
@@ -585,6 +709,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
               "Swap"
             )}
           </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
