@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, TrendingDown, ExternalLink, Copy, Check, 
-  ArrowDownUp, Loader2, BarChart3
+  ArrowDownUp
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -60,26 +60,6 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  interface PriceHistoryResponse {
-    mint: string;
-    currentPrice: number;
-    priceChange24h: number;
-    history: { timestamp: number; price: number }[];
-  }
-
-  const { data: priceHistoryData, isLoading: chartLoading } = useQuery<PriceHistoryResponse | null>({
-    queryKey: ["token-price-history", token.mint],
-    queryFn: async () => {
-      const response = await fetch(`/api/price-history/${token.mint}?timeframe=24h`, { credentials: "include" });
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: isOpen && token.mint !== "SOL" && token.mint !== "So11111111111111111111111111111111111111112",
-    staleTime: 60000,
-  });
-
-  const priceHistory = priceHistoryData?.history || [];
-
   const { data: tokenDetails } = useQuery<Token>({
     queryKey: ["token-details", token.mint],
     queryFn: async () => {
@@ -105,10 +85,6 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
       onTrade();
     }
   };
-
-  const maxPrice = priceHistory.length > 0 ? Math.max(...priceHistory.map(p => p.price)) : 0;
-  const minPrice = priceHistory.length > 0 ? Math.min(...priceHistory.map(p => p.price)) : 0;
-  const priceRange = maxPrice - minPrice || 1;
 
   const isSolToken = token.mint === "SOL" || token.mint === "So11111111111111111111111111111111111111112";
 
@@ -179,45 +155,29 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
           </div>
 
           {!isSolToken && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Price Chart (24h)</span>
-                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+            <div className="bg-muted/30 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b border-border">
+                <span className="text-sm text-muted-foreground">Live Chart</span>
+                <a
+                  href={`https://dexscreener.com/solana/${token.mint}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                  data-testid="link-dexscreener-chart"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open in DexScreener
+                </a>
               </div>
-              
-              {chartLoading ? (
-                <div className="h-32 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : priceHistory.length > 0 ? (
-                <div className="h-32 relative" data-testid="chart-price-history">
-                  <svg className="w-full h-full" viewBox={`0 0 ${priceHistory.length} 100`} preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="priceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d={`M0,${100 - ((priceHistory[0]?.price || 0) - minPrice) / priceRange * 100} ${priceHistory.map((p, i) => `L${i},${100 - (p.price - minPrice) / priceRange * 100}`).join(" ")} V100 H0 Z`}
-                      fill="url(#priceGradient)"
-                    />
-                    <path
-                      d={`M0,${100 - ((priceHistory[0]?.price || 0) - minPrice) / priceRange * 100} ${priceHistory.map((p, i) => `L${i},${100 - (p.price - minPrice) / priceRange * 100}`).join(" ")}`}
-                      fill="none"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth="2"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                  <div className="absolute top-0 right-0 text-xs text-muted-foreground">{formatPrice(maxPrice)}</div>
-                  <div className="absolute bottom-0 right-0 text-xs text-muted-foreground">{formatPrice(minPrice)}</div>
-                </div>
-              ) : (
-                <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-                  No price data available
-                </div>
-              )}
+              <div className="relative w-full" style={{ height: "300px" }}>
+                <iframe
+                  src={`https://dexscreener.com/solana/${token.mint}?embed=1&theme=dark&trades=0&info=0`}
+                  className="absolute inset-0 w-full h-full border-0"
+                  title="DexScreener Chart"
+                  sandbox="allow-scripts allow-same-origin"
+                  data-testid="iframe-dexscreener"
+                />
+              </div>
             </div>
           )}
 
