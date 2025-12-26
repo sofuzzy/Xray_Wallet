@@ -16,6 +16,7 @@ import { StakingModal } from "@/components/StakingModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
 import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { LogIn, Loader2, Sparkles, LogOut, Settings } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,15 +74,18 @@ export default function Home() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-background to-background" />
+        <div className="absolute top-4 right-4 z-20">
+          <ThemeToggle />
+        </div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
         
         <div className="relative z-10 text-center space-y-8 max-w-md w-full">
-          <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl mb-4">
+          <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-muted/50 border border-border backdrop-blur-xl shadow-2xl mb-4">
             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-white">
+            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight">
               <span className="text-primary">Xray</span>
             </h1>
             <p className="text-muted-foreground text-lg">
@@ -91,7 +95,8 @@ export default function Home() {
 
           <button 
             onClick={() => window.location.href = "/api/login"}
-            className="w-full py-4 rounded-xl bg-white text-black font-bold text-lg hover:bg-white/90 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl shadow-white/5"
+            className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl"
+            data-testid="button-login"
           >
             <LogIn className="w-5 h-5" />
             Continue with Replit
@@ -109,7 +114,7 @@ export default function Home() {
     <div className="min-h-screen bg-background pb-10 relative overflow-hidden">
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,_rgba(120,119,198,0.1),_rgba(255,255,255,0))]" />
 
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/5 px-6 py-4 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border px-6 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-display font-bold text-primary">Xray</h1>
           <WalletSwitcher
@@ -123,22 +128,23 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-white">{user?.firstName || "User"}</p>
+            <p className="text-sm font-medium text-foreground">{user?.firstName || "User"}</p>
             <p className="text-xs text-muted-foreground">@{user?.email?.split("@")[0] || "user"}</p>
           </div>
           {user?.profileImageUrl && (
-            <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-white/10" />
+            <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-border" />
           )}
+          <ThemeToggle />
           <button 
             onClick={() => setIsSeedPhraseOpen(true)}
-            className="p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+            className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             data-testid="button-settings"
           >
             <Settings className="w-5 h-5" />
           </button>
           <button 
             onClick={() => logout()}
-            className="p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+            className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <LogOut className="w-5 h-5" />
           </button>
