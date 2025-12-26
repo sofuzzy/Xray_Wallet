@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2 } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
@@ -14,51 +14,85 @@ interface SeedPhraseModalProps {
 }
 
 export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
-  const { getSeedPhrase, importWallet, resetWallet } = useWallet();
+  const { getSeedPhrase, getPrivateKey, isPrivateKeyWallet, importWallet, importFromPrivateKey, resetWallet } = useWallet();
   const { toast } = useToast();
   const biometric = useBiometric();
   const [tab, setTab] = useState<"backup" | "restore" | "security">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [privateKey, setPrivateKey] = useState<string | null>(null);
   const [importPhrase, setImportPhrase] = useState("");
+  const [importPrivateKeyValue, setImportPrivateKeyValue] = useState("");
+  const [importMode, setImportMode] = useState<"seed" | "key">("seed");
   const [isImporting, setIsImporting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
 
   const seedPhrase = getSeedPhrase();
   const words = seedPhrase?.split(" ") || [];
+  const isPKWallet = isPrivateKeyWallet();
 
-  const handleCopy = () => {
+  useEffect(() => {
+    if (showPrivateKey && !privateKey) {
+      getPrivateKey().then(setPrivateKey);
+    }
+  }, [showPrivateKey, privateKey, getPrivateKey]);
+
+  const handleCopySeed = () => {
     if (seedPhrase) {
       navigator.clipboard.writeText(seedPhrase);
       toast({ title: "Copied", description: "Seed phrase copied to clipboard. Keep it safe!" });
     }
   };
 
-  const handleImport = async () => {
-    const trimmed = importPhrase.trim().toLowerCase();
-    
-    if (!validateMnemonic(trimmed)) {
-      toast({ 
-        title: "Invalid Seed Phrase", 
-        description: "Please enter a valid 12-word seed phrase.", 
-        variant: "destructive" 
-      });
-      return;
+  const handleCopyPrivateKey = () => {
+    if (privateKey) {
+      navigator.clipboard.writeText(privateKey);
+      toast({ title: "Copied", description: "Private key copied to clipboard. Keep it safe!" });
     }
+  };
 
-    setIsImporting(true);
-    try {
-      const success = await importWallet(trimmed);
-      if (success) {
-        toast({ title: "Wallet Imported", description: "Reloading to apply changes..." });
-        setImportPhrase("");
-        setTimeout(() => window.location.reload(), 500);
-      } else {
-        toast({ title: "Import Failed", description: "Could not import wallet.", variant: "destructive" });
+  const handleImport = async () => {
+    if (importMode === "seed") {
+      const trimmed = importPhrase.trim().toLowerCase();
+      if (!validateMnemonic(trimmed)) {
+        toast({ title: "Invalid Seed Phrase", description: "Please enter a valid 12-word seed phrase.", variant: "destructive" });
+        return;
+      }
+      setIsImporting(true);
+      try {
+        const success = await importWallet(trimmed);
+        if (success) {
+          toast({ title: "Wallet Imported", description: "Reloading to apply changes..." });
+          setImportPhrase("");
+          setTimeout(() => window.location.reload(), 500);
+        } else {
+          toast({ title: "Import Failed", description: "Could not import wallet.", variant: "destructive" });
+          setIsImporting(false);
+        }
+      } catch {
         setIsImporting(false);
       }
-    } catch {
-      setIsImporting(false);
+    } else {
+      const trimmed = importPrivateKeyValue.trim();
+      if (!trimmed || trimmed.length < 32) {
+        toast({ title: "Invalid Private Key", description: "Please enter a valid base58 encoded private key.", variant: "destructive" });
+        return;
+      }
+      setIsImporting(true);
+      try {
+        const success = await importFromPrivateKey(trimmed);
+        if (success) {
+          toast({ title: "Wallet Imported", description: "Reloading to apply changes..." });
+          setImportPrivateKeyValue("");
+          setTimeout(() => window.location.reload(), 500);
+        } else {
+          toast({ title: "Import Failed", description: "Invalid private key format.", variant: "destructive" });
+          setIsImporting(false);
+        }
+      } catch {
+        setIsImporting(false);
+      }
     }
   };
 
@@ -131,11 +165,11 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="backup" data-testid="tab-backup">
                 <Download className="w-4 h-4 mr-2" />
-                Backup
+                Export
               </TabsTrigger>
               <TabsTrigger value="restore" data-testid="tab-restore">
                 <Upload className="w-4 h-4 mr-2" />
-                Restore
+                Import
               </TabsTrigger>
               <TabsTrigger value="security" data-testid="tab-security">
                 <Shield className="w-4 h-4 mr-2" />
@@ -147,13 +181,18 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                 <div className="text-sm text-amber-200/80">
-                  <p className="font-medium text-amber-200">Never share your seed phrase!</p>
-                  <p className="mt-1">Anyone with these words can access your wallet and steal your funds.</p>
+                  <p className="font-medium text-amber-200">Never share your keys!</p>
+                  <p className="mt-1">Anyone with your seed phrase or private key can access your wallet and steal your funds.</p>
                 </div>
               </div>
 
-              {seedPhrase ? (
-                <>
+              {/* Seed Phrase Section */}
+              {!isPKWallet && seedPhrase && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Seed Phrase (12 words)
+                  </h3>
                   <div className="relative">
                     <div 
                       className={`grid grid-cols-3 gap-2 p-4 rounded-xl bg-white/5 border border-white/10 ${!showPhrase ? 'blur-md select-none' : ''}`}
@@ -186,30 +225,63 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
 
                   {showPhrase && (
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => setShowPhrase(false)}
-                      >
+                      <Button variant="outline" className="flex-1" onClick={() => setShowPhrase(false)}>
                         <EyeOff className="w-4 h-4 mr-2" />
                         Hide
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={handleCopy}
-                        data-testid="button-copy-seed"
-                      >
+                      <Button variant="outline" className="flex-1" onClick={handleCopySeed} data-testid="button-copy-seed">
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
                       </Button>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No seed phrase found.</p>
-                  <p className="text-sm mt-2">Your wallet may have been created with an older version.</p>
+                </div>
+              )}
+
+              {/* Private Key Section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Private Key (Base58)
+                </h3>
+                <div className="relative">
+                  <div 
+                    className={`p-4 rounded-xl bg-white/5 border border-white/10 font-mono text-xs break-all ${!showPrivateKey ? 'blur-md select-none' : ''}`}
+                  >
+                    {privateKey || "Loading..."}
+                  </div>
+                  
+                  {!showPrivateKey && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowPrivateKey(true)}
+                        data-testid="button-reveal-private-key"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Reveal Private Key
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {showPrivateKey && privateKey && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setShowPrivateKey(false)}>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      Hide
+                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={handleCopyPrivateKey} data-testid="button-copy-private-key">
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {isPKWallet && (
+                <div className="text-sm text-muted-foreground text-center py-2">
+                  This wallet was imported from a private key (no seed phrase available).
                 </div>
               )}
             </TabsContent>
@@ -217,21 +289,53 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <TabsContent value="restore" className="space-y-4 mt-4">
               <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <p className="text-sm text-blue-200/80">
-                  Enter your 12-word seed phrase to restore your wallet. This will replace your current wallet.
+                  Import a wallet using either a 12-word seed phrase or a private key.
                 </p>
               </div>
 
-              <textarea
-                className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
-                placeholder="Enter your 12-word seed phrase separated by spaces..."
-                value={importPhrase}
-                onChange={(e) => setImportPhrase(e.target.value)}
-                data-testid="input-import-seed"
-              />
+              {/* Import Mode Toggle */}
+              <div className="flex gap-2">
+                <Button
+                  variant={importMode === "seed" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setImportMode("seed")}
+                  data-testid="button-import-mode-seed"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Seed Phrase
+                </Button>
+                <Button
+                  variant={importMode === "key" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setImportMode("key")}
+                  data-testid="button-import-mode-key"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Private Key
+                </Button>
+              </div>
+
+              {importMode === "seed" ? (
+                <textarea
+                  className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
+                  placeholder="Enter your 12-word seed phrase separated by spaces..."
+                  value={importPhrase}
+                  onChange={(e) => setImportPhrase(e.target.value)}
+                  data-testid="input-import-seed"
+                />
+              ) : (
+                <textarea
+                  className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
+                  placeholder="Enter your base58 encoded private key..."
+                  value={importPrivateKeyValue}
+                  onChange={(e) => setImportPrivateKeyValue(e.target.value)}
+                  data-testid="input-import-private-key"
+                />
+              )}
 
               <Button
                 onClick={handleImport}
-                disabled={isImporting || !importPhrase.trim()}
+                disabled={isImporting || (importMode === "seed" ? !importPhrase.trim() : !importPrivateKeyValue.trim())}
                 className="w-full"
                 data-testid="button-import-wallet"
               >

@@ -120,6 +120,46 @@ export const getActiveWallet = (): StoredWallet | null => {
 };
 
 export const getKeypairForWallet = async (wallet: StoredWallet): Promise<Keypair> => {
+  if (wallet.mnemonic.startsWith('pk:')) {
+    const privateKey = wallet.mnemonic.slice(3);
+    const secretKey = bs58.decode(privateKey);
+    return Keypair.fromSecretKey(secretKey);
+  }
+  return keypairFromMnemonic(wallet.mnemonic);
+};
+
+export const getPrivateKeyForWallet = async (wallet: StoredWallet): Promise<string> => {
+  const keypair = await getKeypairForWallet(wallet);
+  return bs58.encode(keypair.secretKey);
+};
+
+export const importWalletFromPrivateKey = async (privateKey: string, name: string): Promise<StoredWallet | null> => {
+  try {
+    const secretKey = bs58.decode(privateKey.trim());
+    if (secretKey.length !== 64) return null;
+    const keypair = Keypair.fromSecretKey(secretKey);
+    const wallet: StoredWallet = {
+      id: crypto.randomUUID(),
+      name,
+      mnemonic: `pk:${privateKey.trim()}`,
+      publicKey: keypair.publicKey.toString(),
+      createdAt: Date.now(),
+    };
+    const wallets = getStoredWallets();
+    wallets.push(wallet);
+    saveWallets(wallets);
+    return wallet;
+  } catch {
+    return null;
+  }
+};
+
+export const keypairFromStoredWallet = async (wallet: StoredWallet): Promise<Keypair> => {
+  if (wallet.mnemonic.startsWith('pk:')) {
+    const privateKey = wallet.mnemonic.slice(3);
+    const secretKey = bs58.decode(privateKey);
+    return Keypair.fromSecretKey(secretKey);
+  }
   return keypairFromMnemonic(wallet.mnemonic);
 };
 

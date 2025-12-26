@@ -6,10 +6,12 @@ import {
   getActiveWallet,
   setActiveWalletId,
   getKeypairForWallet,
+  getPrivateKeyForWallet,
   createWallet,
   deleteWallet as deleteStoredWallet,
   renameWallet as renameStoredWallet,
   importWalletWithName,
+  importWalletFromPrivateKey,
   migrateLegacyWallet,
   type StoredWallet,
 } from "@/lib/solana";
@@ -84,7 +86,18 @@ export function useWallet() {
   }, [keypair, refreshBalance]);
 
   const getSeedPhrase = useCallback((): string | null => {
-    return activeWallet?.mnemonic || null;
+    if (!activeWallet) return null;
+    if (activeWallet.mnemonic.startsWith('pk:')) return null;
+    return activeWallet.mnemonic;
+  }, [activeWallet]);
+
+  const getPrivateKey = useCallback(async (): Promise<string | null> => {
+    if (!activeWallet) return null;
+    return await getPrivateKeyForWallet(activeWallet);
+  }, [activeWallet]);
+
+  const isPrivateKeyWallet = useCallback((): boolean => {
+    return activeWallet?.mnemonic.startsWith('pk:') || false;
   }, [activeWallet]);
 
   const switchWallet = useCallback(async (walletId: string) => {
@@ -111,6 +124,17 @@ export function useWallet() {
   const importWallet = useCallback(async (mnemonic: string, name?: string): Promise<boolean> => {
     const walletName = name || `Wallet ${wallets.length + 1}`;
     const newWallet = await importWalletWithName(mnemonic, walletName);
+    if (newWallet) {
+      refreshWallets();
+      await switchWallet(newWallet.id);
+      return true;
+    }
+    return false;
+  }, [wallets.length, refreshWallets, switchWallet]);
+
+  const importFromPrivateKey = useCallback(async (privateKey: string, name?: string): Promise<boolean> => {
+    const walletName = name || `Imported Wallet ${wallets.length + 1}`;
+    const newWallet = await importWalletFromPrivateKey(privateKey, walletName);
     if (newWallet) {
       refreshWallets();
       await switchWallet(newWallet.id);
@@ -160,7 +184,10 @@ export function useWallet() {
     refreshBalance,
     requestAirdrop,
     getSeedPhrase,
+    getPrivateKey,
+    isPrivateKeyWallet,
     importWallet,
+    importFromPrivateKey,
     resetWallet,
     wallets,
     activeWallet,
