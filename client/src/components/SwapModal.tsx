@@ -27,6 +27,24 @@ interface Token {
   liquidity?: number;
   priceChange24h?: number;
   isTrending?: boolean;
+  priceUsd?: number;
+  marketCap?: number;
+}
+
+function formatMarketCap(cap?: number): string {
+  if (!cap) return "N/A";
+  if (cap >= 1000000000) return `$${(cap / 1000000000).toFixed(2)}B`;
+  if (cap >= 1000000) return `$${(cap / 1000000).toFixed(2)}M`;
+  if (cap >= 1000) return `$${(cap / 1000).toFixed(1)}K`;
+  return `$${cap.toFixed(0)}`;
+}
+
+function formatPrice(price?: number): string {
+  if (!price) return "N/A";
+  if (price < 0.000001) return `$${price.toExponential(2)}`;
+  if (price < 0.01) return `$${price.toFixed(8)}`;
+  if (price < 1) return `$${price.toFixed(6)}`;
+  return `$${price.toFixed(4)}`;
 }
 
 function isValidSolanaAddress(address: string): boolean {
@@ -444,6 +462,27 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
               </Button>
             </div>
           </div>
+
+          {outputToken && (outputToken.priceUsd || outputToken.marketCap) && (
+            <div className="space-y-2 p-3 rounded-lg bg-muted/50 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Token Price</span>
+                <span>{formatPrice(outputToken.priceUsd)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Market Cap</span>
+                <span>{formatMarketCap(outputToken.marketCap)}</span>
+              </div>
+              {outputToken.priceChange24h !== undefined && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">24h Change</span>
+                  <span className={outputToken.priceChange24h >= 0 ? "text-green-500" : "text-red-500"}>
+                    {outputToken.priceChange24h >= 0 ? "+" : ""}{outputToken.priceChange24h.toFixed(2)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {quote && (
             <div className="space-y-2 p-3 rounded-lg bg-muted/50 text-sm">

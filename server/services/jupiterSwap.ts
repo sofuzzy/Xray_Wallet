@@ -16,6 +16,8 @@ export interface Token {
   liquidity?: number;
   priceChange24h?: number;
   isTrending?: boolean;
+  priceUsd?: number;
+  marketCap?: number;
 }
 
 interface TokenCache {
@@ -193,6 +195,8 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
         volume24h: pair.volume?.h24,
         liquidity: pair.liquidity?.usd,
         priceChange24h: pair.priceChange?.h24,
+        priceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : undefined,
+        marketCap: pair.marketCap || pair.fdv,
       };
     }
     
