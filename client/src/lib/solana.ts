@@ -344,3 +344,42 @@ export async function withdrawStake(
 
   return signature;
 }
+
+// Token account interface
+export interface TokenAccountInfo {
+  mint: string;
+  balance: number;
+  decimals: number;
+  name?: string;
+  symbol?: string;
+}
+
+// Fetch all SPL token accounts for a wallet
+export async function getTokenAccounts(walletAddress: string): Promise<TokenAccountInfo[]> {
+  try {
+    const pubkey = new PublicKey(walletAddress);
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+    });
+
+    return tokenAccounts.value
+      .map((account) => {
+        const parsed = account.account.data.parsed;
+        const info = parsed?.info;
+        if (!info) return null;
+        
+        const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
+        if (balance === 0) return null; // Skip zero balances
+        
+        return {
+          mint: info.mint,
+          balance,
+          decimals: info.tokenAmount?.decimals || 0,
+        };
+      })
+      .filter((t): t is TokenAccountInfo => t !== null);
+  } catch (e) {
+    console.error("Failed to fetch token accounts:", e);
+    return [];
+  }
+}
