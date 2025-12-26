@@ -176,11 +176,12 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
   await refreshTokenCache();
   
   const cached = tokenCache.tokens.find(t => t.mint === mint);
-  if (cached) return cached;
   
   try {
     const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return cached || null;
+    }
     const data = await response.json();
     
     if (data.pairs && data.pairs.length > 0) {
@@ -200,6 +201,10 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
       };
     }
     
+    if (cached) {
+      return cached;
+    }
+    
     return {
       mint,
       name: `Token ${mint.slice(0, 6)}...`,
@@ -208,7 +213,7 @@ export async function getTokenByMint(mint: string): Promise<Token | null> {
     };
   } catch (error) {
     console.error("Failed to fetch token by mint:", error);
-    return null;
+    return cached || null;
   }
 }
 
