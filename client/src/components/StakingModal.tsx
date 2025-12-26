@@ -54,7 +54,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
 
   const stakeMutation = useMutation({
     mutationFn: async ({ amountSol, validatorPubkey }: { amountSol: number; validatorPubkey: string }) => {
-      const keypair = getLocalKeypair();
+      const keypair = await getLocalKeypair();
       if (!keypair) throw new Error("Wallet not found");
       return createStakeAccount(keypair, amountSol, validatorPubkey);
     },
@@ -73,7 +73,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
 
   const deactivateMutation = useMutation({
     mutationFn: async (stakeAccountPubkey: PublicKey) => {
-      const keypair = getLocalKeypair();
+      const keypair = await getLocalKeypair();
       if (!keypair) throw new Error("Wallet not found");
       return deactivateStake(keypair, stakeAccountPubkey);
     },
@@ -88,7 +88,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
 
   const withdrawMutation = useMutation({
     mutationFn: async ({ stakeAccountPubkey, lamports }: { stakeAccountPubkey: PublicKey; lamports: number }) => {
-      const keypair = getLocalKeypair();
+      const keypair = await getLocalKeypair();
       if (!keypair) throw new Error("Wallet not found");
       return withdrawStake(keypair, stakeAccountPubkey, lamports);
     },

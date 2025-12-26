@@ -316,6 +316,7 @@ export async function getStakeAccounts(walletPubkey: PublicKey): Promise<StakeAc
 export async function getValidators(): Promise<{ votePubkey: string; activatedStake: number; commission: number }[]> {
   const { current } = await connection.getVoteAccounts();
   return current
+    .filter((v) => v.commission <= 10) // Only show validators with reasonable commission (max 10%)
     .sort((a, b) => b.activatedStake - a.activatedStake)
     .slice(0, 20)
     .map((v) => ({
