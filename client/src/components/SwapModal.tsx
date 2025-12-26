@@ -524,7 +524,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Priority Fee</label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-4 gap-1">
               {(["low", "medium", "high"] as const).map((level) => {
                 const feeInSol = priorityFeeAmounts[level] / 1_000_000_000;
                 return (
@@ -532,24 +532,24 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
                     key={level}
                     variant={priorityFee === level ? "default" : "outline"}
                     size="sm"
-                    className="flex-1 flex-col h-auto py-2"
+                    className="flex-col h-auto py-1.5 px-1"
                     onClick={() => setPriorityFee(level)}
                     disabled={isSwapping}
                   >
-                    <span className="capitalize">{level}</span>
-                    <span className="text-xs opacity-70">{feeInSol.toFixed(6)} SOL</span>
+                    <span className="capitalize text-xs">{level}</span>
+                    <span className="text-[10px] opacity-70">{feeInSol.toFixed(5)}</span>
                   </Button>
                 );
               })}
               <Button
                 variant={priorityFee === "custom" ? "default" : "outline"}
                 size="sm"
-                className="flex-1 flex-col h-auto py-2"
+                className="flex-col h-auto py-1.5 px-1"
                 onClick={() => setPriorityFee("custom")}
                 disabled={isSwapping}
               >
-                <span>Custom</span>
-                <span className="text-xs opacity-70">Set your own</span>
+                <span className="text-xs">Custom</span>
+                <span className="text-[10px] opacity-70">Set own</span>
               </Button>
             </div>
             {priorityFee === "custom" && (
