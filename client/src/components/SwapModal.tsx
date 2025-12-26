@@ -54,6 +54,7 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
   const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high">("medium");
+  const [customTokens, setCustomTokens] = useState<Token[]>([]);
 
   const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000 };
 
@@ -95,6 +96,10 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
       return response.json();
     },
     onSuccess: (token: Token) => {
+      setCustomTokens(prev => {
+        if (prev.some(t => t.mint === token.mint)) return prev;
+        return [...prev, token];
+      });
       handleSelectToken(token);
       toast({ title: "Token Found", description: `Added ${token.symbol} to your list` });
     },
@@ -105,7 +110,9 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
 
   const getTokenByMint = (mint: string): Token | undefined => {
     if (mint === "SOL") return { mint: "SOL", name: "Solana", symbol: "SOL", decimals: 9 };
-    return tokens.find((t) => t.mint === mint);
+    const fromTokens = tokens.find((t) => t.mint === mint);
+    if (fromTokens) return fromTokens;
+    return customTokens.find((t) => t.mint === mint);
   };
 
   const inputToken = getTokenByMint(inputMint);
