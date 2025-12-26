@@ -88,37 +88,40 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden crt-overlay">
         <div className="absolute top-4 right-4 z-20">
           <ThemeToggle />
         </div>
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
         
         <div className="relative z-10 text-center space-y-8 max-w-md w-full">
-          <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-muted/50 border border-border backdrop-blur-xl shadow-2xl mb-4">
-            <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+          <div className="inline-flex items-center justify-center p-4 rounded border-2 border-primary/50 bg-primary/10 mb-4 glow-border">
+            <Sparkles className="w-8 h-8 text-primary" />
           </div>
           
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight">
-              <span className="text-primary">Xray</span>
+          <div className="space-y-3">
+            <h1 className="text-4xl md:text-5xl font-bold font-mono tracking-tight glow-text">
+              <span className="text-primary">&gt; XRAY_</span>
             </h1>
-            <p className="text-muted-foreground text-lg">
-              The premium Solana experience. Fast, secure, and beautiful.
+            <p className="text-muted-foreground font-mono text-sm">
+              // SOLANA WALLET TERMINAL v1.0.0
+            </p>
+            <p className="text-muted-foreground/70 font-mono text-xs">
+              Fast. Secure. Retro-futuristic.
             </p>
           </div>
 
           <button 
             onClick={() => window.location.href = "/api/login"}
-            className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl"
+            className="w-full py-4 rounded border-2 border-primary bg-primary/20 text-primary font-mono font-bold text-lg hover:bg-primary/30 active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center gap-3 glow-border"
             data-testid="button-login"
           >
             <LogIn className="w-5 h-5" />
-            Continue with Replit
+            [AUTHENTICATE]
           </button>
           
-          <p className="text-xs text-muted-foreground">
-            Connects to Solana Devnet. Keys stored locally.
+          <p className="text-xs text-muted-foreground font-mono">
+            &gt; network: SOLANA_DEVNET | keys: LOCAL_STORAGE
           </p>
         </div>
       </div>
@@ -126,12 +129,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-10 relative overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,_rgba(120,119,198,0.1),_rgba(255,255,255,0))]" />
+    <div className="min-h-screen bg-background pb-10 relative overflow-hidden crt-overlay">
+      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
 
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border px-6 py-4 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-6 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-display font-bold text-primary">Xray</h1>
+          <h1 className="text-xl font-mono font-bold text-primary glow-text">&gt;_XRAY</h1>
           <WalletSwitcher
             wallets={wallets}
             activeWallet={activeWallet}

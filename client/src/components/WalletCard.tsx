@@ -78,59 +78,66 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.5, type: "spring" }}
-      className="w-full max-w-md mx-auto aspect-[1.586/1] rounded-3xl relative overflow-hidden shadow-2xl group cursor-pointer"
+      className="w-full max-w-md mx-auto aspect-[1.586/1] rounded-lg relative overflow-hidden shadow-2xl group cursor-pointer"
       onClick={handleCopy}
     >
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black animate-gradient-xy" />
+      {/* CRT Monitor Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-green-950 to-black" />
       
-      {/* Mesh/Grain Texture */}
-      <div className="absolute inset-0 opacity-30 mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
+      {/* Scanline Effect */}
+      <div className="absolute inset-0 opacity-20" style={{
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)'
+      }} />
       
-      {/* Glass Effect Overlay */}
-      <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] border border-white/10 rounded-3xl" />
+      {/* CRT Glow */}
+      <div className="absolute inset-0 bg-gradient-to-t from-transparent via-emerald-500/5 to-emerald-400/10" />
+      
+      {/* Border Glow */}
+      <div className="absolute inset-0 rounded-lg border-2 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2),inset_0_0_30px_rgba(16,185,129,0.05)]" />
 
       {/* Content */}
       <div className="relative h-full p-6 md:p-8 flex flex-col justify-between text-white z-10">
         <div className="flex justify-between items-start">
           <div>
-            <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-xs font-mono backdrop-blur-md border border-white/5">
-              Solana Devnet
+            <span className="inline-block px-3 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs font-mono border border-emerald-500/30">
+              [SOLANA_DEVNET]
             </span>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent opacity-80" />
+          <div className="w-10 h-10 rounded bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-mono text-xs">
+            SOL
+          </div>
         </div>
 
         <div className="space-y-1">
-          <p className="text-sm text-white/60 font-medium tracking-wide uppercase">Total Balance</p>
+          <p className="text-sm text-emerald-400/70 font-mono tracking-wide uppercase">&gt; TOTAL_BALANCE</p>
           {isLoadingPrice ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-white/50" />
-              <span className="text-white/50">Loading...</span>
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-400/50" />
+              <span className="text-emerald-400/50 font-mono">LOADING...</span>
             </div>
           ) : (
             <>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight font-display" data-testid="text-total-usd-balance">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight font-mono text-emerald-400 glow-text" data-testid="text-total-usd-balance">
                 ${totalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h2>
-              <p className="text-sm text-white/50 mt-1" data-testid="text-sol-balance">
+              <p className="text-sm text-emerald-500/60 font-mono mt-1" data-testid="text-sol-balance">
                 {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
-                {tokensUsdValue > 0 && ` + $${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} in tokens`}
+                {tokensUsdValue > 0 && ` + $${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} tokens`}
               </p>
             </>
           )}
         </div>
 
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end gap-3">
           <div>
-            <p className="text-white/80 font-medium text-lg">{username || "Wallet"}</p>
-            <div className="flex items-center gap-2 text-white/50 text-sm font-mono mt-1 group-hover:text-white/80 transition-colors">
-              {address ? shortenAddress(address, 6) : "Loading..."}
+            <p className="text-emerald-300 font-mono text-lg">{username || "Wallet"}</p>
+            <div className="flex items-center gap-2 text-emerald-500/60 text-sm font-mono mt-1 group-hover:text-emerald-400 transition-colors">
+              {address ? shortenAddress(address, 6) : "LOADING..."}
               <Copy className="w-3 h-3" />
             </div>
           </div>
-          <div className="text-white/30 text-xs font-mono">
-            SILVER CARD
+          <div className="text-emerald-600/50 text-xs font-mono border border-emerald-500/20 px-2 py-1 rounded">
+            v1.0.0
           </div>
         </div>
       </div>
