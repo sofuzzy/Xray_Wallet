@@ -136,11 +136,25 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
   const inputToken = getTokenByMint(inputMint);
   const outputToken = getTokenByMint(outputMint);
 
-  const handleSelectToken = (token: Token) => {
+  const handleSelectToken = async (token: Token) => {
     if (selectingFor === "input") {
       setInputMint(token.mint);
     } else if (selectingFor === "output") {
       setOutputMint(token.mint);
+      if (token.mint !== "SOL" && !token.priceUsd) {
+        try {
+          const response = await fetch(`/api/swaps/tokens/${token.mint}`, { credentials: "include" });
+          if (response.ok) {
+            const enrichedToken = await response.json();
+            setCustomTokens(prev => {
+              const filtered = prev.filter(t => t.mint !== enrichedToken.mint);
+              return [...filtered, enrichedToken];
+            });
+          }
+        } catch (e) {
+          console.error("Failed to fetch token details:", e);
+        }
+      }
     }
     setSelectingFor(null);
     setSearchQuery("");
