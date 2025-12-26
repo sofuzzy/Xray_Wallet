@@ -14,6 +14,7 @@ import {
   sendTransaction,
   type Token 
 } from "./services/jupiterSwap";
+import { getTokenPriceHistory } from "./services/priceHistory";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -489,6 +490,32 @@ export async function registerRoutes(
         return res.status(400).json({ message: error.errors[0].message });
       }
       res.status(500).json({ message: "Swap failed" });
+    }
+  });
+
+  // Price history routes
+  app.get("/api/prices/:mint", hybridAuth, async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const timeframe = (req.query.timeframe as string) || "24h";
+      
+      if (!["1h", "24h", "7d", "30d"].includes(timeframe)) {
+        return res.status(400).json({ message: "Invalid timeframe" });
+      }
+      
+      const priceHistory = await getTokenPriceHistory(
+        mint,
+        timeframe as "1h" | "24h" | "7d" | "30d"
+      );
+      
+      if (!priceHistory) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+      
+      res.json(priceHistory);
+    } catch (error) {
+      console.error("Price history error:", error);
+      res.status(500).json({ message: "Failed to fetch price history" });
     }
   });
 

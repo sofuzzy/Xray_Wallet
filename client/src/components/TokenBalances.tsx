@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Settings2, ChevronDown, ChevronUp, Coins } from "lucide-react";
+import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart } from "lucide-react";
 import { AutoTradeModal } from "./AutoTradeModal";
+import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getTokenAccounts, TokenAccountInfo } from "@/lib/solana";
 import { useWallet } from "@/hooks/use-wallet";
@@ -20,6 +21,7 @@ export function TokenBalances() {
   const { address } = useWallet();
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [showAutoTradeModal, setShowAutoTradeModal] = useState(false);
+  const [showChartModal, setShowChartModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Fetch actual token accounts from the wallet
@@ -52,6 +54,11 @@ export function TokenBalances() {
   const handleAutoTrade = (token: Token) => {
     setSelectedToken(token);
     setShowAutoTradeModal(true);
+  };
+
+  const handleShowChart = (token: Token) => {
+    setSelectedToken(token);
+    setShowChartModal(true);
   };
 
   if (isLoading) {
@@ -112,15 +119,26 @@ export function TokenBalances() {
                         {token.balance?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || "0"} {token.symbol}
                       </div>
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleAutoTrade(token)}
-                      title="Set auto-trade rules"
-                      data-testid={`button-autotrade-${token.symbol}`}
-                    >
-                      <Settings2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleShowChart(token)}
+                        title="View price chart"
+                        data-testid={`button-chart-${token.symbol}`}
+                      >
+                        <LineChart className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleAutoTrade(token)}
+                        title="Set auto-trade rules"
+                        data-testid={`button-autotrade-${token.symbol}`}
+                      >
+                        <Settings2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
@@ -135,6 +153,13 @@ export function TokenBalances() {
         tokenMint={selectedToken?.mint}
         tokenSymbol={selectedToken?.symbol}
         currentPrice="0"
+      />
+
+      <TokenChart
+        isOpen={showChartModal}
+        onClose={() => setShowChartModal(false)}
+        tokenMint={selectedToken?.mint || ""}
+        tokenSymbol={selectedToken?.symbol}
       />
     </>
   );
