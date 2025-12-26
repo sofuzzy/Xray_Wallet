@@ -75,14 +75,19 @@ export const importWalletWithName = async (mnemonic: string, name: string): Prom
   if (!validateMnemonic(mnemonic)) return null;
   const normalizedMnemonic = mnemonic.trim().toLowerCase();
   const keypair = await keypairFromMnemonic(normalizedMnemonic);
+  const publicKeyStr = keypair.publicKey.toString();
+  const wallets = getStoredWallets();
+  const existing = wallets.find(w => w.publicKey === publicKeyStr);
+  if (existing) {
+    return existing;
+  }
   const wallet: StoredWallet = {
     id: crypto.randomUUID(),
     name,
     mnemonic: normalizedMnemonic,
-    publicKey: keypair.publicKey.toString(),
+    publicKey: publicKeyStr,
     createdAt: Date.now(),
   };
-  const wallets = getStoredWallets();
   wallets.push(wallet);
   saveWallets(wallets);
   return wallet;
@@ -138,14 +143,19 @@ export const importWalletFromPrivateKey = async (privateKey: string, name: strin
     const secretKey = bs58.decode(privateKey.trim());
     if (secretKey.length !== 64) return null;
     const keypair = Keypair.fromSecretKey(secretKey);
+    const publicKeyStr = keypair.publicKey.toString();
+    const wallets = getStoredWallets();
+    const existing = wallets.find(w => w.publicKey === publicKeyStr);
+    if (existing) {
+      return existing;
+    }
     const wallet: StoredWallet = {
       id: crypto.randomUUID(),
       name,
       mnemonic: `pk:${privateKey.trim()}`,
-      publicKey: keypair.publicKey.toString(),
+      publicKey: publicKeyStr,
       createdAt: Date.now(),
     };
-    const wallets = getStoredWallets();
     wallets.push(wallet);
     saveWallets(wallets);
     return wallet;
