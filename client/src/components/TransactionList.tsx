@@ -1,6 +1,6 @@
 import { Transaction } from "@shared/schema";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ArrowDownLeft, Clock } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,31 +30,49 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
     );
   }
 
+  const getSolscanUrl = (signature: string) => {
+    return `https://solscan.io/tx/${signature}?cluster=devnet`;
+  };
+
   return (
     <div className="space-y-3 px-4 pb-20">
       <h3 className="text-lg font-bold mb-4 ml-1">Recent Activity</h3>
       {transactions.map((tx, idx) => {
         const isReceived = tx.toAddr === currentAddress;
+        const isSwap = tx.type === "swap";
         
         return (
-          <motion.div
+          <motion.a
             key={tx.id}
+            href={getSolscanUrl(tx.signature)}
+            target="_blank"
+            rel="noopener noreferrer"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-default"
+            className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group block"
+            data-testid={`transaction-item-${tx.id}`}
           >
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                isReceived 
-                  ? "bg-green-500/20 text-green-400" 
-                  : "bg-white/10 text-white"
+                isSwap 
+                  ? "bg-purple-500/20 text-purple-400"
+                  : isReceived 
+                    ? "bg-green-500/20 text-green-400" 
+                    : "bg-white/10 text-white"
               }`}>
-                {isReceived ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                {isSwap ? (
+                  <ArrowRightLeft className="w-5 h-5" />
+                ) : isReceived ? (
+                  <ArrowDownLeft className="w-5 h-5" />
+                ) : (
+                  <ArrowUpRight className="w-5 h-5" />
+                )}
               </div>
               <div>
-                <p className="font-medium text-white">
-                  {isReceived ? "Received" : "Sent"}
+                <p className="font-medium text-white flex items-center gap-2">
+                  {isSwap ? "Swap" : isReceived ? "Received" : "Sent"}
+                  <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {tx.timestamp ? formatDistanceToNow(new Date(tx.timestamp), { addSuffix: true }) : 'Just now'}
@@ -63,14 +81,27 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
             </div>
             
             <div className="text-right">
-              <p className={`font-mono font-medium ${isReceived ? "text-green-400" : "text-white"}`}>
-                {isReceived ? "+" : "-"}{parseFloat(tx.amount).toFixed(4)} SOL
-              </p>
-              <p className="text-xs text-muted-foreground font-mono">
-                {isReceived ? `From: ${shortenAddress(tx.fromAddr)}` : `To: ${shortenAddress(tx.toAddr)}`}
-              </p>
+              {isSwap ? (
+                <>
+                  <p className="font-mono font-medium text-purple-400">
+                    {parseFloat(tx.amount).toFixed(4)} {tx.inputToken || "?"} → {tx.outputAmount ? parseFloat(tx.outputAmount).toFixed(4) : "?"} {tx.outputToken || "?"}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {shortenAddress(tx.signature)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className={`font-mono font-medium ${isReceived ? "text-green-400" : "text-white"}`}>
+                    {isReceived ? "+" : "-"}{parseFloat(tx.amount).toFixed(4)} SOL
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {isReceived ? `From: ${shortenAddress(tx.fromAddr)}` : `To: ${shortenAddress(tx.toAddr)}`}
+                  </p>
+                </>
+              )}
             </div>
-          </motion.div>
+          </motion.a>
         );
       })}
     </div>

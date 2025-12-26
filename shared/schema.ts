@@ -22,6 +22,10 @@ export const transactions = pgTable("transactions", {
   amount: text("amount").notNull(),
   signature: text("signature").notNull(),
   status: text("status").default("confirmed"),
+  type: text("type").default("transfer"), // transfer, swap
+  inputToken: text("input_token"), // For swaps: input token symbol
+  outputToken: text("output_token"), // For swaps: output token symbol
+  outputAmount: text("output_amount"), // For swaps: output amount
   timestamp: timestamp("timestamp").defaultNow(),
 });
 

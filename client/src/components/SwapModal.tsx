@@ -338,8 +338,30 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
 
       return result;
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       setTxStep("success");
+      
+      // Save swap transaction to database
+      try {
+        const outputDecimals = outputToken?.decimals || 9;
+        const calculatedOutputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, outputDecimals)).toString() : "0";
+        
+        await apiRequest("POST", "/api/transactions", {
+          fromAddr: address,
+          toAddr: address,
+          amount: inputAmount,
+          signature: data.signature,
+          type: "swap",
+          inputToken: inputToken?.symbol || "?",
+          outputToken: outputToken?.symbol || "?",
+          outputAmount: calculatedOutputAmount,
+        });
+        
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      } catch (e) {
+        console.error("Failed to save swap transaction:", e);
+      }
+      
       toast({
         title: "Swap Successful!",
         description: `Transaction: ${data.signature.slice(0, 8)}...`,
