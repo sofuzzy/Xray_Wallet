@@ -167,7 +167,7 @@ export const anomalyDetection: RequestHandler = (req, res, next) => {
   tracker.requestCount++;
   tracker.lastRequest = now;
   
-  if (timeSinceLastRequest < 10 && tracker.requestCount > 50) {
+  if (timeSinceLastRequest < 5 && tracker.requestCount > 500) {
     tracker.suspiciousPatterns.push("rapid_requests");
     console.warn(`[ANOMALY] Rapid requests detected from ${key}`);
   }
@@ -185,7 +185,7 @@ export const anomalyDetection: RequestHandler = (req, res, next) => {
     }
   });
   
-  if (tracker.suspiciousPatterns.length > 50) {
+  if (tracker.suspiciousPatterns.length > 100) {
     return res.status(429).json({
       error: "SUSPICIOUS_ACTIVITY",
       message: "Unusual activity detected. Please try again later.",
