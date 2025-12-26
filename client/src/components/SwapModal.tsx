@@ -516,18 +516,22 @@ export function SwapModal({ isOpen, onClose }: SwapModalProps) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Priority Fee</label>
             <div className="flex gap-2">
-              {(["low", "medium", "high"] as const).map((level) => (
-                <Button
-                  key={level}
-                  variant={priorityFee === level ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1 capitalize"
-                  onClick={() => setPriorityFee(level)}
-                  disabled={isSwapping}
-                >
-                  {level}
-                </Button>
-              ))}
+              {(["low", "medium", "high"] as const).map((level) => {
+                const feeInSol = priorityFeeAmounts[level] / 1_000_000_000;
+                return (
+                  <Button
+                    key={level}
+                    variant={priorityFee === level ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 flex-col h-auto py-2"
+                    onClick={() => setPriorityFee(level)}
+                    disabled={isSwapping}
+                  >
+                    <span className="capitalize">{level}</span>
+                    <span className="text-xs opacity-70">{feeInSol.toFixed(6)} SOL</span>
+                  </Button>
+                );
+              })}
             </div>
           </div>
 
