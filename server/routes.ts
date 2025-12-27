@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -37,7 +38,12 @@ import {
   verifyRegistration,
   verifyAuthentication,
   getCredentialsForUser,
-  deleteCredential
+  deleteCredential,
+  generatePasskeyRegistrationOptions,
+  verifyPasskeyRegistration,
+  generatePasskeyLoginOptions,
+  verifyPasskeyLogin,
+  getRpId
 } from "./services/webauthnService";
 import { getOnChainTransactions } from "./services/solanaTransactions";
 
@@ -136,6 +142,134 @@ export async function registerRoutes(
       console.error("Token revocation failed:", error);
       res.status(500).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
     }
+  });
+
+  // ============================================
+  // PASSKEY-ONLY AUTHENTICATION ROUTES
+  // NON-CUSTODIAL: These endpoints NEVER handle private keys, seed phrases, or
+  // anything that can sign transactions. Only public credential data is stored.
+  // ============================================
+
+  app.post("/api/auth/passkey/register/options", authRateLimiter, async (req, res) => {
+    try {
+      const { username } = req.body;
+      const sessionId = req.sessionID || crypto.randomUUID();
+      
+      const options = await generatePasskeyRegistrationOptions(sessionId, username);
+      
+      res.json({
+        ...options,
+        sessionId,
+      });
+    } catch (error) {
+      console.error("Passkey registration options failed:", error);
+      res.status(500).json({ error: "OPTIONS_FAILED", message: "Failed to generate registration options" });
+    }
+  });
+
+  app.post("/api/auth/passkey/register/verify", strictRateLimiter, async (req, res) => {
+    try {
+      const { sessionId, id, response, transports } = req.body;
+
+      if (!sessionId || !id || !response?.clientDataJSON || !response?.attestationObject) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: "Missing required fields" });
+      }
+
+      const result = await verifyPasskeyRegistration(
+        sessionId,
+        id,
+        response.clientDataJSON,
+        response.attestationObject,
+        transports
+      );
+
+      if (!result.success || !result.userId) {
+        return res.status(400).json({ error: "VERIFICATION_FAILED", message: result.error || "Registration failed" });
+      }
+
+      const tokens = await generateTokenPair(
+        result.userId,
+        {},
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      res.json({
+        success: true,
+        message: "Passkey registered successfully",
+        userId: result.userId,
+        ...tokens,
+      });
+    } catch (error) {
+      console.error("Passkey registration failed:", error);
+      res.status(500).json({ error: "REGISTRATION_FAILED", message: "Failed to register passkey" });
+    }
+  });
+
+  app.post("/api/auth/passkey/login/options", authRateLimiter, async (req, res) => {
+    try {
+      const sessionId = req.sessionID || crypto.randomUUID();
+      const options = generatePasskeyLoginOptions(sessionId);
+      
+      res.json({
+        ...options,
+        sessionId,
+      });
+    } catch (error) {
+      console.error("Passkey login options failed:", error);
+      res.status(500).json({ error: "OPTIONS_FAILED", message: "Failed to generate login options" });
+    }
+  });
+
+  app.post("/api/auth/passkey/login/verify", strictRateLimiter, async (req, res) => {
+    try {
+      const { sessionId, id, rawId, response } = req.body;
+
+      if (!sessionId || !id || !response?.clientDataJSON || !response?.authenticatorData || !response?.signature) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: "Missing required fields" });
+      }
+
+      const result = await verifyPasskeyLogin(
+        sessionId,
+        id,
+        rawId || id,
+        response.clientDataJSON,
+        response.authenticatorData,
+        response.signature,
+        response.userHandle
+      );
+
+      if (!result.success || !result.userId) {
+        return res.status(401).json({ error: "AUTH_FAILED", message: result.error || "Authentication failed" });
+      }
+
+      const tokens = await generateTokenPair(
+        result.userId,
+        {},
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      res.json({
+        success: true,
+        message: "Login successful",
+        userId: result.userId,
+        ...tokens,
+      });
+    } catch (error) {
+      console.error("Passkey login failed:", error);
+      res.status(500).json({ error: "AUTH_FAILED", message: "Failed to authenticate" });
+    }
+  });
+
+  app.get("/api/auth/passkey/info", (req, res) => {
+    res.json({
+      rpId: getRpId(),
+      rpName: "Xray Wallet",
+      supported: true,
+      nonCustodial: true,
+      message: "Server cannot sign transactions - your wallet keys never touch our servers",
+    });
   });
 
   app.get("/api/webauthn/credentials", hybridAuth, async (req, res) => {

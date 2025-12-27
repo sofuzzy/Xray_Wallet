@@ -2,7 +2,7 @@
 
 ## Overview
 
-Xray is a Solana devnet wallet application that allows users to manage SOL tokens with a modern, mobile-friendly interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and purchasing SOL via Stripe payments. It uses Replit Auth for user authentication and stores wallet data in a PostgreSQL database.
+Xray is a Solana devnet wallet application that allows users to manage SOL tokens with a retro-futuristic terminal-inspired interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and purchasing SOL via Stripe payments. It supports both Passkey (WebAuthn) and Replit Auth for user authentication and stores wallet data in a PostgreSQL database. The wallet is completely non-custodial - private keys never touch the server.
 
 ## User Preferences
 
@@ -102,7 +102,14 @@ The server follows a modular pattern:
 - Credentials fetched from Replit Connectors API
 
 ### Authentication & Security
-- **Replit Auth**: OpenID Connect authentication
+- **Passkey Authentication (Primary)**: WebAuthn-based passwordless authentication
+  - Supports Touch ID, Face ID, Windows Hello, and security keys
+  - Resident key support for discoverable credentials
+  - Server stores only public credential data - never private keys
+  - Creates new user account on first registration
+  - Issues JWT tokens upon successful authentication
+  - Endpoints: `/api/auth/passkey/register/*` and `/api/auth/passkey/login/*`
+- **Replit Auth (Alternative)**: OpenID Connect authentication
 - **Passport.js**: Authentication middleware
 - **express-session**: Session management (backward compatibility)
 - **Zero-Trust Architecture**: JWT-based authentication with:
@@ -112,17 +119,18 @@ The server follows a modular pattern:
   - Hybrid auth supporting both sessions and tokens
   - Rate limiting (global/strict/auth tiers)
   - Basic anomaly detection for suspicious patterns
-- **Face ID / Biometric Unlock**: WebAuthn-based biometric authentication
-  - Platform authenticator (Face ID, Touch ID) for quick unlock
-  - Credential registration stores public key server-side
-  - Authentication issues new JWT tokens upon successful biometric verification
-  - Feature detection for unsupported browsers with graceful fallback
+- **Face ID / Biometric Unlock**: WebAuthn-based biometric authentication for existing sessions
+- **Non-Custodial Design**: Server NEVER stores or handles:
+  - Private keys
+  - Seed phrases
+  - Anything that can sign transactions
 - **Key Files**:
   - `server/services/tokenService.ts` - JWT token generation/validation
   - `server/middleware/zeroTrust.ts` - Auth middleware, rate limiting, anomaly detection
-  - `server/services/webauthnService.ts` - WebAuthn registration/authentication
+  - `server/services/webauthnService.ts` - WebAuthn registration/authentication + passkey-only auth
   - `client/src/lib/tokenManager.ts` - Frontend token management with auto-refresh
-  - `client/src/hooks/use-biometric.ts` - WebAuthn frontend integration
+  - `client/src/hooks/use-passkey.ts` - Passkey authentication frontend hook
+  - `client/src/hooks/use-biometric.ts` - WebAuthn biometric unlock (for existing sessions)
 
 ### UI Components
 - **shadcn/ui**: Full component library (Radix UI primitives)
