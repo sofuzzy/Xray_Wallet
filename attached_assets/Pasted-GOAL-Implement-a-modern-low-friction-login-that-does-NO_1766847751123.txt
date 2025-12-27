@@ -1,0 +1,71 @@
+GOAL
+- Implement a modern, low-friction login that does NOT make the developer custodial.
+- Use Passkeys (WebAuthn) as the primary login method (no passwords).
+- Use an auth session (JWT) for the app backend.
+- The backend must NEVER store private keys, seed phrases, or anything that can sign transactions.
+- The app should be structured so that later we can add an on-device wallet (private key stored in browser secure storage) OR plug in an MPC provider, but do NOT implement custodial key storage.
+
+STACK
+- Next.js (App Router) + TypeScript
+- Tailwind for UI
+- Use a simple DB (SQLite with Prisma) OR Replit key-value storage if easier.
+- Use a well-known WebAuthn library for passkeys.
+
+FEATURES TO BUILD
+1) Landing page with “Continue with Passkey”
+2) Passkey registration flow:
+   - Create a user record (id, createdAt)
+   - Generate WebAuthn registration options server-side
+   - Complete registration and store ONLY the public credential data needed for future authentication:
+     - credentialId
+     - publicKey
+     - counter
+     - transports (if available)
+   - Never store private keys.
+
+3) Passkey login flow:
+   - Generate WebAuthn authentication options server-side
+   - Verify assertion server-side
+   - On success, create a signed session JWT (httpOnly cookie)
+
+4) Authenticated page:
+   - Shows user id, last login, and a big banner stating “Non-custodial: server cannot sign transactions”
+   - Include a placeholder section “Wallet Setup (Coming Soon)” that explains two future options:
+     A) On-device key (generated client-side, encrypted with WebCrypto, stored in IndexedDB/local secure storage)
+     B) MPC provider (e.g., Web3Auth/Privy/Dynamic) where the app never controls all shares
+
+SECURITY & NON-CUSTODY RULES (must follow)
+- Do not add any server endpoint that accepts a private key, seed phrase, or signed transaction.
+- Do not log sensitive WebAuthn challenges or assertions.
+- Store only what’s required to verify passkey assertions (public data).
+- Use CSRF protection or same-site cookie strategy.
+- JWT must be httpOnly + secure (in production) + sameSite=lax/strict.
+
+DELIVERABLES
+- Working Next.js project with clear file structure:
+  - /app (routes)
+  - /app/api/auth/register/options
+  - /app/api/auth/register/verify
+  - /app/api/auth/login/options
+  - /app/api/auth/login/verify
+  - /lib/webauthn.ts (shared helpers)
+  - /lib/jwt.ts
+  - /lib/db.ts (Prisma or storage)
+- Provide step-by-step setup instructions:
+  - env vars
+  - run commands
+  - how to test registration & login
+- Add clear comments in code explaining why this is non-custodial.
+
+UI REQUIREMENTS
+- Clean, minimal UI: “Continue with Passkey”
+- Display friendly copy that makes users comfortable:
+  - “No passwords”
+  - “Your wallet keys never touch our servers”
+  - “You can export or upgrade security later”
+
+IMPORTANT
+- If WebAuthn requires HTTPS, implement a Replit-friendly approach (Replit provides HTTPS) and note any limitations.
+- Keep the implementation simple and robust.
+
+Build it now.
