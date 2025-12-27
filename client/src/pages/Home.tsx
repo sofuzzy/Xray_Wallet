@@ -18,7 +18,7 @@ import { SeedPhraseModal } from "@/components/SeedPhraseModal";
 import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
 import { TradingViewModal } from "@/components/TradingViewModal";
-import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint } from "lucide-react";
+import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +64,7 @@ export default function Home() {
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [showPasskeyOptions, setShowPasskeyOptions] = useState(false);
+  const [isInIframe] = useState(() => window.top !== window.self);
 
   const passkeyUserId = getStoredUserId();
   const isPasskeyAuth = !!passkeyUserId;
@@ -137,9 +138,27 @@ export default function Home() {
             </p>
           </div>
 
+          {isInIframe && passkeySupported && (
+            <div className="mb-4 p-3 rounded border border-amber-500/50 bg-amber-500/10">
+              <p className="text-xs text-amber-500 font-mono mb-2">
+                Passkeys require a full browser window
+              </p>
+              <a 
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs text-primary font-mono hover:underline"
+                data-testid="link-open-new-tab"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Open in new tab to use passkeys
+              </a>
+            </div>
+          )}
+
           {!showPasskeyOptions ? (
             <div className="space-y-4">
-              {passkeySupported && (
+              {passkeySupported && !isInIframe && (
                 <button 
                   onClick={() => setShowPasskeyOptions(true)}
                   disabled={passkeyLoading}
