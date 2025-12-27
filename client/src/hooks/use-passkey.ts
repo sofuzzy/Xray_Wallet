@@ -36,8 +36,7 @@ export function usePasskey() {
     setError(null);
 
     try {
-      const optionsRes = await apiRequest("POST", "/api/auth/passkey/register/options", { username });
-      const options = await optionsRes.json();
+      const options = await apiRequest("POST", "/api/auth/passkey/register/options", { username });
 
       const credential = await navigator.credentials.create({
         publicKey: {
@@ -61,7 +60,7 @@ export function usePasskey() {
 
       const attestationResponse = credential.response as AuthenticatorAttestationResponse;
       
-      const verifyRes = await apiRequest("POST", "/api/auth/passkey/register/verify", {
+      const result = await apiRequest("POST", "/api/auth/passkey/register/verify", {
         sessionId: options.sessionId,
         id: credential.id,
         rawId: arrayBufferToBase64Url(credential.rawId),
@@ -72,8 +71,6 @@ export function usePasskey() {
         },
         transports: attestationResponse.getTransports?.() || [],
       });
-
-      const result = await verifyRes.json();
 
       if (result.success && result.accessToken) {
         localStorage.setItem("accessToken", result.accessToken);
@@ -100,8 +97,7 @@ export function usePasskey() {
     setError(null);
 
     try {
-      const optionsRes = await apiRequest("POST", "/api/auth/passkey/login/options", {});
-      const options = await optionsRes.json();
+      const options = await apiRequest("POST", "/api/auth/passkey/login/options", {});
 
       const credential = await navigator.credentials.get({
         publicKey: {
@@ -119,7 +115,7 @@ export function usePasskey() {
 
       const assertionResponse = credential.response as AuthenticatorAssertionResponse;
       
-      const verifyRes = await apiRequest("POST", "/api/auth/passkey/login/verify", {
+      const result = await apiRequest("POST", "/api/auth/passkey/login/verify", {
         sessionId: options.sessionId,
         id: credential.id,
         rawId: arrayBufferToBase64Url(credential.rawId),
@@ -131,8 +127,6 @@ export function usePasskey() {
           userHandle: assertionResponse.userHandle ? arrayBufferToBase64Url(assertionResponse.userHandle) : undefined,
         },
       });
-
-      const result = await verifyRes.json();
 
       if (result.success && result.accessToken) {
         localStorage.setItem("accessToken", result.accessToken);
