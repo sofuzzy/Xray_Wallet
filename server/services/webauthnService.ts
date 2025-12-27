@@ -19,12 +19,28 @@ const passkeyRegistrationChallenges = new Map<string, { challenge: string; expir
 const passkeyLoginChallenges = new Map<string, { challenge: string; expiresAt: number }>();
 
 const RP_NAME = "Xray Wallet";
-const RP_ID = process.env.REPL_SLUG && process.env.REPL_OWNER 
-  ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER.toLowerCase()}.repl.co` 
-  : "localhost";
-const ORIGIN = process.env.REPL_SLUG && process.env.REPL_OWNER
-  ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER.toLowerCase()}.repl.co`
-  : "http://localhost:5000";
+
+function getRpIdAndOrigin(): { rpId: string; origin: string } {
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return {
+      rpId: process.env.REPLIT_DEV_DOMAIN,
+      origin: `https://${process.env.REPLIT_DEV_DOMAIN}`,
+    };
+  }
+  if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
+    const domain = `${process.env.REPL_SLUG}.${process.env.REPL_OWNER.toLowerCase()}.repl.co`;
+    return {
+      rpId: domain,
+      origin: `https://${domain}`,
+    };
+  }
+  return {
+    rpId: "localhost",
+    origin: "http://localhost:5000",
+  };
+}
+
+const { rpId: RP_ID, origin: ORIGIN } = getRpIdAndOrigin();
 
 export function generateRegistrationChallenge(userId: string): {
   challenge: string;
