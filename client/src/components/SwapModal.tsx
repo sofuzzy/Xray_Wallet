@@ -601,13 +601,22 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               />
               <Button
                 variant="outline"
-                className="w-32 justify-between"
+                className="w-36 justify-between"
                 onClick={() => setSelectingFor("input")}
                 disabled={isSwapping}
                 data-testid="select-input-token"
               >
-                {inputToken?.symbol || "Select"}
-                <Search className="w-3 h-3 ml-1 opacity-50" />
+                <span className="flex items-center gap-2">
+                  {inputToken?.logoURI ? (
+                    <img src={inputToken.logoURI} alt={inputToken.symbol} className="w-5 h-5 rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : inputToken?.symbol === "SOL" ? (
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">S</div>
+                  ) : inputToken ? (
+                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">{inputToken.symbol.slice(0, 2)}</div>
+                  ) : null}
+                  {inputToken?.symbol || "Select"}
+                </span>
+                <Search className="w-3 h-3 opacity-50" />
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">Balance: {balance.toFixed(4)} SOL</p>
@@ -632,13 +641,22 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               />
               <Button
                 variant="outline"
-                className="w-32 justify-between"
+                className="w-36 justify-between"
                 onClick={() => setSelectingFor("output")}
                 disabled={isSwapping}
                 data-testid="select-output-token"
               >
-                {outputToken?.symbol || "Select"}
-                <Search className="w-3 h-3 ml-1 opacity-50" />
+                <span className="flex items-center gap-2">
+                  {outputToken?.logoURI ? (
+                    <img src={outputToken.logoURI} alt={outputToken.symbol} className="w-5 h-5 rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : outputToken?.symbol === "SOL" ? (
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">S</div>
+                  ) : outputToken ? (
+                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">{outputToken.symbol.slice(0, 2)}</div>
+                  ) : null}
+                  {outputToken?.symbol || "Select"}
+                </span>
+                <Search className="w-3 h-3 opacity-50" />
               </Button>
             </div>
           </div>
