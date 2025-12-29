@@ -11,7 +11,6 @@ import { TokenBalances } from "@/components/TokenBalances";
 import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
-import { BuyModal } from "@/components/BuyModal";
 import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { StakingModal } from "@/components/StakingModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
@@ -58,7 +57,6 @@ export default function Home() {
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isSwapOpen, setIsSwapOpen] = useState(false);
-  const [isBuyOpen, setIsBuyOpen] = useState(false);
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
   const [isStakeOpen, setIsStakeOpen] = useState(false);
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
@@ -311,7 +309,6 @@ export default function Home() {
           onReceive={() => setIsReceiveOpen(true)}
           onSwap={() => setIsSwapOpen(true)}
           onTopUp={handleTopUp}
-          onBuy={() => setIsBuyOpen(true)}
           onLaunch={() => setIsLaunchOpen(true)}
           onStake={() => setIsStakeOpen(true)}
         />
@@ -331,7 +328,6 @@ export default function Home() {
         {isSendOpen && <SendModal isOpen={isSendOpen} onClose={() => setIsSendOpen(false)} />}
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
         {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => { setIsSwapOpen(false); setSelectedToken(null); }} initialOutputToken={selectedToken || undefined} />}
-        {isBuyOpen && <BuyModal isOpen={isBuyOpen} onClose={() => setIsBuyOpen(false)} />}
         {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
         {isStakeOpen && <StakingModal isOpen={isStakeOpen} onClose={() => setIsStakeOpen(false)} />}
         {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
