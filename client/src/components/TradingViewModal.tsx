@@ -120,7 +120,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
             </div>
             {!isSolToken && (
               <a
-                href={`https://solscan.io/token/${token.mint}?cluster=devnet`}
+                href={`https://solscan.io/token/${token.mint}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 rounded-full hover:bg-muted text-muted-foreground"

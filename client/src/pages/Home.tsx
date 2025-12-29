@@ -39,7 +39,6 @@ export default function Home() {
   const { 
     balance, 
     address, 
-    requestAirdrop, 
     isLoading: walletLoading,
     wallets,
     activeWallet,
@@ -92,16 +91,6 @@ export default function Home() {
       updateUser({ walletPublicKey: address });
     }
   }, [dbUser, address, updateUser]);
-
-  const handleTopUp = async () => {
-    try {
-      toast({ title: "Requesting Airdrop...", description: "Please wait ~10-20 seconds for confirmation." });
-      await requestAirdrop();
-      toast({ title: "Airdrop Received!", description: "1 SOL has been added to your devnet wallet." });
-    } catch (e) {
-      toast({ title: "Airdrop Failed", description: "You may be rate limited. Try again later.", variant: "destructive" });
-    }
-  };
 
   if (authLoading || walletLoading) {
     return (
@@ -308,7 +297,6 @@ export default function Home() {
           onSend={() => setIsSendOpen(true)}
           onReceive={() => setIsReceiveOpen(true)}
           onSwap={() => setIsSwapOpen(true)}
-          onTopUp={handleTopUp}
           onLaunch={() => setIsLaunchOpen(true)}
           onStake={() => setIsStakeOpen(true)}
         />

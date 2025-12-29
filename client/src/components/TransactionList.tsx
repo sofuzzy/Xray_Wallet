@@ -31,7 +31,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
   }
 
   const getSolscanUrl = (signature: string) => {
-    return `https://solscan.io/tx/${signature}?cluster=devnet`;
+    return `https://solscan.io/tx/${signature}`;
   };
 
   return (

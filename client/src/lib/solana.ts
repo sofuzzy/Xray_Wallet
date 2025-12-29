@@ -12,8 +12,8 @@ import {
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 
-// Use Devnet for this demo
-export const SOLANA_NETWORK = "devnet";
+// Use Mainnet for production
+export const SOLANA_NETWORK = "mainnet-beta";
 export const SOLANA_RPC_URL = clusterApiUrl(SOLANA_NETWORK);
 export const connection = new Connection(SOLANA_RPC_URL, "confirmed");
 

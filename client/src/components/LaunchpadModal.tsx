@@ -114,7 +114,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     if (balance < requiredLamports) {
       toast({ 
         title: "Insufficient Balance", 
-        description: `You need at least 0.05 SOL to create a token. Current balance: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL. Use the airdrop feature to get some devnet SOL.`, 
+        description: `You need at least 0.05 SOL to create a token. Current balance: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL.`, 
         variant: "destructive" 
       });
       return;
@@ -333,7 +333,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 <p className="text-xs text-muted-foreground">Estimated Cost</p>
                 <p className="text-lg font-bold text-white">~0.05 SOL</p>
                 <p className="text-xs text-muted-foreground">
-                  Covers account rent and transaction fees on devnet
+                  Covers account rent and transaction fees
                 </p>
               </div>
 

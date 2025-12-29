@@ -2,7 +2,7 @@
 
 ## Overview
 
-Xray is a Solana devnet wallet application that allows users to manage SOL tokens with a retro-futuristic terminal-inspired interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and purchasing SOL via Stripe payments. It supports both Passkey (WebAuthn) and Replit Auth for user authentication and stores wallet data in a PostgreSQL database. The wallet is completely non-custodial - private keys never touch the server.
+Xray is a Solana mainnet wallet application that allows users to manage SOL tokens with a retro-futuristic terminal-inspired interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and token launchpad. It supports both Passkey (WebAuthn) and Replit Auth for user authentication and stores wallet data in a PostgreSQL database. The wallet is completely non-custodial - private keys never touch the server.
 
 ## User Preferences
 
@@ -50,7 +50,7 @@ The server follows a modular pattern:
 - Keypairs are generated client-side using `@solana/web3.js`
 - Private keys stored in browser localStorage (base58 encoded)
 - Public keys synced to server database for user lookups
-- Connects to Solana devnet for all operations
+- Connects to Solana mainnet-beta for all operations
 - **Multi-Wallet Support**: Create and manage multiple wallets
   - Wallet data stored in localStorage as JSON array
   - Each wallet has id, name, mnemonic, publicKey, and createdAt
@@ -69,7 +69,7 @@ The server follows a modular pattern:
 - Stake accounts created client-side with wallet keypair as authority
 - Supports delegation to top validators by activated stake
 - Stake lifecycle: create → delegate → deactivate → withdraw
-- Activation/deactivation takes 2-3 epochs (~4-6 days on devnet)
+- Activation/deactivation takes 2-3 epochs (~4-6 days on mainnet)
 
 ### Token Swap Implementation (Jupiter)
 - **Jupiter API Integration**: Server-side quote and swap transaction generation

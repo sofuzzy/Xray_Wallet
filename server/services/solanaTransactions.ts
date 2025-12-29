@@ -1,6 +1,6 @@
 import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || clusterApiUrl("devnet");
+const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || clusterApiUrl("mainnet-beta");
 const connection = new Connection(SOLANA_RPC_URL, "confirmed");
 
 export interface OnChainTransaction {

@@ -5,12 +5,11 @@ interface ActionButtonsProps {
   onSend: () => void;
   onReceive: () => void;
   onSwap: () => void;
-  onTopUp: () => void;
   onLaunch?: () => void;
   onStake?: () => void;
 }
 
-export function ActionButtons({ onSend, onReceive, onSwap, onTopUp, onLaunch, onStake }: ActionButtonsProps) {
+export function ActionButtons({ onSend, onReceive, onSwap, onLaunch, onStake }: ActionButtonsProps) {
   const buttons = [
     { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-white text-black hover:bg-white/90", testId: "button-send" },
     { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-white/10 text-white hover:bg-white/20 backdrop-blur-md", testId: "button-receive" },
