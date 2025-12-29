@@ -100,7 +100,7 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
         <div className="flex justify-between items-start">
           <div>
             <span className="inline-block px-3 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs font-mono border border-emerald-500/30">
-              [SOLANA_DEVNET]
+              [SOLANA_MAINNET]
             </span>
           </div>
           <div className="w-10 h-10 rounded bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-mono text-xs">
