@@ -63,11 +63,19 @@ export function useWallet() {
     queryKey: ["wallet-balance", keypair?.publicKey.toString()],
     queryFn: async () => {
       if (!keypair) return 0;
-      const bal = await connection.getBalance(keypair.publicKey);
-      return bal / LAMPORTS_PER_SOL;
+      try {
+        const bal = await connection.getBalance(keypair.publicKey);
+        return bal / LAMPORTS_PER_SOL;
+      } catch (error) {
+        console.error("Failed to fetch balance:", error);
+        throw error;
+      }
     },
     enabled: !!keypair,
-    refetchInterval: 10000,
+    refetchInterval: 15000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 5000,
   });
 
   const requestAirdrop = useCallback(async () => {

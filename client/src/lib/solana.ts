@@ -12,10 +12,14 @@ import {
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 
-// Use Mainnet for production
+// Use Mainnet for production with reliable RPC
 export const SOLANA_NETWORK = "mainnet-beta";
-export const SOLANA_RPC_URL = clusterApiUrl(SOLANA_NETWORK);
-export const connection = new Connection(SOLANA_RPC_URL, "confirmed");
+// Use environment variable RPC or fallback to public endpoint
+export const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+export const connection = new Connection(SOLANA_RPC_URL, {
+  commitment: "confirmed",
+  confirmTransactionInitialTimeout: 60000,
+});
 
 // Constants
 export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
