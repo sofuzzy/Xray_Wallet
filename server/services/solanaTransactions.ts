@@ -1,8 +1,10 @@
 import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-// Try multiple RPC endpoints - some may be blocked on Replit
-const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://solana-mainnet.g.alchemy.com/v2/demo";
-const connection = new Connection(SOLANA_RPC_URL, "confirmed");
+// Use user-provided RPC or fallback to public mainnet
+const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || clusterApiUrl("mainnet-beta");
+const connection = new Connection(SOLANA_RPC_URL, {
+  commitment: "confirmed",
+});
 
 console.log("Solana RPC URL:", SOLANA_RPC_URL);
 
