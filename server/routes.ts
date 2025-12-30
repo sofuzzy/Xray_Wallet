@@ -45,7 +45,7 @@ import {
   verifyPasskeyLogin,
   getRpId
 } from "./services/webauthnService";
-import { getOnChainTransactions } from "./services/solanaTransactions";
+import { getOnChainTransactions, getWalletBalance, getTokenAccounts } from "./services/solanaTransactions";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -454,6 +454,30 @@ export async function registerRoutes(
       res.status(201).json(wallet);
     } catch (err) {
        res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // Wallet balance endpoint - proxies to Solana RPC
+  app.get("/api/wallet/balance/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+      const result = await getWalletBalance(address);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching wallet balance:", error);
+      res.status(500).json({ error: "Failed to fetch balance" });
+    }
+  });
+
+  // Token accounts endpoint - proxies to Solana RPC
+  app.get("/api/wallet/tokens/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+      const tokens = await getTokenAccounts(address);
+      res.json(tokens);
+    } catch (error) {
+      console.error("Error fetching token accounts:", error);
+      res.json([]);
     }
   });
 

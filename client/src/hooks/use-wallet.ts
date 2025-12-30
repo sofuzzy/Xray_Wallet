@@ -64,8 +64,10 @@ export function useWallet() {
     queryFn: async () => {
       if (!keypair) return 0;
       try {
-        const bal = await connection.getBalance(keypair.publicKey);
-        return bal / LAMPORTS_PER_SOL;
+        const response = await fetch(`/api/wallet/balance/${keypair.publicKey.toString()}`);
+        if (!response.ok) throw new Error("Failed to fetch balance");
+        const data = await response.json();
+        return data.balance as number;
       } catch (error) {
         console.error("Failed to fetch balance:", error);
         throw error;

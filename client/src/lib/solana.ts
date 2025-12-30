@@ -14,8 +14,8 @@ import * as bip39 from "bip39";
 
 // Use Mainnet for production with reliable RPC
 export const SOLANA_NETWORK = "mainnet-beta";
-// Use environment variable RPC or fallback to public endpoint
-export const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+// Use environment variable RPC or fallback to Ankr's free endpoint (more reliable than public RPC)
+export const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL || "https://rpc.ankr.com/solana";
 export const connection = new Connection(SOLANA_RPC_URL, {
   commitment: "confirmed",
   confirmTransactionInitialTimeout: 60000,
@@ -409,30 +409,13 @@ export interface TokenAccountInfo {
   symbol?: string;
 }
 
-// Fetch all SPL token accounts for a wallet
+// Fetch all SPL token accounts for a wallet via backend proxy
 export async function getTokenAccounts(walletAddress: string): Promise<TokenAccountInfo[]> {
   try {
-    const pubkey = new PublicKey(walletAddress);
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
-      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-    });
-
-    return tokenAccounts.value
-      .map((account) => {
-        const parsed = account.account.data.parsed;
-        const info = parsed?.info;
-        if (!info) return null;
-        
-        const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
-        if (balance === 0) return null; // Skip zero balances
-        
-        return {
-          mint: info.mint,
-          balance,
-          decimals: info.tokenAmount?.decimals || 0,
-        };
-      })
-      .filter((t): t is TokenAccountInfo => t !== null);
+    const response = await fetch(`/api/wallet/tokens/${walletAddress}`);
+    if (!response.ok) throw new Error("Failed to fetch token accounts");
+    const tokens = await response.json();
+    return tokens as TokenAccountInfo[];
   } catch (e) {
     console.error("Failed to fetch token accounts:", e);
     return [];

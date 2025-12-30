@@ -1,7 +1,50 @@
 import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || clusterApiUrl("mainnet-beta");
+const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
 const connection = new Connection(SOLANA_RPC_URL, "confirmed");
+
+export async function getWalletBalance(walletAddress: string): Promise<{ balance: number; lamports: number }> {
+  try {
+    const publicKey = new PublicKey(walletAddress);
+    const lamports = await connection.getBalance(publicKey);
+    return {
+      balance: lamports / LAMPORTS_PER_SOL,
+      lamports,
+    };
+  } catch (error) {
+    console.error("Error fetching wallet balance:", error);
+    throw error;
+  }
+}
+
+export async function getTokenAccounts(walletAddress: string): Promise<Array<{ mint: string; balance: number; decimals: number }>> {
+  try {
+    const publicKey = new PublicKey(walletAddress);
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+    });
+
+    return tokenAccounts.value
+      .map((account) => {
+        const parsed = account.account.data.parsed;
+        const info = parsed?.info;
+        if (!info) return null;
+
+        const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
+        if (balance === 0) return null;
+
+        return {
+          mint: info.mint,
+          balance,
+          decimals: info.tokenAmount?.decimals || 0,
+        };
+      })
+      .filter((t): t is { mint: string; balance: number; decimals: number } => t !== null);
+  } catch (error) {
+    console.error("Error fetching token accounts:", error);
+    return [];
+  }
+}
 
 export interface OnChainTransaction {
   id: number;
