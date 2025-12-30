@@ -1,7 +1,10 @@
 import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
+// Try multiple RPC endpoints - some may be blocked on Replit
+const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://solana-mainnet.g.alchemy.com/v2/demo";
 const connection = new Connection(SOLANA_RPC_URL, "confirmed");
+
+console.log("Solana RPC URL:", SOLANA_RPC_URL);
 
 export async function getWalletBalance(walletAddress: string): Promise<{ balance: number; lamports: number }> {
   try {
@@ -19,18 +22,22 @@ export async function getWalletBalance(walletAddress: string): Promise<{ balance
 
 export async function getTokenAccounts(walletAddress: string): Promise<Array<{ mint: string; balance: number; decimals: number }>> {
   try {
+    console.log("Fetching token accounts for:", walletAddress);
     const publicKey = new PublicKey(walletAddress);
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
       programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
     });
 
-    return tokenAccounts.value
+    console.log("Found", tokenAccounts.value.length, "token accounts");
+
+    const tokens = tokenAccounts.value
       .map((account) => {
         const parsed = account.account.data.parsed;
         const info = parsed?.info;
         if (!info) return null;
 
         const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
+        console.log("Token:", info.mint, "balance:", balance);
         if (balance === 0) return null;
 
         return {
@@ -40,6 +47,9 @@ export async function getTokenAccounts(walletAddress: string): Promise<Array<{ m
         };
       })
       .filter((t): t is { mint: string; balance: number; decimals: number } => t !== null);
+    
+    console.log("Returning", tokens.length, "tokens with non-zero balance");
+    return tokens;
   } catch (error) {
     console.error("Error fetching token accounts:", error);
     return [];
