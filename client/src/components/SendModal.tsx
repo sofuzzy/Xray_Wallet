@@ -4,7 +4,6 @@ import { X, Send, User, Loader2, Check } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useCreateTransaction } from "@/hooks/use-transactions";
 import { useLookupUser } from "@/hooks/use-users";
-import { connection } from "@/lib/solana";
 import { SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +56,11 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
     try {
       setIsProcessing(true);
       
+      // Get blockhash from backend
+      const blockhashRes = await fetch("/api/solana/blockhash");
+      if (!blockhashRes.ok) throw new Error("Failed to get blockhash");
+      const { blockhash } = await blockhashRes.json();
+      
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
@@ -64,10 +68,27 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
           lamports: amountNum * LAMPORTS_PER_SOL,
         })
       );
+      
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = keypair.publicKey;
 
-      // Sign and send
-      const signature = await connection.sendTransaction(transaction, [keypair]);
-      await connection.confirmTransaction(signature, "confirmed");
+      // Sign locally
+      transaction.sign(keypair);
+      
+      // Serialize and send via backend
+      const serializedTransaction = transaction.serialize().toString("base64");
+      const sendRes = await fetch("/api/solana/send-transaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serializedTransaction }),
+      });
+      
+      if (!sendRes.ok) {
+        const err = await sendRes.json();
+        throw new Error(err.error || "Transaction failed");
+      }
+      
+      const { signature } = await sendRes.json();
       
       // Record in DB
       await recordTx({
@@ -88,9 +109,9 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
         setIsProcessing(false);
       }, 2000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ title: "Transaction failed", description: "Could not complete transfer.", variant: "destructive" });
+      toast({ title: "Transaction failed", description: error.message || "Could not complete transfer.", variant: "destructive" });
       setIsProcessing(false);
     }
   };

@@ -45,7 +45,7 @@ import {
   verifyPasskeyLogin,
   getRpId
 } from "./services/webauthnService";
-import { getOnChainTransactions, getWalletBalance, getTokenAccounts } from "./services/solanaTransactions";
+import { getOnChainTransactions, getWalletBalance, getTokenAccounts, sendRawTransaction, getLatestBlockhash } from "./services/solanaTransactions";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -478,6 +478,32 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching token accounts:", error);
       res.json([]);
+    }
+  });
+
+  // Get latest blockhash for transaction building
+  app.get("/api/solana/blockhash", async (req, res) => {
+    try {
+      const result = await getLatestBlockhash();
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching blockhash:", error);
+      res.status(500).json({ error: "Failed to fetch blockhash" });
+    }
+  });
+
+  // Send signed transaction
+  app.post("/api/solana/send-transaction", async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      if (!serializedTransaction) {
+        return res.status(400).json({ error: "Missing serializedTransaction" });
+      }
+      const signature = await sendRawTransaction(serializedTransaction);
+      res.json({ signature });
+    } catch (error: any) {
+      console.error("Error sending transaction:", error);
+      res.status(500).json({ error: error.message || "Failed to send transaction" });
     }
   });
 

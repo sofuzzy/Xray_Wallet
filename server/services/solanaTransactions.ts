@@ -46,6 +46,37 @@ export async function getTokenAccounts(walletAddress: string): Promise<Array<{ m
   }
 }
 
+export async function sendRawTransaction(serializedTransaction: string): Promise<string> {
+  try {
+    const buffer = Buffer.from(serializedTransaction, "base64");
+    const signature = await connection.sendRawTransaction(buffer, {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+    
+    // Wait for confirmation
+    const latestBlockhash = await connection.getLatestBlockhash();
+    await connection.confirmTransaction({
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    }, "confirmed");
+    
+    return signature;
+  } catch (error) {
+    console.error("Error sending transaction:", error);
+    throw error;
+  }
+}
+
+export async function getLatestBlockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+  const result = await connection.getLatestBlockhash("confirmed");
+  return {
+    blockhash: result.blockhash,
+    lastValidBlockHeight: result.lastValidBlockHeight,
+  };
+}
+
 export interface OnChainTransaction {
   id: number;
   signature: string;
