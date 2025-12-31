@@ -15,7 +15,7 @@ import {
   sendTransaction,
   type Token 
 } from "./services/jupiterSwap";
-import { getTokenPriceHistory } from "./services/priceHistory";
+import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -935,6 +935,49 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to remove token from watchlist" });
+    }
+  });
+
+  // Token metadata endpoint for watchlist enrichment
+  app.get("/api/tokens/metadata/:mint", hybridAuth, async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const metadata = await getTokenMetadata(mint);
+      
+      if (!metadata) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+      
+      res.json(metadata);
+    } catch (error) {
+      console.error("Token metadata error:", error);
+      res.status(500).json({ message: "Failed to fetch token metadata" });
+    }
+  });
+
+  // Batch token metadata endpoint - returns object keyed by mint for proper mapping
+  app.post("/api/tokens/metadata/batch", hybridAuth, async (req, res) => {
+    try {
+      const { mints } = req.body;
+      
+      if (!Array.isArray(mints) || mints.length === 0) {
+        return res.status(400).json({ message: "Mints array required" });
+      }
+      
+      if (mints.length > 20) {
+        return res.status(400).json({ message: "Maximum 20 tokens per batch" });
+      }
+      
+      const results = await getMultipleTokenMetadata(mints);
+      const metadataByMint: Record<string, any> = {};
+      results.forEach((value, key) => {
+        metadataByMint[key] = value;
+      });
+      
+      res.json(metadataByMint);
+    } catch (error) {
+      console.error("Batch metadata error:", error);
+      res.status(500).json({ message: "Failed to fetch token metadata" });
     }
   });
 

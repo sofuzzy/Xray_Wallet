@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, Eye, Trash2, Plus, LineChart, X } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Eye, Trash2, Plus, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TokenChart } from "./TokenChart";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -15,6 +15,73 @@ interface TokenInfo {
   name: string;
   symbol: string;
   decimals: number;
+}
+
+interface TokenMetadata {
+  mint: string;
+  name: string;
+  symbol: string;
+  imageUrl: string | null;
+  marketCap: number | null;
+  price: number;
+  priceChange24h: number;
+  sparkline: number[];
+  createdAt: number | null;
+}
+
+function formatMarketCap(value: number | null): string {
+  if (!value) return "N/A";
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+function formatAge(timestamp: number | null): string {
+  if (!timestamp) return "";
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 30) return `${days}d`;
+  return `${Math.floor(days / 30)}mo`;
+}
+
+function Sparkline({ data, positive }: { data: number[]; positive: boolean }) {
+  if (!data || data.length < 2) return null;
+  
+  const width = 80;
+  const height = 32;
+  const padding = 2;
+  
+  const minVal = Math.min(...data);
+  const maxVal = Math.max(...data);
+  const range = maxVal - minVal || 1;
+  
+  const points = data.map((val, i) => {
+    const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((val - minVal) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  
+  const color = positive ? "#22c55e" : "#ef4444";
+  
+  return (
+    <svg width={width} height={height} className="flex-shrink-0">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function Watchlist() {
@@ -31,6 +98,25 @@ export function Watchlist() {
 
   const { data: knownTokens = [] } = useQuery<TokenInfo[]>({
     queryKey: ["/api/swaps/tokens"],
+  });
+
+  // Fetch metadata for all watchlist tokens - returns object keyed by mint
+  const mints = watchlist.map(t => t.tokenMint);
+  const { data: tokenMetadata = {} } = useQuery<Record<string, TokenMetadata>>({
+    queryKey: ["/api/tokens/metadata/batch", mints],
+    queryFn: async () => {
+      if (mints.length === 0) return {};
+      const response = await fetch("/api/tokens/metadata/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mints }),
+        credentials: "include",
+      });
+      if (!response.ok) return {};
+      return response.json();
+    },
+    enabled: mints.length > 0,
+    refetchInterval: 30000,
   });
 
   const addMutation = useMutation({
@@ -98,7 +184,7 @@ export function Watchlist() {
 
   return (
     <>
-      <Card className="p-6">
+      <Card className="p-4">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger asChild>
             <button
@@ -122,9 +208,9 @@ export function Watchlist() {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-4">
-            <div className="space-y-3">
+            <div className="space-y-1">
               {showAddForm ? (
-                <div className="flex gap-2 items-center p-3 rounded-lg bg-muted/50">
+                <div className="flex gap-2 items-center p-3 rounded-lg bg-muted/50 mb-3">
                   <Input
                     placeholder="Paste token mint address..."
                     value={mintAddress}
@@ -152,7 +238,7 @@ export function Watchlist() {
               ) : (
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full mb-3"
                   onClick={() => setShowAddForm(true)}
                   data-testid="button-add-to-watchlist"
                 >
@@ -168,36 +254,76 @@ export function Watchlist() {
                   <p className="text-xs mt-1">Add tokens to track their prices.</p>
                 </div>
               ) : (
-                watchlist.map((token: WatchlistToken) => (
-                  <div
-                    key={token.id}
-                    className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-testid={`watchlist-token-${token.tokenSymbol}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium" data-testid={`text-watchlist-name-${token.tokenSymbol}`}>
-                        {token.tokenName}
+                watchlist.map((token: WatchlistToken) => {
+                  const meta = tokenMetadata[token.tokenMint];
+                  const isPositive = (meta?.priceChange24h || 0) >= 0;
+                  
+                  return (
+                    <div
+                      key={token.id}
+                      className="flex items-center gap-3 py-3 px-2 rounded-lg hover-elevate active-elevate-2 cursor-pointer"
+                      onClick={() => handleShowChart(token)}
+                      data-testid={`watchlist-token-${token.tokenSymbol}`}
+                    >
+                      {/* Token Image */}
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        {meta?.imageUrl ? (
+                          <img 
+                            src={meta.imageUrl} 
+                            alt={token.tokenSymbol}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold text-lg">
+                            {token.tokenSymbol.charAt(0)}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground" data-testid={`text-watchlist-symbol-${token.tokenSymbol}`}>
-                        {token.tokenSymbol}
+                      
+                      {/* Token Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate" data-testid={`text-watchlist-name-${token.tokenSymbol}`}>
+                          {meta?.name || token.tokenName}
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span data-testid={`text-watchlist-symbol-${token.tokenSymbol}`}>
+                            {meta?.symbol || token.tokenSymbol}
+                          </span>
+                          {meta?.createdAt && (
+                            <span className="opacity-70">{formatAge(meta.createdAt)}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
+                      
+                      {/* Sparkline Chart */}
+                      <div className="hidden sm:block">
+                        <Sparkline 
+                          data={meta?.sparkline || []} 
+                          positive={isPositive}
+                        />
+                      </div>
+                      
+                      {/* Market Cap */}
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-bold text-lg" data-testid={`text-watchlist-mcap-${token.tokenSymbol}`}>
+                          {formatMarketCap(meta?.marketCap || null)}
+                        </div>
+                      </div>
+                      
+                      {/* Remove Button */}
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => handleShowChart(token)}
-                        title="View price chart"
-                        data-testid={`button-watchlist-chart-${token.tokenSymbol}`}
-                      >
-                        <LineChart className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeMutation.mutate(token.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeMutation.mutate(token.id);
+                        }}
                         disabled={removeMutation.isPending}
                         title="Remove from watchlist"
+                        className="flex-shrink-0"
                         data-testid={`button-watchlist-remove-${token.tokenSymbol}`}
                       >
                         {removeMutation.isPending ? (
@@ -207,8 +333,8 @@ export function Watchlist() {
                         )}
                       </Button>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </CollapsibleContent>
