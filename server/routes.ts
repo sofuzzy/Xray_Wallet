@@ -880,5 +880,63 @@ export async function registerRoutes(
     }
   });
 
+  // Watchlist Token endpoints
+  app.get("/api/watchlist", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const tokens = await storage.getWatchlistTokens(userId);
+      res.json(tokens);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch watchlist" });
+    }
+  });
+
+  app.post("/api/watchlist", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const tokenInput = z.object({
+        tokenMint: z.string().min(32).max(64),
+        tokenSymbol: z.string().min(1).max(20),
+        tokenName: z.string().min(1).max(100),
+        tokenDecimals: z.number().int().min(0).max(18).default(9),
+      });
+      
+      const parsed = tokenInput.parse(req.body);
+      
+      // Check if already in watchlist
+      const existing = await storage.getWatchlistTokenByMint(userId, parsed.tokenMint);
+      if (existing) {
+        return res.status(409).json({ message: "Token already in watchlist" });
+      }
+      
+      const token = await storage.addWatchlistToken({
+        userId,
+        tokenMint: parsed.tokenMint,
+        tokenSymbol: parsed.tokenSymbol,
+        tokenName: parsed.tokenName,
+        tokenDecimals: parsed.tokenDecimals,
+      });
+      
+      res.status(201).json(token);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to add token to watchlist" });
+    }
+  });
+
+  app.delete("/api/watchlist/:id", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const tokenId = parseInt(req.params.id);
+      
+      await storage.removeWatchlistToken(tokenId, userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove token from watchlist" });
+    }
+  });
+
   return httpServer;
 }

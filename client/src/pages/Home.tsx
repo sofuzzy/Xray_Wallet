@@ -17,6 +17,7 @@ import { SeedPhraseModal } from "@/components/SeedPhraseModal";
 import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
 import { TradingViewModal } from "@/components/TradingViewModal";
+import { Watchlist } from "@/components/Watchlist";
 import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -303,6 +304,10 @@ export default function Home() {
 
         <div className="px-6">
           <TokenBalances />
+        </div>
+
+        <div className="px-6">
+          <Watchlist />
         </div>
 
         <TransactionList 

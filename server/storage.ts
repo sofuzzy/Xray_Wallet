@@ -6,6 +6,7 @@ import {
   tokenLaunches,
   autoTradeRules,
   webauthnCredentials,
+  watchlistTokens,
   type User,
   type Wallet,
   type InsertWallet,
@@ -15,6 +16,8 @@ import {
   type InsertTokenLaunch,
   type AutoTradeRule,
   type InsertAutoTradeRule,
+  type WatchlistToken,
+  type InsertWatchlistToken,
 } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -53,6 +56,11 @@ export interface IStorage {
   createWebAuthnCredential(credential: Omit<WebAuthnCredential, 'id' | 'createdAt'>): Promise<WebAuthnCredential>;
   updateWebAuthnCounter(credentialId: string, counter: number): Promise<void>;
   deleteWebAuthnCredential(id: number, userId: string): Promise<boolean>;
+
+  getWatchlistTokens(userId: string): Promise<WatchlistToken[]>;
+  addWatchlistToken(token: InsertWatchlistToken): Promise<WatchlistToken>;
+  removeWatchlistToken(id: number, userId: string): Promise<boolean>;
+  getWatchlistTokenByMint(userId: string, tokenMint: string): Promise<WatchlistToken | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -177,6 +185,34 @@ export class DatabaseStorage implements IStorage {
       .delete(webauthnCredentials)
       .where(and(eq(webauthnCredentials.id, id), eq(webauthnCredentials.userId, userId)));
     return true;
+  }
+
+  async getWatchlistTokens(userId: string): Promise<WatchlistToken[]> {
+    return await db
+      .select()
+      .from(watchlistTokens)
+      .where(eq(watchlistTokens.userId, userId))
+      .orderBy(desc(watchlistTokens.createdAt));
+  }
+
+  async addWatchlistToken(token: InsertWatchlistToken): Promise<WatchlistToken> {
+    const [created] = await db.insert(watchlistTokens).values(token).returning();
+    return created;
+  }
+
+  async removeWatchlistToken(id: number, userId: string): Promise<boolean> {
+    await db
+      .delete(watchlistTokens)
+      .where(and(eq(watchlistTokens.id, id), eq(watchlistTokens.userId, userId)));
+    return true;
+  }
+
+  async getWatchlistTokenByMint(userId: string, tokenMint: string): Promise<WatchlistToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(watchlistTokens)
+      .where(and(eq(watchlistTokens.userId, userId), eq(watchlistTokens.tokenMint, tokenMint)));
+    return token;
   }
 }
 

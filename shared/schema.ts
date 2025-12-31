@@ -78,10 +78,21 @@ export const webauthnCredentials = pgTable("webauthn_credentials", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const watchlistTokens = pgTable("watchlist_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tokenMint: text("token_mint").notNull(),
+  tokenSymbol: text("token_symbol").notNull(),
+  tokenName: text("token_name").notNull(),
+  tokenDecimals: integer("token_decimals").notNull().default(9),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });
 export const insertAutoTradeRuleSchema = createInsertSchema(autoTradeRules).omit({ id: true, createdAt: true, triggeredAt: true });
+export const insertWatchlistTokenSchema = createInsertSchema(watchlistTokens).omit({ id: true, createdAt: true });
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
@@ -91,3 +102,5 @@ export type TokenLaunch = typeof tokenLaunches.$inferSelect;
 export type InsertTokenLaunch = z.infer<typeof insertTokenLaunchSchema>;
 export type AutoTradeRule = typeof autoTradeRules.$inferSelect;
 export type InsertAutoTradeRule = z.infer<typeof insertAutoTradeRuleSchema>;
+export type WatchlistToken = typeof watchlistTokens.$inferSelect;
+export type InsertWatchlistToken = z.infer<typeof insertWatchlistTokenSchema>;
