@@ -45,6 +45,7 @@ The server follows a modular pattern:
   - `transactions` - Transaction history records
   - `tokenLaunches` - User-created SPL tokens with mint addresses and images
   - `autoTradeRules` - User-defined stop loss and take profit rules for tokens
+  - `watchlistTokens` - User token watchlist for tracking tokens of interest
 
 ### Wallet Implementation
 - Keypairs are generated client-side using `@solana/web3.js`
