@@ -5,6 +5,7 @@ import { usePasskey } from "@/hooks/use-passkey";
 import { useUpdateUser, useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { WalletCard } from "@/components/WalletCard";
+import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { ActionButtons } from "@/components/ActionButtons";
 import { TransactionList } from "@/components/TransactionList";
 import { TokenBalances } from "@/components/TokenBalances";
@@ -283,6 +284,10 @@ export default function Home() {
             address={address} 
             username={activeWallet?.name || "Wallet"} 
           />
+        </div>
+
+        <div className="px-6">
+          <PortfolioSummary address={address} solBalance={balance} />
         </div>
 
         <div className="px-6">
