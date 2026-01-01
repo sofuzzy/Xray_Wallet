@@ -81,11 +81,11 @@ export function WalletSwitcher({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors"
         data-testid="button-wallet-switcher"
       >
         <Wallet className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-white max-w-[120px] truncate">
+        <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
           {activeWallet?.name || "Select Wallet"}
         </span>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -103,9 +103,9 @@ export function WalletSwitcher({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-white/10 shadow-2xl z-50 overflow-hidden"
+              className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-2xl z-50 overflow-hidden"
             >
-              <div className="p-2 border-b border-white/10">
+              <div className="p-2 border-b border-border">
                 <p className="px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Your Wallets
                 </p>
@@ -118,7 +118,7 @@ export function WalletSwitcher({
                     className={`group flex items-center gap-2 p-2 rounded-lg transition-colors ${
                       wallet.id === activeWallet?.id 
                         ? 'bg-primary/20' 
-                        : 'hover:bg-white/5'
+                        : 'hover:bg-muted'
                     }`}
                   >
                     {editingId === wallet.id ? (
@@ -127,7 +127,7 @@ export function WalletSwitcher({
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="flex-1 px-2 py-1 text-sm bg-white/10 border border-white/20 rounded text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="flex-1 px-2 py-1 text-sm bg-muted border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleRename(wallet.id);
@@ -142,7 +142,7 @@ export function WalletSwitcher({
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="p-1 rounded hover:bg-white/10 text-muted-foreground"
+                          className="p-1 rounded hover:bg-muted text-muted-foreground"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -157,12 +157,12 @@ export function WalletSwitcher({
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                             wallet.id === activeWallet?.id 
                               ? 'bg-primary text-primary-foreground' 
-                              : 'bg-white/10 text-muted-foreground'
+                              : 'bg-muted text-muted-foreground'
                           }`}>
                             <Wallet className="w-4 h-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{wallet.name}</p>
+                            <p className="text-sm font-medium text-foreground truncate">{wallet.name}</p>
                             <p className="text-xs text-muted-foreground">{shortenAddress(wallet.publicKey)}</p>
                           </div>
                           {wallet.id === activeWallet?.id && (
@@ -176,7 +176,7 @@ export function WalletSwitcher({
                               setEditingId(wallet.id);
                               setEditName(wallet.name);
                             }}
-                            className="p-1 rounded hover:bg-white/10 text-muted-foreground"
+                            className="p-1 rounded hover:bg-muted text-muted-foreground"
                             data-testid={`button-edit-wallet-${wallet.id}`}
                           >
                             <Pencil className="w-3 h-3" />
@@ -184,7 +184,7 @@ export function WalletSwitcher({
                           {wallets.length > 1 && (
                             <button
                               onClick={() => handleDelete(wallet.id)}
-                              className="p-1 rounded hover:bg-white/10 text-destructive"
+                              className="p-1 rounded hover:bg-muted text-destructive"
                               data-testid={`button-delete-wallet-${wallet.id}`}
                             >
                               <Trash2 className="w-3 h-3" />
@@ -197,7 +197,7 @@ export function WalletSwitcher({
                 ))}
               </div>
 
-              <div className="p-2 border-t border-white/10">
+              <div className="p-2 border-t border-border">
                 {isCreating ? (
                   <div className="flex items-center gap-2">
                     <input
@@ -205,7 +205,7 @@ export function WalletSwitcher({
                       value={newWalletName}
                       onChange={(e) => setNewWalletName(e.target.value)}
                       placeholder="Wallet name..."
-                      className="flex-1 px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="flex-1 px-3 py-2 text-sm bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleCreateWallet();
@@ -225,7 +225,7 @@ export function WalletSwitcher({
                     </button>
                     <button
                       onClick={() => setIsCreating(false)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground"
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -233,7 +233,7 @@ export function WalletSwitcher({
                 ) : (
                   <button
                     onClick={() => setIsCreating(true)}
-                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     data-testid="button-create-wallet"
                   >
                     <Plus className="w-4 h-4" />

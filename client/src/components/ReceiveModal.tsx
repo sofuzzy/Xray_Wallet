@@ -40,9 +40,9 @@ export function ReceiveModal({ isOpen, onClose }: ReceiveModalProps) {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-md bg-card border border-white/10 rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md bg-card border border-border rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden"
       >
-        <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white">
+        <button onClick={onClose} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground">
           <X className="w-6 h-6" />
         </button>
 
@@ -71,7 +71,7 @@ export function ReceiveModal({ isOpen, onClose }: ReceiveModalProps) {
             <label className="text-sm font-medium text-muted-foreground block text-center">Your Wallet Address</label>
             <button 
               onClick={handleCopy}
-              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors font-mono text-sm break-all"
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors font-mono text-sm break-all text-foreground"
             >
               {address}
               <Copy className="w-4 h-4 shrink-0" />

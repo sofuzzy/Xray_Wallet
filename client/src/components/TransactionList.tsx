@@ -15,7 +15,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
     return (
       <div className="space-y-4 px-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 w-full bg-white/5 rounded-2xl animate-pulse" />
+          <div key={i} className="h-16 w-full bg-muted rounded-2xl animate-pulse" />
         ))}
       </div>
     );
@@ -50,7 +50,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group block"
+            className="flex items-center justify-between p-4 rounded-2xl bg-muted/50 border border-border hover:bg-muted transition-colors cursor-pointer group block"
             data-testid={`transaction-item-${tx.id}`}
           >
             <div className="flex items-center gap-4">
@@ -59,7 +59,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
                   ? "bg-purple-500/20 text-purple-400"
                   : isReceived 
                     ? "bg-green-500/20 text-green-400" 
-                    : "bg-white/10 text-white"
+                    : "bg-muted text-foreground"
               }`}>
                 {isSwap ? (
                   <ArrowRightLeft className="w-5 h-5" />
@@ -70,7 +70,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
                 )}
               </div>
               <div>
-                <p className="font-medium text-white flex items-center gap-2">
+                <p className="font-medium text-foreground flex items-center gap-2">
                   {isSwap ? "Swap" : isReceived ? "Received" : "Sent"}
                   <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                 </p>
@@ -92,7 +92,7 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
                 </>
               ) : (
                 <>
-                  <p className={`font-mono font-medium ${isReceived ? "text-green-400" : "text-white"}`}>
+                  <p className={`font-mono font-medium ${isReceived ? "text-green-500 dark:text-green-400" : "text-foreground"}`}>
                     {isReceived ? "+" : "-"}{parseFloat(tx.amount).toFixed(4)} SOL
                   </p>
                   <p className="text-xs text-muted-foreground font-mono">

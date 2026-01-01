@@ -150,16 +150,16 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="bg-card border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[85vh] overflow-hidden"
+        className="bg-card border border-border rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[85vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+        <div className="p-6 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center">
               <Coins className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Staking</h2>
+              <h2 className="text-lg font-bold text-foreground">Staking</h2>
               <p className="text-sm text-muted-foreground">
                 {totalStaked > 0 ? `${(totalStaked / LAMPORTS_PER_SOL).toFixed(4)} SOL staked` : "Earn rewards on your SOL"}
               </p>
@@ -170,11 +170,11 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
           </Button>
         </div>
 
-        <div className="flex border-b border-white/10">
+        <div className="flex border-b border-border">
           <button
             onClick={() => setTab("stake")}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              tab === "stake" ? "text-white border-b-2 border-primary" : "text-muted-foreground"
+              tab === "stake" ? "text-foreground border-b-2 border-primary" : "text-muted-foreground"
             }`}
             data-testid="tab-stake"
           >
@@ -183,7 +183,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
           <button
             onClick={() => setTab("manage")}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              tab === "manage" ? "text-white border-b-2 border-primary" : "text-muted-foreground"
+              tab === "manage" ? "text-foreground border-b-2 border-primary" : "text-muted-foreground"
             }`}
             data-testid="tab-manage"
           >
@@ -205,7 +205,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white pr-20"
+                    className="bg-muted border-border text-foreground pr-20"
                     data-testid="input-stake-amount"
                   />
                   <button
@@ -226,17 +226,17 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
                 <div className="relative">
                   <button
                     onClick={() => setShowValidatorDropdown(!showValidatorDropdown)}
-                    className="w-full flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg text-left"
+                    className="w-full flex items-center justify-between p-3 bg-muted border border-border rounded-lg text-left"
                     data-testid="button-select-validator"
                   >
-                    <span className={selectedValidator ? "text-white" : "text-muted-foreground"}>
+                    <span className={selectedValidator ? "text-foreground" : "text-muted-foreground"}>
                       {selectedValidator ? shortenAddress(selectedValidator, 8) : "Choose a validator..."}
                     </span>
                     <ChevronDown className="w-4 h-4 text-muted-foreground" />
                   </button>
 
                   {showValidatorDropdown && (
-                    <div className="absolute z-10 mt-2 w-full bg-card border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 mt-2 w-full bg-card border border-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
                       {validatorsLoading ? (
                         <div className="p-4 flex items-center justify-center">
                           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -249,11 +249,11 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
                               setSelectedValidator(v.votePubkey);
                               setShowValidatorDropdown(false);
                             }}
-                            className="w-full p-3 text-left hover:bg-white/5 flex items-center justify-between"
+                            className="w-full p-3 text-left hover:bg-muted flex items-center justify-between"
                             data-testid={`validator-${v.votePubkey.slice(0, 8)}`}
                           >
                             <div>
-                              <p className="text-sm text-white">{shortenAddress(v.votePubkey, 6)}</p>
+                              <p className="text-sm text-foreground">{shortenAddress(v.votePubkey, 6)}</p>
                               <p className="text-xs text-muted-foreground">
                                 {(v.activatedStake / LAMPORTS_PER_SOL / 1000000).toFixed(2)}M SOL staked
                               </p>
@@ -271,7 +271,7 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
                 </div>
               </div>
 
-              <div className="p-4 bg-white/5 rounded-xl space-y-2">
+              <div className="p-4 bg-muted rounded-xl space-y-2">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5" />
                   <div className="text-xs text-muted-foreground">
@@ -309,12 +309,12 @@ export function StakingModal({ isOpen, onClose }: StakingModalProps) {
                 stakeAccounts.map((account) => (
                   <div
                     key={account.pubkey.toString()}
-                    className="p-4 bg-white/5 rounded-xl space-y-3"
+                    className="p-4 bg-muted rounded-xl space-y-3"
                     data-testid={`stake-account-${account.pubkey.toString().slice(0, 8)}`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-white">
+                        <p className="text-sm font-medium text-foreground">
                           {(account.lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
                         </p>
                         <p className="text-xs text-muted-foreground">

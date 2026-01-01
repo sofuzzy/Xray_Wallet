@@ -148,11 +148,11 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-lg bg-card border border-white/10 rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-lg bg-card border border-border rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
       >
         <button 
           onClick={onClose} 
-          className="absolute top-6 right-6 text-white/50 hover:text-white"
+          className="absolute top-6 right-6 text-muted-foreground hover:text-foreground"
           data-testid="button-close-seed-modal"
         >
           <X className="w-6 h-6" />
@@ -195,12 +195,12 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   </h3>
                   <div className="relative">
                     <div 
-                      className={`grid grid-cols-3 gap-2 p-4 rounded-xl bg-white/5 border border-white/10 ${!showPhrase ? 'blur-md select-none' : ''}`}
+                      className={`grid grid-cols-3 gap-2 p-4 rounded-xl bg-muted border border-border ${!showPhrase ? 'blur-md select-none' : ''}`}
                     >
                       {words.map((word, index) => (
                         <div 
                           key={index} 
-                          className="flex items-center gap-2 p-2 rounded-lg bg-white/5"
+                          className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
                           data-testid={`seed-word-${index}`}
                         >
                           <span className="text-xs text-muted-foreground w-5">{index + 1}.</span>
@@ -246,7 +246,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 </h3>
                 <div className="relative">
                   <div 
-                    className={`p-4 rounded-xl bg-white/5 border border-white/10 font-mono text-xs break-all ${!showPrivateKey ? 'blur-md select-none' : ''}`}
+                    className={`p-4 rounded-xl bg-muted border border-border font-mono text-xs break-all ${!showPrivateKey ? 'blur-md select-none' : ''}`}
                   >
                     {privateKey || "Loading..."}
                   </div>
@@ -317,7 +317,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
 
               {importMode === "seed" ? (
                 <textarea
-                  className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
+                  className="w-full h-32 bg-muted border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
                   placeholder="Enter your 12-word seed phrase separated by spaces..."
                   value={importPhrase}
                   onChange={(e) => setImportPhrase(e.target.value)}
@@ -325,7 +325,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 />
               ) : (
                 <textarea
-                  className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
+                  className="w-full h-32 bg-muted border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm resize-none"
                   placeholder="Enter your base58 encoded private key..."
                   value={importPrivateKeyValue}
                   onChange={(e) => setImportPrivateKeyValue(e.target.value)}
@@ -352,7 +352,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 )}
               </Button>
 
-              <div className="border-t border-white/10 pt-4 mt-4">
+              <div className="border-t border-border pt-4 mt-4">
                 <Button
                   variant="destructive"
                   onClick={handleReset}
@@ -405,7 +405,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   {biometric.credentials.map((cred) => (
                     <div 
                       key={cred.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border"
                     >
                       <div className="flex items-center gap-3">
                         <Fingerprint className="w-5 h-5 text-muted-foreground" />

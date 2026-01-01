@@ -133,9 +133,9 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-md bg-card border border-white/10 rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md bg-card border border-border rounded-t-3xl md:rounded-3xl p-6 shadow-2xl overflow-hidden"
       >
-        <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white">
+        <button onClick={onClose} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground">
           <X className="w-6 h-6" />
         </button>
 
@@ -156,7 +156,7 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
                   <label className="text-sm font-medium text-muted-foreground">Recipient</label>
                   <div className="relative">
                     <input
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="Username or SOL address"
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
@@ -179,7 +179,7 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
                   <div className="relative">
                     <input
                       type="number"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-2xl font-mono placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-foreground text-2xl font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}

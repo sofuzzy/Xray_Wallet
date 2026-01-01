@@ -11,11 +11,11 @@ interface ActionButtonsProps {
 
 export function ActionButtons({ onSend, onReceive, onSwap, onLaunch, onStake }: ActionButtonsProps) {
   const buttons = [
-    { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-white text-black hover:bg-white/90", testId: "button-send" },
-    { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-white/10 text-white hover:bg-white/20 backdrop-blur-md", testId: "button-receive" },
-    { label: "Swap", icon: Shuffle, onClick: onSwap, color: "bg-white/10 text-white hover:bg-white/20 backdrop-blur-md", testId: "button-swap" },
-    { label: "Launch", icon: Rocket, onClick: onLaunch || (() => {}), color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600", testId: "button-launch" },
-    { label: "Stake", icon: Coins, onClick: onStake || (() => {}), color: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600", testId: "button-stake" },
+    { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-primary text-primary-foreground", testId: "button-send" },
+    { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-muted text-foreground", testId: "button-receive" },
+    { label: "Swap", icon: Shuffle, onClick: onSwap, color: "bg-muted text-foreground", testId: "button-swap" },
+    { label: "Launch", icon: Rocket, onClick: onLaunch || (() => {}), color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white", testId: "button-launch" },
+    { label: "Stake", icon: Coins, onClick: onStake || (() => {}), color: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white", testId: "button-stake" },
   ];
 
   return (

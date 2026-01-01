@@ -225,7 +225,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-md bg-card border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+          className="relative w-full max-w-md bg-card border border-border rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -233,13 +233,13 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 <Rocket className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Token Launchpad</h2>
+                <h2 className="text-xl font-bold text-foreground">Token Launchpad</h2>
                 <p className="text-sm text-muted-foreground">Create your own SPL token</p>
               </div>
             </div>
             <button 
               onClick={handleClose}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="p-2 rounded-full hover:bg-muted transition-colors"
               data-testid="button-close-launchpad"
             >
               <X className="w-5 h-5 text-muted-foreground" />
@@ -260,7 +260,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 />
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-32 bg-white/5 border border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-colors"
+                  className="w-full h-32 bg-muted border border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors"
                   data-testid="button-upload-image"
                 >
                   {isUploading ? (
@@ -284,7 +284,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   placeholder="e.g., My Awesome Token"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
-                  className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   data-testid="input-token-name"
                 />
               </div>
@@ -296,7 +296,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   placeholder="e.g., MAT"
                   value={formData.symbol}
                   onChange={(e) => handleInputChange("symbol", e.target.value.toUpperCase().slice(0, 10))}
-                  className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground uppercase"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground uppercase"
                   data-testid="input-token-symbol"
                 />
               </div>
@@ -311,7 +311,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     max="9"
                     value={formData.decimals}
                     onChange={(e) => handleInputChange("decimals", parseInt(e.target.value) || 0)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-muted border-border text-foreground"
                     data-testid="input-token-decimals"
                   />
                 </div>
@@ -323,15 +323,15 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     placeholder="1000000"
                     value={formData.totalSupply}
                     onChange={(e) => handleInputChange("totalSupply", e.target.value.replace(/[^0-9]/g, ""))}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-muted border-border text-foreground"
                     data-testid="input-token-supply"
                   />
                 </div>
               </div>
 
-              <div className="bg-white/5 rounded-xl p-4 space-y-2">
+              <div className="bg-muted rounded-xl p-4 space-y-2">
                 <p className="text-xs text-muted-foreground">Estimated Cost</p>
-                <p className="text-lg font-bold text-white">~0.05 SOL</p>
+                <p className="text-lg font-bold text-foreground">~0.05 SOL</p>
                 <p className="text-xs text-muted-foreground">
                   Covers account rent and transaction fees
                 </p>
@@ -352,7 +352,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
             <div className="py-12 text-center space-y-4">
               <Loader2 className="w-12 h-12 animate-spin text-purple-400 mx-auto" />
               <div>
-                <p className="text-lg font-medium text-white">Creating your token...</p>
+                <p className="text-lg font-medium text-foreground">Creating your token...</p>
                 <p className="text-sm text-muted-foreground">This may take a moment</p>
               </div>
             </div>
@@ -372,20 +372,20 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 </div>
               )}
               <div>
-                <p className="text-xl font-bold text-white">Token Created!</p>
+                <p className="text-xl font-bold text-foreground">Token Created!</p>
                 <p className="text-muted-foreground">{createdToken.name} ({createdToken.symbol})</p>
               </div>
               
               <div 
-                className="bg-white/5 rounded-xl p-4 cursor-pointer hover:bg-white/10 transition-colors"
+                className="bg-muted rounded-xl p-4 cursor-pointer hover:bg-muted/80 transition-colors"
                 onClick={() => copyToClipboard(createdToken.mintAddress)}
                 data-testid="button-copy-mint-address"
               >
                 <p className="text-xs text-muted-foreground mb-1">Mint Address (tap to copy)</p>
-                <p className="text-sm font-mono text-white break-all">{createdToken.mintAddress}</p>
+                <p className="text-sm font-mono text-foreground break-all">{createdToken.mintAddress}</p>
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted rounded-lg p-3">
                 <Coins className="w-4 h-4" />
                 <span>Tokens minted to your wallet</span>
               </div>
@@ -402,7 +402,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 <AlertCircle className="w-10 h-10 text-red-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">Launch Failed</p>
+                <p className="text-xl font-bold text-foreground">Launch Failed</p>
                 <p className="text-sm text-muted-foreground mt-2">{errorMessage}</p>
               </div>
               <div className="flex gap-3">
