@@ -19,7 +19,8 @@ import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
 import { TradingViewModal } from "@/components/TradingViewModal";
 import { Watchlist } from "@/components/Watchlist";
-import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink } from "lucide-react";
+import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass } from "lucide-react";
+import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -257,6 +258,9 @@ export default function Home() {
             <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-border" />
           )}
           <ThemeToggle />
+          <Link href="/explore" className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
+            <Compass className="w-5 h-5" />
+          </Link>
           <button 
             onClick={() => setIsSeedPhraseOpen(true)}
             className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
