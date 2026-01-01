@@ -260,6 +260,18 @@ function TokenDetail({ token, onBack, onAddToWatchlist }: {
   );
 }
 
+interface TokenMetadata {
+  mint: string;
+  name: string;
+  symbol: string;
+  imageUrl?: string;
+  marketCap?: number;
+  price?: number;
+  priceChange24h?: number;
+  volume24h?: number;
+  sparkline?: number[];
+}
+
 export default function TokenExplorer() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
@@ -276,10 +288,56 @@ export default function TokenExplorer() {
     staleTime: 60000,
   });
 
+  // Get all unique mints from both lists
+  const allMints = useMemo(() => {
+    const mints = new Set<string>();
+    trendingTokens.forEach(t => mints.add(t.mint));
+    allTokens.forEach(t => mints.add(t.mint));
+    return Array.from(mints);
+  }, [trendingTokens, allTokens]);
+
+  // Fetch enriched metadata for all tokens (same as Watchlist)
+  const { data: tokenMetadata = {} } = useQuery<Record<string, TokenMetadata>>({
+    queryKey: ["/api/tokens/metadata/batch", allMints],
+    queryFn: async () => {
+      if (allMints.length === 0) return {};
+      const response = await fetch("/api/tokens/metadata/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mints: allMints }),
+        credentials: "include",
+      });
+      if (!response.ok) return {};
+      return response.json();
+    },
+    enabled: allMints.length > 0,
+    staleTime: 30000,
+    refetchInterval: 30000,
+  });
+
+  // Enrich tokens with metadata
+  const enrichToken = (token: Token): Token => {
+    const meta = tokenMetadata[token.mint];
+    if (!meta) return token;
+    return {
+      ...token,
+      name: meta.name || token.name,
+      symbol: meta.symbol || token.symbol,
+      logoURI: meta.imageUrl || token.logoURI,
+      priceUsd: meta.price ?? token.priceUsd,
+      marketCap: meta.marketCap ?? token.marketCap,
+      priceChange24h: meta.priceChange24h ?? token.priceChange24h,
+      volume24h: meta.volume24h ?? token.volume24h,
+    };
+  };
+
+  const enrichedTrending = useMemo(() => trendingTokens.map(enrichToken), [trendingTokens, tokenMetadata]);
+  const enrichedAll = useMemo(() => allTokens.map(enrichToken), [allTokens, tokenMetadata]);
+
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return [];
-    const allData = [...trendingTokens, ...allTokens];
+    const allData = [...enrichedTrending, ...enrichedAll];
     const uniqueTokens = allData.reduce((acc, token) => {
       if (!acc.find(t => t.mint === token.mint)) {
         acc.push(token);
@@ -291,7 +349,7 @@ export default function TokenExplorer() {
       t.symbol?.toLowerCase().includes(query) ||
       t.mint?.toLowerCase().includes(query)
     ).slice(0, 30);
-  }, [searchQuery, trendingTokens, allTokens]);
+  }, [searchQuery, enrichedTrending, enrichedAll]);
   
   const searchLoading = trendingLoading || tokensLoading;
 
@@ -342,8 +400,8 @@ export default function TokenExplorer() {
   const displayTokens = searchQuery.trim() 
     ? searchResults 
     : activeTab === "trending" 
-      ? trendingTokens 
-      : allTokens.slice(0, 50);
+      ? enrichedTrending 
+      : enrichedAll.slice(0, 50);
 
   const isLoading = searchQuery.trim() ? searchLoading : activeTab === "trending" ? trendingLoading : tokensLoading;
   const isSearchingMint = isValidSolanaAddress(searchQuery.trim()) && searchResults.length === 0;
