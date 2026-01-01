@@ -296,23 +296,43 @@ export default function TokenExplorer() {
     return Array.from(mints);
   }, [trendingTokens, allTokens]);
 
-  // Fetch enriched metadata for all tokens (same as Watchlist)
+  // Fetch enriched metadata for all tokens in batches of 20 (same as Watchlist)
   const { data: tokenMetadata = {} } = useQuery<Record<string, TokenMetadata>>({
     queryKey: ["/api/tokens/metadata/batch", allMints],
     queryFn: async () => {
       if (allMints.length === 0) return {};
-      const response = await fetch("/api/tokens/metadata/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mints: allMints }),
-        credentials: "include",
-      });
-      if (!response.ok) return {};
-      return response.json();
+      
+      // Batch requests in groups of 20 (API limit)
+      const batchSize = 20;
+      const batches: string[][] = [];
+      for (let i = 0; i < allMints.length; i += batchSize) {
+        batches.push(allMints.slice(i, i + batchSize));
+      }
+      
+      const results: Record<string, TokenMetadata> = {};
+      
+      for (const batch of batches) {
+        try {
+          const response = await fetch("/api/tokens/metadata/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mints: batch }),
+            credentials: "include",
+          });
+          if (response.ok) {
+            const data = await response.json();
+            Object.assign(results, data);
+          }
+        } catch (e) {
+          console.error("Batch metadata fetch failed:", e);
+        }
+      }
+      
+      return results;
     },
     enabled: allMints.length > 0,
     staleTime: 30000,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // Enrich tokens with metadata

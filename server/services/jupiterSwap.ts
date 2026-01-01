@@ -103,67 +103,45 @@ function getFallbackTokens(): Token[] {
 
 export async function fetchTrendingTokens(): Promise<Token[]> {
   try {
-    // First try DexScreener boosted tokens API
-    const boostResponse = await fetch("https://api.dexscreener.com/token-boosts/top/v1");
-    if (boostResponse.ok) {
-      const boostData = await boostResponse.json();
-      if (Array.isArray(boostData) && boostData.length > 0) {
-        const solanaTokens = boostData.filter((t: any) => t.chainId === "solana");
-        const tokenMap = new Map<string, Token>();
+    // Use DexScreener search API with popular search terms to get trending tokens
+    const searches = ["pump", "sol", "meme"];
+    const tokenMap = new Map<string, Token>();
+    
+    for (const query of searches) {
+      try {
+        const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
+        if (!response.ok) continue;
+        const data = await response.json();
         
-        for (const token of solanaTokens.slice(0, 50)) {
-          if (!token.tokenAddress || tokenMap.has(token.tokenAddress)) continue;
+        if (!data.pairs || !Array.isArray(data.pairs)) continue;
+        
+        for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, 30)) {
+          const baseToken = pair.baseToken;
+          if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
           
-          tokenMap.set(token.tokenAddress, {
-            mint: token.tokenAddress,
-            name: token.description || token.tokenAddress.slice(0, 8),
-            symbol: token.tokenAddress.slice(0, 4).toUpperCase(),
+          tokenMap.set(baseToken.address, {
+            mint: baseToken.address,
+            name: baseToken.name || "Unknown",
+            symbol: baseToken.symbol || "???",
             decimals: 9,
-            logoURI: token.icon,
+            logoURI: pair.info?.imageUrl,
+            volume24h: pair.volume?.h24 || 0,
+            liquidity: pair.liquidity?.usd || 0,
+            priceChange24h: pair.priceChange?.h24 || 0,
+            priceUsd: parseFloat(pair.priceUsd) || undefined,
+            marketCap: pair.marketCap || pair.fdv || undefined,
             isTrending: true,
           });
         }
-        
-        if (tokenMap.size > 0) {
-          return Array.from(tokenMap.values());
-        }
+      } catch (e) {
+        console.error(`Failed to search for ${query}:`, e);
       }
     }
 
-    // Fallback: Search for popular Solana tokens
-    const searchResponse = await fetch(`${DEXSCREENER_API}/search?q=sol`);
-    if (!searchResponse.ok) throw new Error(`DexScreener API error: ${searchResponse.status}`);
-    const data = await searchResponse.json();
-    
-    if (!data.pairs || !Array.isArray(data.pairs)) {
-      return getTrendingFallback();
-    }
-
-    const tokenMap = new Map<string, Token>();
-    
-    for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, 100)) {
-      const baseToken = pair.baseToken;
-      if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
-      
-      tokenMap.set(baseToken.address, {
-        mint: baseToken.address,
-        name: baseToken.name || "Unknown",
-        symbol: baseToken.symbol || "???",
-        decimals: 9,
-        logoURI: pair.info?.imageUrl,
-        volume24h: pair.volume?.h24 || 0,
-        liquidity: pair.liquidity?.usd || 0,
-        priceChange24h: pair.priceChange?.h24 || 0,
-        priceUsd: parseFloat(pair.priceUsd) || undefined,
-        marketCap: pair.marketCap || pair.fdv || undefined,
-        isTrending: true,
-      });
-    }
-
     const result = Array.from(tokenMap.values())
-      .filter(t => (t.volume24h || 0) > 10000)
+      .filter(t => (t.volume24h || 0) > 5000 && (t.liquidity || 0) > 1000)
       .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
-      .slice(0, 50);
+      .slice(0, 30);
     
     return result.length > 0 ? result : getTrendingFallback();
   } catch (error) {
