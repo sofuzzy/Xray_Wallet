@@ -417,6 +417,15 @@ export default function TokenExplorer() {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData("text").trim();
+    if (isValidSolanaAddress(pastedText)) {
+      e.preventDefault();
+      setSearchQuery(pastedText);
+      lookupMint(pastedText);
+    }
+  };
+
   const displayTokens = searchQuery.trim() 
     ? searchResults 
     : activeTab === "trending" 
@@ -468,6 +477,7 @@ export default function TokenExplorer() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            onPaste={handlePaste}
             className="pl-10 bg-muted/50"
             data-testid="input-explorer-search"
           />
