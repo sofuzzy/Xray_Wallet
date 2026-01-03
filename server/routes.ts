@@ -13,7 +13,8 @@ import {
   getJupiterQuote, 
   getJupiterSwapTransaction,
   sendTransaction,
-  type Token 
+  type Token,
+  type DexOption
 } from "./services/jupiterSwap";
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
 import { registerStripeRoutes } from "./stripeRoutes";
@@ -596,23 +597,30 @@ export async function registerRoutes(
     }
   });
 
-  // Jupiter Quote
+  // Jupiter Quote (supports direct DEX routing via 'dex' param: auto, orca, raydium)
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
-      const { inputMint, outputMint, amount, slippage } = req.query;
+      const { inputMint, outputMint, amount, slippage, dex } = req.query;
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
       }
+      
+      // Validate dex parameter
+      const dexOption: DexOption = ["auto", "orca", "raydium"].includes(dex as string) 
+        ? (dex as DexOption) 
+        : "auto";
       
       const quote = await getJupiterQuote(
         inputMint as string,
         outputMint as string,
         parseInt(amount as string),
-        slippage ? parseInt(slippage as string) : 50
+        slippage ? parseInt(slippage as string) : 50,
+        dexOption
       );
       
       if (!quote) {
-        return res.status(400).json({ message: "No route found for this swap" });
+        const dexName = dexOption === "auto" ? "any DEX" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1);
+        return res.status(400).json({ message: `No route found on ${dexName} for this swap` });
       }
       
       res.json({
@@ -623,6 +631,7 @@ export async function registerRoutes(
         outputAmount: parseInt(quote.outAmount),
         priceImpact: parseFloat(quote.priceImpactPct),
         routePlan: quote.routePlan,
+        dex: dexOption,
         quote,
       });
     } catch (error) {
