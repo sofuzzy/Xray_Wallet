@@ -1,5 +1,4 @@
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-const BIRDEYE_API = "https://public-api.birdeye.so";
 
 export interface PricePoint {
   timestamp: number;

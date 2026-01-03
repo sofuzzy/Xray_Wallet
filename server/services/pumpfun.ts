@@ -1,6 +1,8 @@
 // PumpFun service for token swaps
 // Simplified implementation for devnet
 
+const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
+
 export interface SwapParams {
   inputMint: string;
   outputMint: string;
@@ -67,32 +69,51 @@ export async function getAvailableTokens(): Promise<
   }
   
   try {
-    // Fetch from Jupiter's verified token list (includes meme coins)
-    const response = await fetch("https://token.jup.ag/strict");
-    if (!response.ok) {
-      throw new Error(`Jupiter API error: ${response.status}`);
+    // Fetch popular tokens from DexScreener
+    const searches = ["usdc", "sol", "bonk", "wif", "jup"];
+    const tokenMap = new Map<string, { mint: string; name: string; symbol: string; decimals: number; logoURI?: string }>();
+    
+    for (const query of searches) {
+      try {
+        const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
+        if (!response.ok) continue;
+        const data = await response.json();
+        
+        if (!data.pairs || !Array.isArray(data.pairs)) continue;
+        
+        for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, 10)) {
+          const baseToken = pair.baseToken;
+          if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
+          
+          tokenMap.set(baseToken.address, {
+            mint: baseToken.address,
+            name: baseToken.name || "Unknown",
+            symbol: baseToken.symbol || "???",
+            decimals: 9,
+            logoURI: pair.info?.imageUrl,
+          });
+        }
+      } catch (e) {
+        // Skip failed searches
+      }
     }
     
-    const tokens = await response.json();
-    
-    // Map to our format and cache
-    const mappedTokens = tokens.map((token: any) => ({
-      mint: token.address,
-      name: token.name,
-      symbol: token.symbol,
-      decimals: token.decimals,
-      logoURI: token.logoURI,
-    }));
+    const mappedTokens = Array.from(tokenMap.values());
     cachedTokens = mappedTokens;
     cacheTimestamp = now;
     
-    return mappedTokens;
+    return mappedTokens.length > 0 ? mappedTokens : getDefaultTokens();
   } catch (error) {
-    console.error("Failed to fetch tokens from Jupiter:", error);
+    console.error("Failed to fetch tokens from DexScreener:", error);
     
     // Return comprehensive fallback tokens if API fails
-    return [
-      // Stablecoins
+    return getDefaultTokens();
+  }
+}
+
+function getDefaultTokens() {
+  return [
+    // Stablecoins
       { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", name: "USD Coin", symbol: "USDC", decimals: 6 },
       { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenErt", name: "Tether USD", symbol: "USDT", decimals: 6 },
       // Major tokens
@@ -124,6 +145,5 @@ export async function getAvailableTokens(): Promise<
       { mint: "kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6", name: "Kin", symbol: "KIN", decimals: 5 },
       { mint: "AFbX8oGjGpmVFywbVouvhQSRmiW2aR1mohfahi4Y2AdB", name: "GST", symbol: "GST", decimals: 9 },
       { mint: "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt", name: "Serum", symbol: "SRM", decimals: 6 },
-    ];
-  }
+  ];
 }

@@ -2,7 +2,6 @@ import { Connection, PublicKey, Transaction, VersionedTransaction, ComputeBudget
 
 const JUPITER_API_BASE = "https://lite-api.jup.ag/swap/v1";
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-const JUPITER_TOKEN_LIST = "https://lite-api.jup.ag/tokens/v1/strict";
 
 const RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
 
@@ -61,25 +60,51 @@ let tokenCache: TokenCache = {
 
 const CACHE_TTL = 30 * 1000;
 
-export async function fetchJupiterTokens(): Promise<Token[]> {
+export async function fetchPopularTokens(): Promise<Token[]> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    // Use DexScreener to fetch popular Solana tokens
+    const searches = ["usdc", "usdt", "sol", "jup", "bonk"];
+    const tokenMap = new Map<string, Token>();
     
-    const response = await fetch(JUPITER_TOKEN_LIST, { signal: controller.signal });
-    clearTimeout(timeout);
+    for (const query of searches) {
+      try {
+        const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
+        if (!response.ok) continue;
+        const data = await response.json();
+        
+        if (!data.pairs || !Array.isArray(data.pairs)) continue;
+        
+        for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, 10)) {
+          const baseToken = pair.baseToken;
+          if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
+          
+          tokenMap.set(baseToken.address, {
+            mint: baseToken.address,
+            name: baseToken.name || "Unknown",
+            symbol: baseToken.symbol || "???",
+            decimals: 9,
+            logoURI: pair.info?.imageUrl,
+            volume24h: pair.volume?.h24 || 0,
+            liquidity: pair.liquidity?.usd || 0,
+            priceUsd: parseFloat(pair.priceUsd) || undefined,
+          });
+        }
+      } catch (e) {
+        console.error(`Failed to search DexScreener for ${query}:`, e);
+      }
+    }
     
-    if (!response.ok) throw new Error(`Jupiter API error: ${response.status}`);
-    const tokens = await response.json();
-    return tokens.map((t: any) => ({
-      mint: t.address,
-      name: t.name,
-      symbol: t.symbol,
-      decimals: t.decimals,
-      logoURI: t.logoURI,
-    }));
+    // Add fallback tokens that might not be in search results
+    const fallbacks = getFallbackTokens();
+    for (const token of fallbacks) {
+      if (!tokenMap.has(token.mint)) {
+        tokenMap.set(token.mint, token);
+      }
+    }
+    
+    return Array.from(tokenMap.values());
   } catch (error) {
-    console.error("Failed to fetch Jupiter tokens (using fallback):", error);
+    console.error("Failed to fetch popular tokens from DexScreener:", error);
     return getFallbackTokens();
   }
 }
@@ -161,14 +186,14 @@ export async function refreshTokenCache(): Promise<void> {
   }
 
   try {
-    const [jupiterTokens, trendingTokens] = await Promise.all([
-      fetchJupiterTokens(),
+    const [popularTokens, trendingTokens] = await Promise.all([
+      fetchPopularTokens(),
       fetchTrendingTokens(),
     ]);
 
     const trendingMints = new Set(trendingTokens.map(t => t.mint));
     
-    const enrichedTokens = jupiterTokens.map(token => {
+    const enrichedTokens = popularTokens.map(token => {
       const trending = trendingTokens.find(t => t.mint === token.mint);
       if (trending) {
         return { ...token, ...trending, isTrending: true };

@@ -73,8 +73,8 @@ The server follows a modular pattern:
 - Activation/deactivation takes 2-3 epochs (~4-6 days on mainnet)
 
 ### Token Swap Implementation (Jupiter)
-- **Jupiter API Integration**: Server-side quote and swap transaction generation
-- **Token Discovery**: DexScreener trending tokens + fallback verified token list
+- **Jupiter API Integration**: Server-side quote and swap transaction generation (lite-api.jup.ag for swaps only)
+- **Token Discovery**: All token data (names, symbols, logos, prices, market caps) fetched from DexScreener API
 - **Swap Flow**:
   1. Client fetches quote via `/api/swaps/quote`
   2. Client requests transaction via `/api/swaps/transaction`
@@ -83,10 +83,11 @@ The server follows a modular pattern:
 - **Priority Fee Tiers**: Low (5k), Medium (25k), High (100k) lamports
 - **Paste-to-Add**: Paste any token mint address to discover and swap
 - **Key Files**:
-  - `server/services/jupiterSwap.ts` - Jupiter API client, token caching, swap execution
+  - `server/services/jupiterSwap.ts` - DexScreener token discovery, Jupiter swap execution
+  - `server/services/priceHistory.ts` - DexScreener token metadata and price history
   - `client/src/components/SwapModal.tsx` - Swap UI with token selection and trending
-- **Note**: Jupiter token.jup.ag DNS is blocked on Replit, falls back to hardcoded popular tokens; DexScreener API works for trending discovery
-- **RPC**: Uses HELIUS_RPC_URL or QUICKNODE_RPC_URL env var, falls back to devnet
+- **Data Source**: DexScreener API (https://api.dexscreener.com) for all token metadata, prices, and trending data
+- **RPC**: Uses HELIUS_RPC_URL or QUICKNODE_RPC_URL env var, falls back to mainnet-beta
 
 ## External Dependencies
 
