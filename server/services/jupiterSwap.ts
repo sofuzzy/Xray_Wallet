@@ -344,10 +344,11 @@ export interface JupiterQuote {
 }
 
 // DEX identifiers for Jupiter API filtering
+// Labels verified from: https://lite-api.jup.ag/swap/v1/program-id-to-label
 export type DexOption = "auto" | "orca" | "raydium";
 
 const DEX_AMM_KEYS: Record<string, string[]> = {
-  orca: ["Orca", "Whirlpool"],
+  orca: ["Orca V1", "Orca V2", "Whirlpool"],
   raydium: ["Raydium", "Raydium CLMM", "Raydium CP"],
 };
 
