@@ -109,6 +109,47 @@ export async function fetchPopularTokens(): Promise<Token[]> {
   }
 }
 
+// Search tokens by name/symbol using DexScreener API
+export async function searchTokens(query: string, limit: number = 20): Promise<Token[]> {
+  try {
+    const response = await fetch(`${DEXSCREENER_API}/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) {
+      console.error("DexScreener search failed:", response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    if (!data.pairs || !Array.isArray(data.pairs)) return [];
+    
+    const tokenMap = new Map<string, Token>();
+    
+    for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, limit * 2)) {
+      const baseToken = pair.baseToken;
+      if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
+      
+      tokenMap.set(baseToken.address, {
+        mint: baseToken.address,
+        name: baseToken.name || "Unknown",
+        symbol: baseToken.symbol || "???",
+        decimals: 9,
+        logoURI: pair.info?.imageUrl,
+        volume24h: pair.volume?.h24 || 0,
+        liquidity: pair.liquidity?.usd || 0,
+        priceChange24h: pair.priceChange?.h24 || 0,
+        priceUsd: parseFloat(pair.priceUsd) || undefined,
+        marketCap: pair.marketCap || pair.fdv || undefined,
+      });
+      
+      if (tokenMap.size >= limit) break;
+    }
+    
+    return Array.from(tokenMap.values());
+  } catch (error) {
+    console.error("DexScreener search error:", error);
+    return [];
+  }
+}
+
 function getFallbackTokens(): Token[] {
   return [
     { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", name: "USD Coin", symbol: "USDC", decimals: 6 },

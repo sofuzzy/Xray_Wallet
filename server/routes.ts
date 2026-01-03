@@ -938,6 +938,25 @@ export async function registerRoutes(
     }
   });
 
+  // Token search endpoint using DexScreener
+  app.get("/api/tokens/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      
+      if (!query || query.trim().length < 2) {
+        return res.status(400).json({ message: "Query must be at least 2 characters" });
+      }
+      
+      const { searchTokens } = await import("./services/jupiterSwap");
+      const tokens = await searchTokens(query.trim(), limit);
+      res.json(tokens);
+    } catch (error) {
+      console.error("Token search error:", error);
+      res.status(500).json({ message: "Failed to search tokens" });
+    }
+  });
+
   // Token metadata endpoint for watchlist enrichment
   app.get("/api/tokens/metadata/:mint", hybridAuth, async (req, res) => {
     try {

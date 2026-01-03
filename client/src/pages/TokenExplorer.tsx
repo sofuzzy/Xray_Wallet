@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -274,9 +274,31 @@ interface TokenMetadata {
 
 export default function TokenExplorer() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [activeTab, setActiveTab] = useState("trending");
   const { toast } = useToast();
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Live search using DexScreener API
+  const { data: liveSearchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
+    queryKey: ["/api/tokens/search", debouncedQuery],
+    queryFn: async () => {
+      if (debouncedQuery.length < 2) return [];
+      const response = await fetch(`/api/tokens/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: debouncedQuery.length >= 2 && !isValidSolanaAddress(debouncedQuery),
+    staleTime: 30000,
+  });
 
   const { data: trendingTokens = [], isLoading: trendingLoading } = useQuery<Token[]>({
     queryKey: ["/api/swaps/trending"],
@@ -354,9 +376,17 @@ export default function TokenExplorer() {
   const enrichedTrending = useMemo(() => trendingTokens.map(enrichToken), [trendingTokens, tokenMetadata]);
   const enrichedAll = useMemo(() => allTokens.map(enrichToken), [allTokens, tokenMetadata]);
 
+  // Combine local cache search with live DexScreener results
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return [];
+    if (!query || query.length < 2) return [];
+    
+    // If we have live search results, use them
+    if (liveSearchResults.length > 0) {
+      return liveSearchResults;
+    }
+    
+    // Fall back to local cache search
     const allData = [...enrichedTrending, ...enrichedAll];
     const uniqueTokens = allData.reduce((acc, token) => {
       if (!acc.find(t => t.mint === token.mint)) {
@@ -369,9 +399,7 @@ export default function TokenExplorer() {
       t.symbol?.toLowerCase().includes(query) ||
       t.mint?.toLowerCase().includes(query)
     ).slice(0, 30);
-  }, [searchQuery, enrichedTrending, enrichedAll]);
-  
-  const searchLoading = trendingLoading || tokensLoading;
+  }, [searchQuery, enrichedTrending, enrichedAll, liveSearchResults]);
 
   const { mutate: lookupMint, isPending: isLookingUp } = useMutation({
     mutationFn: async (mint: string) => {
@@ -432,7 +460,9 @@ export default function TokenExplorer() {
       ? enrichedTrending 
       : enrichedAll.slice(0, 50);
 
-  const isLoading = searchQuery.trim() ? searchLoading : activeTab === "trending" ? trendingLoading : tokensLoading;
+  const isLoading = searchQuery.trim() && searchQuery.trim().length >= 2 
+    ? searchLoading 
+    : activeTab === "trending" ? trendingLoading : tokensLoading;
   const isSearchingMint = isValidSolanaAddress(searchQuery.trim()) && searchResults.length === 0;
 
   if (selectedToken) {
