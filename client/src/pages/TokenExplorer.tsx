@@ -9,10 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, TrendingUp, TrendingDown, Loader2, Flame, Star, 
   ArrowLeft, ExternalLink, Copy, Plus, BarChart3, Volume2,
-  DollarSign, Activity, X, Eye, Home
+  DollarSign, Activity, X, Eye, Home, ArrowRightLeft
 } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SwapModal } from "@/components/SwapModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { PublicKey } from "@solana/web3.js";
@@ -128,10 +129,11 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
   );
 }
 
-function TokenDetail({ token, onBack, onAddToWatchlist }: { 
+function TokenDetail({ token, onBack, onAddToWatchlist, onSwap }: { 
   token: Token; 
   onBack: () => void;
   onAddToWatchlist: (mint: string) => void;
+  onSwap: () => void;
 }) {
   const { toast } = useToast();
 
@@ -180,10 +182,16 @@ function TokenDetail({ token, onBack, onAddToWatchlist }: {
               <p className="text-muted-foreground">{token.symbol}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => onAddToWatchlist(token.mint)} data-testid="button-add-watchlist-detail">
-            <Star className="w-4 h-4 mr-2" />
-            Add to Watchlist
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={onSwap} data-testid="button-swap-token">
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
+              Swap
+            </Button>
+            <Button variant="outline" onClick={() => onAddToWatchlist(token.mint)} data-testid="button-add-watchlist-detail">
+              <Star className="w-4 h-4 mr-2" />
+              Add to Watchlist
+            </Button>
+          </div>
         </div>
 
         <div className="mt-6 flex items-center gap-2 text-sm">
@@ -277,6 +285,7 @@ export default function TokenExplorer() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [activeTab, setActiveTab] = useState("trending");
+  const [isSwapOpen, setIsSwapOpen] = useState(false);
   const { toast } = useToast();
 
   // Debounce search query
@@ -473,8 +482,16 @@ export default function TokenExplorer() {
             token={selectedToken} 
             onBack={() => setSelectedToken(null)}
             onAddToWatchlist={addToWatchlist}
+            onSwap={() => setIsSwapOpen(true)}
           />
         </AnimatePresence>
+        {isSwapOpen && (
+          <SwapModal 
+            isOpen={isSwapOpen} 
+            onClose={() => setIsSwapOpen(false)} 
+            initialOutputToken={selectedToken} 
+          />
+        )}
       </div>
     );
   }
