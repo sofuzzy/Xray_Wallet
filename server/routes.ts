@@ -16,6 +16,8 @@ import {
   type Token 
 } from "./services/jupiterSwap";
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
+import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
+import { decideTokenAction, getRiskShieldPolicy } from "./services/riskShield";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -600,6 +602,20 @@ export async function registerRoutes(
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
       const { inputMint, outputMint, amount, slippage } = req.query;
+
+      // Risk Shield: block/require acknowledgement for risky tokens
+      const ack = (req.query.ack as string) === "true";
+      if (outputMint) {
+        const decision = await decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true });
+        if (!decision.allowed) {
+          return res.status(decision.blocked ? 403 : 428).json({
+            message: decision.reason,
+            decision,
+            hint: decision.requiresAcknowledgement ? "Pass ?ack=true to acknowledge the risk for this token." : undefined,
+          });
+        }
+      }
+
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
       }
@@ -635,6 +651,23 @@ export async function registerRoutes(
   app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const { quote, userPublicKey, priorityFee } = req.body;
+
+      // Risk Shield: require acknowledgement/block risky swaps
+      const ack = Boolean(req.body?.acknowledgeRisk || req.body?.riskAcknowledgement?.accepted);
+      const outMint = quote?.outputMint;
+      if (outMint) {
+        const decision = await decideTokenAction({ mint: outMint, action: "swap_tx_output", acknowledge: ack, includeAssessment: true });
+        if (!decision.allowed) {
+          return res.status(decision.blocked ? 403 : 428).json({
+            message: decision.reason,
+            decision,
+            hint: decision.requiresAcknowledgement
+              ? "Include { acknowledgeRisk: true } (or riskAcknowledgement.accepted=true) to proceed."
+              : undefined,
+          });
+        }
+      }
+
       
       if (!quote || !userPublicKey) {
         return res.status(400).json({ message: "Missing quote or userPublicKey" });
@@ -967,7 +1000,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Token not found" });
       }
       
-      res.json(metadata);
+      const risk = await assessTokenRisk(mint);
+      res.json({ ...metadata, risk });
     } catch (error) {
       console.error("Token metadata error:", error);
       res.status(500).json({ message: "Failed to fetch token metadata" });
@@ -993,10 +1027,50 @@ export async function registerRoutes(
         metadataByMint[key] = value;
       });
       
+      const riskResults = await assessTokenRiskBatch(mints);
+      riskResults.forEach((value, key) => {
+        if (!metadataByMint[key]) metadataByMint[key] = { mint: key };
+        metadataByMint[key].risk = value;
+      });
+
       res.json(metadataByMint);
     } catch (error) {
       console.error("Batch metadata error:", error);
       res.status(500).json({ message: "Failed to fetch token metadata" });
+    }
+  });
+
+  // Token risk endpoints (heuristic, not a guarantee)
+  app.get("/api/tokens/risk/:mint", hybridAuth, async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const risk = await assessTokenRisk(mint);
+      if (!risk) return res.status(404).json({ message: "Token not found" });
+      res.json(risk);
+    } catch (error) {
+      console.error("Token risk error:", error);
+      res.status(500).json({ message: "Failed to assess token risk" });
+    }
+  });
+
+  app.post("/api/tokens/risk/batch", hybridAuth, async (req, res) => {
+    try {
+      const { mints } = req.body;
+      if (!Array.isArray(mints) || mints.length === 0) {
+        return res.status(400).json({ message: "Mints array required" });
+      }
+      if (mints.length > 20) {
+        return res.status(400).json({ message: "Maximum 20 tokens per batch" });
+      }
+      const results = await assessTokenRiskBatch(mints);
+      const byMint: Record<string, any> = {};
+      results.forEach((value, key) => {
+        byMint[key] = value;
+      });
+      res.json(byMint);
+    } catch (error) {
+      console.error("Batch risk error:", error);
+      res.status(500).json({ message: "Failed to assess token risk" });
     }
   });
 
