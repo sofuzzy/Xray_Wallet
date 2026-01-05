@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
+import { RiskShieldModal, type RiskShieldDecision } from "@/components/RiskShieldModal";
 import bs58 from "bs58";
 
 type TransactionStep = "idle" | "building" | "signing" | "sending" | "confirming" | "success" | "error";
@@ -298,17 +299,36 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         outputMint: outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint,
         amount: amount.toString(),
         slippage: "50",
+        ...(riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint ? { ack: "true" } : {}),
       });
       
       const response = await fetch(`/api/swaps/quote?${params}`, { credentials: "include" });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to get quote");
+        let errorData: any = {};
+        try { errorData = await response.json(); } catch {}
+        const err: any = new Error(errorData?.message || "Failed to get quote");
+        err.status = response.status;
+        err.data = errorData;
+        // Surface Risk Shield decisions to the UI
+        if (response.status === 428 || response.status === 403) {
+          err.decision = errorData?.decision;
+        }
+        throw err;
       }
       return response.json();
     },
     enabled: isOpen && !!inputAmount && parseFloat(inputAmount) > 0 && inputMint !== outputMint,
     retry: false,
+
+  useEffect(() => {
+    const err: any = quoteError;
+    if (err?.decision) {
+      setRiskDecision(err.decision);
+      setRiskPendingStage("quote");
+      setRiskModalOpen(true);
+    }
+  }, [quoteError]);
+
   });
 
   const { mutate: executeSwap, isPending: isSwapping } = useMutation({
@@ -320,11 +340,24 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       setTxStep("building");
       setTxError("");
       
-      const txResponse = await apiRequest("POST", "/api/swaps/transaction", {
+      let txResponse: any;
+      try {
+        txResponse = await apiRequest("POST", "/api/swaps/transaction", {
         quote: quote.quote,
         userPublicKey: address,
         priorityFee: getActivePriorityFee(),
+        acknowledgeRisk: riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint ? true : false,
       });
+      } catch (e: any) {
+        const decision = e?.data?.decision || e?.decision;
+        if (decision && (e?.status === 428 || e?.status === 403)) {
+          setRiskDecision(decision);
+          setRiskPendingStage("transaction");
+          setRiskModalOpen(true);
+          throw new Error("Risk acknowledgement required");
+        }
+        throw e;
+      }
 
       if (!txResponse.swapTransaction) {
         throw new Error("Failed to get swap transaction");
@@ -763,6 +796,30 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           </div>
         </div>
       </DialogContent>
-    </Dialog>
+    
+      <RiskShieldModal
+        open={riskModalOpen}
+        onOpenChange={setRiskModalOpen}
+        decision={riskDecision}
+        onAcknowledge={() => {
+          const normalizedOut = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
+          setRiskAckedMint(normalizedOut);
+          setRiskModalOpen(false);
+          // Re-fetch quote or retry transaction after acknowledgement
+          if (riskPendingStage === "quote") {
+            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, inputAmount] });
+          } else if (riskPendingStage === "transaction") {
+            // retry swap
+            executeSwap();
+          }
+          setRiskPendingStage(null);
+        }}
+      />
+</Dialog>
   );
 }
+
+  const [riskModalOpen, setRiskModalOpen] = useState(false);
+  const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
+  const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
+  const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
