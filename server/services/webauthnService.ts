@@ -12,35 +12,49 @@ import {
   type VerifiedAuthenticationResponse,
 } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
+import { env } from "../config/env";
 
-const registrationChallenges = new Map<string, { challenge: string; expiresAt: number }>();
-const authenticationChallenges = new Map<string, { challenge: string; expiresAt: number }>();
-const passkeyRegistrationChallenges = new Map<string, { challenge: string; expiresAt: number; username?: string }>();
-const passkeyLoginChallenges = new Map<string, { challenge: string; expiresAt: number }>();
+const CHALLENGE_TTL_MS = 90 * 1000;
+
+const registrationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
+const authenticationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
+const passkeyRegistrationChallenges = new Map<string, { challenge: string; expiresAt: number; username?: string; nonce: string }>();
+const passkeyLoginChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
+
+const usedChallenges = new Set<string>();
 
 const RP_NAME = "Xray Wallet";
 
-function getRpIdAndOrigin(): { rpId: string; origin: string } {
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return {
-      rpId: process.env.REPLIT_DEV_DOMAIN,
-      origin: `https://${process.env.REPLIT_DEV_DOMAIN}`,
-    };
-  }
-  if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-    const domain = `${process.env.REPL_SLUG}.${process.env.REPL_OWNER.toLowerCase()}.repl.co`;
-    return {
-      rpId: domain,
-      origin: `https://${domain}`,
-    };
-  }
-  return {
-    rpId: "localhost",
-    origin: "http://localhost:5000",
-  };
+const RP_ID = env.webauthnRpId;
+const ALLOWED_ORIGINS = env.webauthnOrigins;
+
+function isOriginAllowed(origin: string): boolean {
+  return ALLOWED_ORIGINS.includes(origin);
 }
 
-const { rpId: RP_ID, origin: ORIGIN } = getRpIdAndOrigin();
+function generateNonce(): string {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+function isChallengeReplayed(challenge: string): boolean {
+  if (usedChallenges.has(challenge)) {
+    return true;
+  }
+  usedChallenges.add(challenge);
+
+  if (usedChallenges.size > 10000) {
+    const entries = Array.from(usedChallenges);
+    for (let i = 0; i < 5000; i++) {
+      usedChallenges.delete(entries[i]);
+    }
+  }
+
+  return false;
+}
+
+function validateCredentialScope(credentialUserId: string, requestUserId: string): boolean {
+  return credentialUserId === requestUserId;
+}
 
 export function generateRegistrationChallenge(userId: string): {
   challenge: string;
@@ -58,7 +72,8 @@ export function generateRegistrationChallenge(userId: string): {
   
   registrationChallenges.set(userId, {
     challenge,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    nonce: generateNonce(),
   });
 
   return {
@@ -92,7 +107,8 @@ export function generateAuthenticationChallenge(userId: string): {
   
   authenticationChallenges.set(userId, {
     challenge,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    nonce: generateNonce(),
   });
 
   return {
@@ -135,7 +151,7 @@ export async function verifyRegistration(
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: storedChallenge.challenge,
-        expectedOrigin: ORIGIN,
+        expectedOrigin: ALLOWED_ORIGINS,
         expectedRPID: RP_ID,
         requireUserVerification: true,
       });
@@ -146,6 +162,11 @@ export async function verifyRegistration(
 
     if (!verification.verified || !verification.registrationInfo) {
       console.error("Registration not verified");
+      return false;
+    }
+
+    if (isChallengeReplayed(storedChallenge.challenge)) {
+      console.error("Challenge replay detected");
       return false;
     }
 
@@ -207,7 +228,7 @@ export async function verifyAuthentication(
       verification = await verifyAuthenticationResponse({
         response,
         expectedChallenge: storedChallenge.challenge,
-        expectedOrigin: ORIGIN,
+        expectedOrigin: ALLOWED_ORIGINS,
         expectedRPID: RP_ID,
         requireUserVerification: true,
         credential: {
@@ -224,6 +245,16 @@ export async function verifyAuthentication(
 
     if (!verification.verified) {
       console.error("Authentication not verified");
+      return false;
+    }
+
+    if (isChallengeReplayed(storedChallenge.challenge)) {
+      console.error("Challenge replay detected");
+      return false;
+    }
+
+    if (!validateCredentialScope(credential.userId, userId)) {
+      console.error("Credential scope mismatch");
       return false;
     }
 
@@ -265,8 +296,9 @@ export async function generatePasskeyRegistrationOptions(sessionId: string, user
   
   passkeyRegistrationChallenges.set(sessionId, {
     challenge,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
     username,
+    nonce: generateNonce(),
   });
 
   return {
@@ -322,7 +354,7 @@ export async function verifyPasskeyRegistration(
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: storedChallenge.challenge,
-        expectedOrigin: ORIGIN,
+        expectedOrigin: ALLOWED_ORIGINS,
         expectedRPID: RP_ID,
         requireUserVerification: true,
       });
@@ -333,6 +365,10 @@ export async function verifyPasskeyRegistration(
 
     if (!verification.verified || !verification.registrationInfo) {
       return { success: false, error: "Registration not verified" };
+    }
+
+    if (isChallengeReplayed(storedChallenge.challenge)) {
+      return { success: false, error: "Challenge replay detected" };
     }
 
     passkeyRegistrationChallenges.delete(sessionId);
@@ -376,7 +412,8 @@ export function generatePasskeyLoginOptions(sessionId: string): {
   
   passkeyLoginChallenges.set(sessionId, {
     challenge,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    nonce: generateNonce(),
   });
 
   return {
@@ -427,7 +464,7 @@ export async function verifyPasskeyLogin(
       verification = await verifyAuthenticationResponse({
         response,
         expectedChallenge: storedChallenge.challenge,
-        expectedOrigin: ORIGIN,
+        expectedOrigin: ALLOWED_ORIGINS,
         expectedRPID: RP_ID,
         requireUserVerification: true,
         credential: {
@@ -444,6 +481,10 @@ export async function verifyPasskeyLogin(
 
     if (!verification.verified) {
       return { success: false, error: "Authentication not verified" };
+    }
+
+    if (isChallengeReplayed(storedChallenge.challenge)) {
+      return { success: false, error: "Challenge replay detected" };
     }
 
     passkeyLoginChallenges.delete(sessionId);

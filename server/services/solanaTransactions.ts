@@ -1,17 +1,16 @@
-import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { getRpcService, createUserRpcService } from "./rpcService";
 
-// Use user-provided RPC or fallback to public mainnet
-const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || clusterApiUrl("mainnet-beta");
-const connection = new Connection(SOLANA_RPC_URL, {
-  commitment: "confirmed",
-});
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
-console.log("Solana RPC URL:", SOLANA_RPC_URL);
-
-export async function getWalletBalance(walletAddress: string): Promise<{ balance: number; lamports: number }> {
+export async function getWalletBalance(
+  walletAddress: string,
+  userRpc?: string
+): Promise<{ balance: number; lamports: number }> {
   try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const publicKey = new PublicKey(walletAddress);
-    const lamports = await connection.getBalance(publicKey);
+    const lamports = await rpc.getBalance(publicKey);
     return {
       balance: lamports / LAMPORTS_PER_SOL,
       lamports,
@@ -22,12 +21,16 @@ export async function getWalletBalance(walletAddress: string): Promise<{ balance
   }
 }
 
-export async function getTokenAccounts(walletAddress: string): Promise<Array<{ mint: string; balance: number; decimals: number }>> {
+export async function getTokenAccounts(
+  walletAddress: string,
+  userRpc?: string
+): Promise<Array<{ mint: string; balance: number; decimals: number }>> {
   try {
     console.log("Fetching token accounts for:", walletAddress);
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const publicKey = new PublicKey(walletAddress);
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
-      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+    const tokenAccounts = await rpc.getParsedTokenAccountsByOwner(publicKey, {
+      programId: TOKEN_PROGRAM_ID,
     });
 
     console.log("Found", tokenAccounts.value.length, "token accounts");
@@ -39,7 +42,6 @@ export async function getTokenAccounts(walletAddress: string): Promise<Array<{ m
         if (!info) return null;
 
         const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
-        console.log("Token:", info.mint, "balance:", balance);
         if (balance === 0) return null;
 
         return {
@@ -58,21 +60,24 @@ export async function getTokenAccounts(walletAddress: string): Promise<Array<{ m
   }
 }
 
-export async function sendRawTransaction(serializedTransaction: string): Promise<string> {
+export async function sendRawTransaction(
+  serializedTransaction: string,
+  userRpc?: string
+): Promise<string> {
   try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const buffer = Buffer.from(serializedTransaction, "base64");
-    const signature = await connection.sendRawTransaction(buffer, {
+    const signature = await rpc.sendRawTransaction(buffer, {
       skipPreflight: false,
       preflightCommitment: "confirmed",
     });
     
-    // Wait for confirmation
-    const latestBlockhash = await connection.getLatestBlockhash();
-    await connection.confirmTransaction({
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    await rpc.confirmTransaction(
       signature,
-      blockhash: latestBlockhash.blockhash,
-      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-    }, "confirmed");
+      latestBlockhash.blockhash,
+      latestBlockhash.lastValidBlockHeight
+    );
     
     return signature;
   } catch (error) {
@@ -81,12 +86,12 @@ export async function sendRawTransaction(serializedTransaction: string): Promise
   }
 }
 
-export async function getLatestBlockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
-  const result = await connection.getLatestBlockhash("confirmed");
-  return {
-    blockhash: result.blockhash,
-    lastValidBlockHeight: result.lastValidBlockHeight,
-  };
+export async function getLatestBlockhash(userRpc?: string): Promise<{
+  blockhash: string;
+  lastValidBlockHeight: number;
+}> {
+  const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
+  return rpc.getLatestBlockhash();
 }
 
 export interface OnChainTransaction {
@@ -104,17 +109,22 @@ export interface OnChainTransaction {
   outputAmount: string | null;
 }
 
-export async function getOnChainTransactions(walletAddress: string, limit: number = 10): Promise<OnChainTransaction[]> {
+export async function getOnChainTransactions(
+  walletAddress: string,
+  limit: number = 10,
+  userRpc?: string
+): Promise<OnChainTransaction[]> {
   try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const publicKey = new PublicKey(walletAddress);
     
-    const signatures = await connection.getSignaturesForAddress(publicKey, { limit });
+    const signatures = await rpc.getSignaturesForAddress(publicKey, { limit });
     
     const transactions: OnChainTransaction[] = [];
     
     for (const sigInfo of signatures) {
       try {
-        const tx = await connection.getParsedTransaction(sigInfo.signature, {
+        const tx = await rpc.getParsedTransaction(sigInfo.signature, {
           maxSupportedTransactionVersion: 0,
         });
         
@@ -175,15 +185,15 @@ export async function getOnChainTransactions(walletAddress: string, limit: numbe
           toAddr: toAddr || "Unknown",
           amount,
           type: "transfer",
-          status: sigInfo.err ? "failed" : "confirmed",
+          status: tx.meta.err ? "failed" : "confirmed",
           timestamp: sigInfo.blockTime ? new Date(sigInfo.blockTime * 1000) : null,
           userId: null,
           inputToken: null,
           outputToken: null,
           outputAmount: null,
         });
-      } catch (e) {
-        console.error("Error parsing transaction:", sigInfo.signature, e);
+      } catch (txError) {
+        console.error("Error parsing transaction:", sigInfo.signature, txError);
       }
     }
     

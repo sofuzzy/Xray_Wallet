@@ -1,17 +1,9 @@
 import crypto from "crypto";
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getMint } from "@solana/spl-token";
+import { getRpcService } from "./rpcService";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-
-// Use best available RPC (match solanaTransactions.ts behavior)
-const SOLANA_RPC_URL =
-  process.env.HELIUS_RPC_URL ||
-  process.env.QUICKNODE_RPC_URL ||
-  process.env.SOLANA_RPC_URL ||
-  clusterApiUrl("mainnet-beta");
-
-const connection = new Connection(SOLANA_RPC_URL, { commitment: "confirmed" });
 
 /**
  * Risk engine heuristics:
@@ -100,7 +92,8 @@ async function assessOnChain(mint: PublicKey): Promise<{
     largest: { address: string; uiAmount: number }[];
   };
 }> {
-  const acct = await connection.getAccountInfo(mint);
+  const rpc = getRpcService();
+  const acct = await rpc.getAccountInfo(mint);
   if (!acct) {
     return {
       tokenProgram: "unknown",
@@ -121,10 +114,9 @@ async function assessOnChain(mint: PublicKey): Promise<{
 
   let mintInfo: any = null;
   try {
-    // getMint can parse both TOKEN_PROGRAM_ID and TOKEN_2022_PROGRAM_ID
     const programId =
       tokenProgram === "token-2022" ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-    mintInfo = await getMint(connection, mint, "confirmed", programId);
+    mintInfo = await getMint(rpc.getConnection(), mint, "confirmed", programId);
   } catch {
     // If parsing fails, still proceed with program classification only
   }
@@ -139,12 +131,11 @@ async function assessOnChain(mint: PublicKey): Promise<{
       : null;
   const decimals = typeof mintInfo?.decimals === "number" ? mintInfo.decimals : null;
 
-  // Largest accounts + concentration
   let topHolders: any = undefined;
   try {
     const [supplyResp, largestResp] = await Promise.all([
-      connection.getTokenSupply(mint),
-      connection.getTokenLargestAccounts(mint),
+      rpc.getTokenSupply(mint),
+      rpc.getTokenLargestAccounts(mint),
     ]);
 
     const supplyUi2 = safeNum(supplyResp?.value?.uiAmount);
@@ -153,11 +144,11 @@ async function assessOnChain(mint: PublicKey): Promise<{
         address: String(x.address),
         uiAmount: safeNum(x.uiAmount) ?? 0,
       }))
-      .sort((a: any, b: any) => b.uiAmount - a.uiAmount);
+      .sort((a: { uiAmount: number }, b: { uiAmount: number }) => b.uiAmount - a.uiAmount);
 
     const total = supplyUi2 && supplyUi2 > 0 ? supplyUi2 : supplyUi && supplyUi > 0 ? supplyUi : null;
 
-    const sumTop = (k: number) => largest.slice(0, k).reduce((acc, x) => acc + (x.uiAmount || 0), 0);
+    const sumTop = (k: number) => largest.slice(0, k).reduce((acc: number, x: { uiAmount: number }) => acc + (x.uiAmount || 0), 0);
 
     const pct = (x: number) => (total ? (x / total) * 100 : null);
 

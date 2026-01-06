@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { validateStartupConfig, env } from "./config/env";
 
 const app = express();
 const httpServer = createServer(app);
@@ -142,7 +143,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize Stripe first
+  validateStartupConfig();
+  
   await initStripe();
   
   await registerRoutes(httpServer, app);
