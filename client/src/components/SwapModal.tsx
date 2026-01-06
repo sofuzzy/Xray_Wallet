@@ -393,6 +393,9 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           console.error("Failed to fetch token details:", e);
         }
       }
+      if (token.mint !== "SOL" && riskShieldSettings.enabled) {
+        fetch(`/api/risk-assessment/${token.mint}`, { credentials: "include" }).catch(() => {});
+      }
     }
     setSelectingFor(null);
     setSearchQuery("");

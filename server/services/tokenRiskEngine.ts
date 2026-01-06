@@ -34,7 +34,7 @@ export interface TokenRiskAssessment {
 type CacheEntry = { expiry: number; data: TokenRiskAssessment };
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 60_000; // 60 seconds
+const CACHE_TTL_MS = 300_000; // 5 minutes - token risk doesn't change rapidly
 
 function nowMs() {
   return Date.now();
@@ -190,8 +190,20 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
   const flags: RiskFlag[] = [];
   let score = 0;
 
-  // ---------- Off-chain heuristics (DexScreener) ----------
-  const data = await fetchJson(`${DEXSCREENER_API}/tokens/${encodeURIComponent(key)}`);
+  // Run DexScreener and on-chain assessment in PARALLEL for speed
+  const disableOnchain = process.env.DISABLE_ONCHAIN_RISK === "1" || process.env.DISABLE_ONCHAIN_RISK === "true";
+  
+  let pk: PublicKey | null = null;
+  try {
+    pk = new PublicKey(key);
+  } catch {
+    pk = null;
+  }
+
+  const [data, onchainResult] = await Promise.all([
+    fetchJson(`${DEXSCREENER_API}/tokens/${encodeURIComponent(key)}`),
+    (!disableOnchain && pk) ? assessOnChain(pk).catch(() => null) : Promise.resolve(null),
+  ]);
   const pairs = data?.pairs as any[] | undefined;
 
   if (!pairs?.length) {
@@ -380,32 +392,28 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
     }
   }
 
-  // ---------- On-chain heuristics ----------
-  const disableOnchain = process.env.DISABLE_ONCHAIN_RISK === "1" || process.env.DISABLE_ONCHAIN_RISK === "true";
-
+  // ---------- On-chain heuristics (from parallel fetch) ----------
   let onchainInputs: Record<string, any> = {};
-  if (!disableOnchain) {
-    try {
-      const pk = new PublicKey(key);
-      const oc = await assessOnChain(pk);
+  if (onchainResult) {
+    const oc = onchainResult;
 
-      onchainInputs = {
-        tokenProgram: oc.tokenProgram,
-        mintAuthorityPresent: oc.mintAuthorityPresent,
-        freezeAuthorityPresent: oc.freezeAuthorityPresent,
-        supplyUi: oc.supplyUi,
-        decimals: oc.decimals,
-        topHolders: oc.topHolders
-          ? {
-              top1Pct: oc.topHolders.top1Pct,
-              top5Pct: oc.topHolders.top5Pct,
-              top10Pct: oc.topHolders.top10Pct,
-            }
-          : undefined,
-      };
+    onchainInputs = {
+      tokenProgram: oc.tokenProgram,
+      mintAuthorityPresent: oc.mintAuthorityPresent,
+      freezeAuthorityPresent: oc.freezeAuthorityPresent,
+      supplyUi: oc.supplyUi,
+      decimals: oc.decimals,
+      topHolders: oc.topHolders
+        ? {
+            top1Pct: oc.topHolders.top1Pct,
+            top5Pct: oc.topHolders.top5Pct,
+            top10Pct: oc.topHolders.top10Pct,
+          }
+        : undefined,
+    };
 
-      // Token program
-      if (oc.tokenProgram === "unknown") {
+    // Token program
+    if (oc.tokenProgram === "unknown") {
         score += 35;
         addFlag(flags, {
           code: "UNKNOWN_TOKEN_PROGRAM",
@@ -524,22 +532,6 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
           });
         }
       }
-    } catch (e: any) {
-      // Don't fail the endpoint if RPC errors.
-      score += 8;
-      addFlag(flags, {
-        code: "ONCHAIN_CHECK_FAILED",
-        severity: "low",
-        message: "On-chain risk checks failed (RPC unavailable or rate-limited).",
-        details: { error: String(e?.message || e) },
-      });
-    }
-  } else {
-    addFlag(flags, {
-      code: "ONCHAIN_DISABLED",
-      severity: "low",
-      message: "On-chain risk checks are disabled by server configuration.",
-    });
   }
 
   score = clamp(score, 0, 100);
