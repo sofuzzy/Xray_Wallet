@@ -82,6 +82,12 @@ The server follows a modular pattern:
   4. Client sends signed tx via `/api/swaps/send` for broadcast
 - **Priority Fee Tiers**: Low (5k), Medium (25k), High (100k) lamports
 - **Paste-to-Add**: Paste any token mint address to discover and swap
+- **Direct DEX Routing**: Option to route swaps through a single DEX for faster execution
+  - Auto (default): Jupiter aggregates across all DEXes for best price
+  - Orca: Routes through Orca V1, V2, and Whirlpool pools only
+  - Raydium: Routes through Raydium, CLMM, and CP pools only
+  - Uses `dex` query parameter on `/api/swaps/quote` endpoint
+  - AMM labels from Jupiter's program-id-to-label endpoint
 - **Key Files**:
   - `server/services/jupiterSwap.ts` - DexScreener token discovery, Jupiter swap execution
   - `server/services/priceHistory.ts` - DexScreener token metadata and price history

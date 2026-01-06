@@ -487,7 +487,7 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
 
       // Concentration: top holders
       const th = oc.topHolders;
-      if (th?.top1Pct !== null) {
+      if (th && th.top1Pct !== null) {
         if (th.top1Pct >= 35) {
           score += 25;
           addFlag(flags, {
@@ -514,7 +514,7 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
         });
       }
 
-      if (th?.top5Pct !== null) {
+      if (th && th.top5Pct !== null) {
         if (th.top5Pct >= 70) {
           score += 20;
           addFlag(flags, {
@@ -565,4 +565,28 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
 
   cache.set(cacheKey, { expiry: nowMs() + CACHE_TTL_MS, data: assessment });
   return assessment;
+}
+
+/**
+ * Batch assess multiple tokens for risk.
+ * Returns a record of mint -> assessment (null if assessment failed).
+ */
+export async function assessTokenRiskBatch(
+  mints: string[]
+): Promise<Record<string, TokenRiskAssessment | null>> {
+  const results: Record<string, TokenRiskAssessment | null> = {};
+  
+  // Process in parallel with concurrency limit
+  const CONCURRENCY = 5;
+  for (let i = 0; i < mints.length; i += CONCURRENCY) {
+    const batch = mints.slice(i, i + CONCURRENCY);
+    const assessments = await Promise.all(
+      batch.map((mint) => assessTokenRisk(mint).catch(() => null))
+    );
+    batch.forEach((mint, idx) => {
+      results[mint] = assessments[idx];
+    });
+  }
+  
+  return results;
 }

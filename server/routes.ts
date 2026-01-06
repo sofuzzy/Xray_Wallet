@@ -6,14 +6,15 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as sessionAuth } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
-import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
+import { swapTokens, getSwapQuote } from "./services/pumpfun";
 import { 
   getTokens, 
   getTokenByMint, 
   getJupiterQuote, 
   getJupiterSwapTransaction,
   sendTransaction,
-  type Token 
+  type Token,
+  type DexOption
 } from "./services/jupiterSwap";
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
 import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
@@ -598,37 +599,45 @@ export async function registerRoutes(
     }
   });
 
-  // Jupiter Quote
+  // Jupiter Quote (supports direct DEX routing via 'dex' param: auto, orca, raydium)
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
-      const { inputMint, outputMint, amount, slippage } = req.query;
-
-      // Risk Shield: block/require acknowledgement for risky tokens
-      const ack = (req.query.ack as string) === "true";
-      if (outputMint) {
-        const decision = await decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true });
-        if (!decision.allowed) {
-          return res.status(decision.blocked ? 403 : 428).json({
-            message: decision.reason,
-            decision,
-            hint: decision.requiresAcknowledgement ? "Pass ?ack=true to acknowledge the risk for this token." : undefined,
-          });
-        }
-      }
+      const { inputMint, outputMint, amount, slippage, dex } = req.query;
 
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
       }
       
-      const quote = await getJupiterQuote(
-        inputMint as string,
-        outputMint as string,
-        parseInt(amount as string),
-        slippage ? parseInt(slippage as string) : 50
-      );
+      // Validate dex parameter
+      const dexOption: DexOption = ["auto", "orca", "raydium"].includes(dex as string) 
+        ? (dex as DexOption) 
+        : "auto";
+
+      // Risk Shield check and Jupiter quote run in PARALLEL for faster response
+      const ack = (req.query.ack as string) === "true";
+      const [riskDecision, quote] = await Promise.all([
+        outputMint ? decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true }) : Promise.resolve(null),
+        getJupiterQuote(
+          inputMint as string,
+          outputMint as string,
+          parseInt(amount as string),
+          slippage ? parseInt(slippage as string) : 50,
+          dexOption
+        )
+      ]);
+
+      // Check risk decision after parallel fetch
+      if (riskDecision && !riskDecision.allowed) {
+        return res.status(riskDecision.blocked ? 403 : 428).json({
+          message: riskDecision.reason,
+          decision: riskDecision,
+          hint: riskDecision.requiresAcknowledgement ? "Pass ?ack=true to acknowledge the risk for this token." : undefined,
+        });
+      }
       
       if (!quote) {
-        return res.status(400).json({ message: "No route found for this swap" });
+        const dexName = dexOption === "auto" ? "any DEX" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1);
+        return res.status(400).json({ message: `No route found on ${dexName} for this swap` });
       }
       
       res.json({
@@ -639,6 +648,7 @@ export async function registerRoutes(
         outputAmount: parseInt(quote.outAmount),
         priceImpact: parseFloat(quote.priceImpactPct),
         routePlan: quote.routePlan,
+        dex: dexOption,
         quote,
       });
     } catch (error) {
@@ -1028,7 +1038,7 @@ export async function registerRoutes(
       });
       
       const riskResults = await assessTokenRiskBatch(mints);
-      riskResults.forEach((value, key) => {
+      Object.entries(riskResults).forEach(([key, value]) => {
         if (!metadataByMint[key]) metadataByMint[key] = { mint: key };
         metadataByMint[key].risk = value;
       });
@@ -1063,11 +1073,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Maximum 20 tokens per batch" });
       }
       const results = await assessTokenRiskBatch(mints);
-      const byMint: Record<string, any> = {};
-      results.forEach((value, key) => {
-        byMint[key] = value;
-      });
-      res.json(byMint);
+      res.json(results);
     } catch (error) {
       console.error("Batch risk error:", error);
       res.status(500).json({ message: "Failed to assess token risk" });

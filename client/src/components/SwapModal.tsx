@@ -162,10 +162,13 @@ function formatVolume(volume?: number): string {
   return `$${volume.toFixed(0)}`;
 }
 
+type DexOption = "auto" | "orca" | "raydium";
+
 export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProps) {
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const [inputAmount, setInputAmount] = useState("");
+  const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
   const [inputMint, setInputMint] = useState("SOL");
   const [outputMint, setOutputMint] = useState(initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const [searchQuery, setSearchQuery] = useState("");
@@ -175,6 +178,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   const [customTokens, setCustomTokens] = useState<Token[]>(initialOutputToken ? [initialOutputToken] : []);
   const [txStep, setTxStep] = useState<TransactionStep>("idle");
   const [txError, setTxError] = useState<string>("");
+  const [dexOption, setDexOption] = useState<DexOption>("auto");
+  const [riskModalOpen, setRiskModalOpen] = useState(false);
+  const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
+  const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
+  const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
+
+  // Debounce input amount to avoid spamming quote requests on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedInputAmount(inputAmount);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [inputAmount]);
 
   useEffect(() => {
     if (initialOutputToken && isOpen) {
@@ -288,19 +304,24 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   };
 
   const { data: quote, isLoading: quoteLoading, error: quoteError } = useQuery({
-    queryKey: ["/api/swaps/quote", inputMint, outputMint, inputAmount],
+    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption],
     queryFn: async () => {
-      if (!inputAmount || parseFloat(inputAmount) <= 0) return null;
+      if (!debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return null;
       const inputDecimals = inputToken?.decimals || 9;
-      const amount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputDecimals));
+      const amount = Math.floor(parseFloat(debouncedInputAmount) * Math.pow(10, inputDecimals));
       
       const params = new URLSearchParams({
         inputMint: inputMint === "SOL" ? "So11111111111111111111111111111111111111112" : inputMint,
         outputMint: outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint,
         amount: amount.toString(),
         slippage: "50",
-        ...(riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint ? { ack: "true" } : {}),
+        dex: dexOption,
       });
+      
+      // Add risk acknowledgement if needed
+      if (riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint) {
+        params.set("ack", "true");
+      }
       
       const response = await fetch(`/api/swaps/quote?${params}`, { credentials: "include" });
       if (!response.ok) {
@@ -317,8 +338,9 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       }
       return response.json();
     },
-    enabled: isOpen && !!inputAmount && parseFloat(inputAmount) > 0 && inputMint !== outputMint,
+    enabled: isOpen && !!debouncedInputAmount && parseFloat(debouncedInputAmount) > 0 && inputMint !== outputMint,
     retry: false,
+  });
 
   useEffect(() => {
     const err: any = quoteError;
@@ -328,8 +350,6 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       setRiskModalOpen(true);
     }
   }, [quoteError]);
-
-  });
 
   const { mutate: executeSwap, isPending: isSwapping } = useMutation({
     mutationFn: async () => {
@@ -727,8 +747,41 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
                 <span className="text-muted-foreground">Route</span>
                 <span>{quote.routePlan?.length || 1} hop{(quote.routePlan?.length || 1) > 1 ? "s" : ""}</span>
               </div>
+              {quote.dex && quote.dex !== "auto" && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">DEX</span>
+                  <span className="capitalize">{quote.dex}</span>
+                </div>
+              )}
             </div>
           )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Routing</label>
+            <div className="grid grid-cols-3 gap-1">
+              {(["auto", "orca", "raydium"] as const).map((dex) => (
+                <Button
+                  key={dex}
+                  variant={dexOption === dex ? "default" : "outline"}
+                  size="sm"
+                  className="flex-col h-auto py-1.5 px-2"
+                  onClick={() => setDexOption(dex)}
+                  disabled={isSwapping}
+                  data-testid={`button-dex-${dex}`}
+                >
+                  <span className="capitalize text-xs">{dex === "auto" ? "Best Route" : dex}</span>
+                  <span className="text-[10px] opacity-70">
+                    {dex === "auto" ? "Jupiter" : "Direct"}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {dexOption === "auto" 
+                ? "Jupiter finds the best price across all DEXes" 
+                : `Swap directly on ${dexOption.charAt(0).toUpperCase() + dexOption.slice(1)} - faster for small trades`}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Priority Fee</label>
@@ -807,7 +860,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           setRiskModalOpen(false);
           // Re-fetch quote or retry transaction after acknowledgement
           if (riskPendingStage === "quote") {
-            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, inputAmount] });
+            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption] });
           } else if (riskPendingStage === "transaction") {
             // retry swap
             executeSwap();
@@ -818,8 +871,3 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
 </Dialog>
   );
 }
-
-  const [riskModalOpen, setRiskModalOpen] = useState(false);
-  const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
-  const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
-  const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);

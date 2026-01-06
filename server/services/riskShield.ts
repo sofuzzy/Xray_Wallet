@@ -107,6 +107,19 @@ export async function decideTokenAction(opts: {
 
   const assessment = await assessTokenRisk(mint);
 
+  // If assessment failed (null), treat as high risk requiring acknowledgement
+  if (!assessment) {
+    return {
+      mint,
+      action: opts.action,
+      allowed: false,
+      blocked: false,
+      requiresAcknowledgement: true,
+      policy,
+      reason: "Unable to assess token risk - proceed with caution",
+    };
+  }
+
   const requiresAcknowledgement = atOrAbove(assessment.level, policy.requireAckLevel);
 
   const atBlock = atOrAbove(assessment.level, policy.blockLevel);

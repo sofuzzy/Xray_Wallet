@@ -343,11 +343,21 @@ export interface JupiterQuote {
   swapMode: string;
 }
 
+// DEX identifiers for Jupiter API filtering
+// Labels verified from: https://lite-api.jup.ag/swap/v1/program-id-to-label
+export type DexOption = "auto" | "orca" | "raydium";
+
+const DEX_AMM_KEYS: Record<string, string[]> = {
+  orca: ["Orca V1", "Orca V2", "Whirlpool"],
+  raydium: ["Raydium", "Raydium CLMM", "Raydium CP"],
+};
+
 export async function getJupiterQuote(
   inputMint: string,
   outputMint: string,
   amount: number,
-  slippageBps: number = 50
+  slippageBps: number = 50,
+  dex: DexOption = "auto"
 ): Promise<JupiterQuote | null> {
   try {
     const solMint = "So11111111111111111111111111111111111111112";
@@ -359,9 +369,14 @@ export async function getJupiterQuote(
       outputMint: actualOutputMint,
       amount: amount.toString(),
       slippageBps: slippageBps.toString(),
-      onlyDirectRoutes: "false",
+      onlyDirectRoutes: dex !== "auto" ? "true" : "false",
       asLegacyTransaction: "false",
     });
+
+    // Filter to specific DEX if requested
+    if (dex !== "auto" && DEX_AMM_KEYS[dex]) {
+      params.set("dexes", DEX_AMM_KEYS[dex].join(","));
+    }
 
     const response = await fetch(`${JUPITER_API_BASE}/quote?${params}`);
     if (!response.ok) {
