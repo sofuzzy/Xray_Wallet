@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,45 @@ import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { RiskShieldModal, type RiskShieldDecision } from "@/components/RiskShieldModal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import bs58 from "bs58";
+
+type RiskLevel = "low" | "medium" | "high" | "critical";
+
+const SLIPPAGE_DEFAULTS: Record<RiskLevel, number> = {
+  low: 2,
+  medium: 3.5,
+  high: 6,
+  critical: 10,
+};
+
+function getSlippageForRiskLevel(level?: RiskLevel): number {
+  return level ? SLIPPAGE_DEFAULTS[level] : 2;
+}
+
+function friendlyFlagMessage(code: string, message: string): string {
+  const friendlyMessages: Record<string, string> = {
+    VERY_LOW_LIQUIDITY: "Very little money in the trading pool - your trade could move the price a lot",
+    LOW_LIQUIDITY: "Limited trading pool size - larger trades may affect the price",
+    VERY_NEW_MARKET: "This token just launched - extra caution recommended",
+    LOW_VOLUME: "Few people are trading this token right now",
+    HIGH_HOLDER_CONCENTRATION: "A small group of wallets owns most of this token",
+    MINT_AUTHORITY_PRESENT: "The token creator can still make more tokens (diluting your holdings)",
+    FREEZE_AUTHORITY_PRESENT: "The token creator can freeze your tokens",
+    TOP_HOLDER_DOMINANCE: "One wallet owns a very large share of this token",
+    UNVERIFIED_METADATA: "Token details haven't been verified - could be a copycat",
+    HONEYPOT_RISK: "You might not be able to sell this token after buying",
+  };
+  return friendlyMessages[code] || message;
+}
+
+function formatLiquidityUsd(value?: number): string {
+  if (!value) return "Unknown";
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
 
 type TransactionStep = "idle" | "building" | "signing" | "sending" | "confirming" | "success" | "error";
 
@@ -185,6 +223,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
   const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
   const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
+  
+  // Slippage state
+  const [slippageMode, setSlippageMode] = useState<"auto" | "custom">("auto");
+  const [customSlippage, setCustomSlippage] = useState("");
+  const [showHighSlippageConfirm, setShowHighSlippageConfirm] = useState(false);
+  const [highSlippageConfirmed, setHighSlippageConfirmed] = useState(false);
+  
+  // Quote freshness tracking
+  const [quoteTimestamp, setQuoteTimestamp] = useState<number | null>(null);
+  const [isQuoteStale, setIsQuoteStale] = useState(false);
+  
+  // Blocked token state for Why Blocked tooltip
+  const [blockedReason, setBlockedReason] = useState<RiskShieldDecision | null>(null);
 
   // Debounce input amount to avoid spamming quote requests on every keystroke
   useEffect(() => {
@@ -193,6 +244,54 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     }, 500);
     return () => clearTimeout(timer);
   }, [inputAmount]);
+  
+  // Check quote staleness every second
+  useEffect(() => {
+    if (!quoteTimestamp) {
+      setIsQuoteStale(false);
+      return;
+    }
+    
+    const checkStaleness = () => {
+      const age = Date.now() - quoteTimestamp;
+      setIsQuoteStale(age > 15000); // 15 seconds
+    };
+    
+    checkStaleness();
+    const interval = setInterval(checkStaleness, 1000);
+    return () => clearInterval(interval);
+  }, [quoteTimestamp]);
+  
+  // Compute the token's risk level from the last risk decision or quote response
+  const tokenRiskLevel = useMemo((): RiskLevel | undefined => {
+    if (riskDecision?.assessment?.level) return riskDecision.assessment.level;
+    if (blockedReason?.assessment?.level) return blockedReason.assessment.level;
+    return undefined;
+  }, [riskDecision, blockedReason]);
+  
+  // Compute effective slippage in basis points
+  const effectiveSlippageBps = useMemo(() => {
+    if (slippageMode === "custom" && customSlippage) {
+      const pct = parseFloat(customSlippage);
+      return Math.max(1, Math.min(5000, Math.round(pct * 100))); // 0.01% to 50%
+    }
+    const defaultPct = getSlippageForRiskLevel(tokenRiskLevel);
+    return Math.round(defaultPct * 100);
+  }, [slippageMode, customSlippage, tokenRiskLevel]);
+  
+  const effectiveSlippagePct = effectiveSlippageBps / 100;
+  
+  // Check if slippage is dangerously high
+  const isHighSlippage = effectiveSlippagePct > 10;
+  const needsHighSlippageConfirm = isHighSlippage && !highSlippageConfirmed;
+  
+  // Reset high slippage confirmation when slippage changes
+  useEffect(() => {
+    if (!isHighSlippage) {
+      setHighSlippageConfirmed(false);
+      setShowHighSlippageConfirm(false);
+    }
+  }, [isHighSlippage]);
 
   useEffect(() => {
     if (initialOutputToken && isOpen) {
@@ -311,8 +410,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     return JSON.stringify(riskShieldSettings.checks);
   }, [riskShieldSettings.enabled, riskShieldSettings.checks]);
 
-  const { data: quote, isLoading: quoteLoading, error: quoteError } = useQuery({
-    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, enabledCheckCodesKey],
+  const { data: quote, isLoading: quoteLoading, error: quoteError, refetch: refetchQuote } = useQuery({
+    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey],
     queryFn: async () => {
       if (!debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return null;
       const inputDecimals = inputToken?.decimals || 9;
@@ -322,7 +421,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         inputMint: inputMint === "SOL" ? "So11111111111111111111111111111111111111112" : inputMint,
         outputMint: outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint,
         amount: amount.toString(),
-        slippage: "50",
+        slippage: effectiveSlippageBps.toString(),
         dex: dexOption,
       });
       
@@ -351,9 +450,17 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         // Surface Risk Shield decisions to the UI
         if (response.status === 428 || response.status === 403) {
           err.decision = errorData?.decision;
+          // Store blocked reason for Why Blocked tooltip
+          if (response.status === 403) {
+            setBlockedReason(errorData?.decision || null);
+          }
         }
         throw err;
       }
+      
+      // Clear blocked reason on success and track timestamp
+      setBlockedReason(null);
+      setQuoteTimestamp(Date.now());
       return response.json();
     },
     enabled: isOpen && !!debouncedInputAmount && parseFloat(debouncedInputAmount) > 0 && inputMint !== outputMint,
@@ -479,7 +586,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     setOutputMint(temp);
   };
 
-  const handleSwap = () => {
+  const handleSwap = async () => {
     if (!inputAmount || parseFloat(inputAmount) <= 0) {
       toast({ title: "Invalid Amount", description: "Please enter a valid amount", variant: "destructive" });
       return;
@@ -492,7 +599,39 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       toast({ title: "No Quote", description: "Please wait for a quote", variant: "destructive" });
       return;
     }
+    
+    // Check high slippage confirmation
+    if (needsHighSlippageConfirm) {
+      setShowHighSlippageConfirm(true);
+      return;
+    }
+    
+    // Re-quote if stale (older than 15 seconds)
+    if (isQuoteStale) {
+      toast({ title: "Refreshing Quote", description: "Getting a fresh price before swapping..." });
+      try {
+        const result = await refetchQuote();
+        if (result.error) {
+          toast({ title: "Quote Failed", description: "Could not get a fresh price. Please try again.", variant: "destructive" });
+          return;
+        }
+        // Update quote timestamp after successful refetch
+        setQuoteTimestamp(Date.now());
+        // Continue to executeSwap with fresh quote
+      } catch (err) {
+        toast({ title: "Quote Failed", description: "Could not get a fresh price. Please try again.", variant: "destructive" });
+        return;
+      }
+    }
+    
     executeSwap();
+  };
+  
+  const confirmHighSlippage = () => {
+    setHighSlippageConfirmed(true);
+    setShowHighSlippageConfirm(false);
+    // Continue with swap
+    handleSwap();
   };
 
   const outputDecimals = outputToken?.decimals || 9;
@@ -507,26 +646,34 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search or paste token address..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-9"
-                autoFocus
-                data-testid="input-token-search"
-              />
-              {searchQuery && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search or paste token address..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-9"
+                  autoFocus
+                  data-testid="input-token-search"
+                />
+                {searchQuery && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Info className="w-3 h-3" />
+                <span>
+                  A <strong>token address</strong> (or "mint") is the unique ID for each token on Solana. You can find it on the token's page or from the sender.
+                </span>
+              </div>
             </div>
 
             <ScrollArea className="h-[350px]">
@@ -767,6 +914,12 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
                 <span className="text-muted-foreground">Route</span>
                 <span>{quote.routePlan?.length || 1} hop{(quote.routePlan?.length || 1) > 1 ? "s" : ""}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Slippage</span>
+                <span className={effectiveSlippagePct > 10 ? "text-destructive" : "text-foreground"}>
+                  {effectiveSlippagePct}%
+                </span>
+              </div>
               {quote.dex && quote.dex !== "auto" && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">DEX</span>
@@ -775,6 +928,83 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               )}
             </div>
           )}
+          
+          {isQuoteStale && quote && (
+            <Alert className="border-amber-500/50 bg-amber-500/10">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs">
+                Quote is over 15 seconds old. A fresh quote will be fetched when you swap.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Slippage Tolerance</label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[280px] p-3">
+                  <p className="text-xs">
+                    <strong>Slippage</strong> is the maximum price change you'll accept between when you request a swap and when it executes.
+                  </p>
+                  <p className="text-xs mt-2 text-muted-foreground">
+                    For popular tokens (USDC, SOL), 1-2% is usually safe. For newer or less liquid tokens (like pump.fun coins), you may need 5-10% or higher.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              <Button
+                variant={slippageMode === "auto" ? "default" : "outline"}
+                size="sm"
+                className="flex-col h-auto py-1.5 px-2"
+                onClick={() => { setSlippageMode("auto"); setCustomSlippage(""); }}
+                disabled={isSwapping}
+                data-testid="button-slippage-auto"
+              >
+                <span className="text-xs">Auto</span>
+                <span className="text-[10px] opacity-70">{getSlippageForRiskLevel(tokenRiskLevel)}%</span>
+              </Button>
+              {[1, 3, 5].map((pct) => (
+                <Button
+                  key={pct}
+                  variant={slippageMode === "custom" && customSlippage === pct.toString() ? "default" : "outline"}
+                  size="sm"
+                  className="flex-col h-auto py-1.5 px-2"
+                  onClick={() => { setSlippageMode("custom"); setCustomSlippage(pct.toString()); }}
+                  disabled={isSwapping}
+                  data-testid={`button-slippage-${pct}`}
+                >
+                  <span className="text-xs">{pct}%</span>
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="Custom %"
+                value={slippageMode === "custom" && !["1", "3", "5"].includes(customSlippage) ? customSlippage : ""}
+                onChange={(e) => { setSlippageMode("custom"); setCustomSlippage(e.target.value); }}
+                className="flex-1"
+                step="0.1"
+                min="0.1"
+                max="50"
+                disabled={isSwapping}
+                data-testid="input-custom-slippage"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            {isHighSlippage && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                High slippage increases risk of unfavorable trade execution
+              </p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Routing</label>
@@ -851,9 +1081,85 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
             )}
           </div>
 
+          {showHighSlippageConfirm && (
+            <Alert className="border-destructive/50 bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-xs">
+                <p className="font-medium text-destructive mb-1">Confirm High Slippage ({effectiveSlippagePct}%)</p>
+                <p className="text-muted-foreground mb-2">
+                  With slippage over 10%, you may receive significantly less than quoted. Only proceed if you understand the risks.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" onClick={confirmHighSlippage} data-testid="button-confirm-high-slippage">
+                    I understand, proceed
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowHighSlippageConfirm(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {blockedReason && (
+            <Alert className="border-destructive/50 bg-destructive/10">
+              <ShieldAlert className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-medium text-destructive">Swap Blocked by Risk Shield</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground underline text-xs" data-testid="button-why-blocked">
+                        Why blocked?
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[320px] p-3">
+                      <p className="text-xs font-medium mb-2">Risk Analysis Details</p>
+                      {blockedReason.assessment?.inputs && (
+                        <div className="space-y-1 text-xs mb-2">
+                          {blockedReason.assessment.inputs.liquidity !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Liquidity:</span>
+                              <span>{formatLiquidityUsd(blockedReason.assessment.inputs.liquidity)}</span>
+                            </div>
+                          )}
+                          {blockedReason.assessment.inputs.top1HolderPct !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Top holder owns:</span>
+                              <span>{blockedReason.assessment.inputs.top1HolderPct.toFixed(1)}%</span>
+                            </div>
+                          )}
+                          {blockedReason.assessment.inputs.mintAuthorityPresent !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Mint authority:</span>
+                              <span>{blockedReason.assessment.inputs.mintAuthorityPresent ? "Active" : "Revoked"}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {blockedReason.assessment?.flags && blockedReason.assessment.flags.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground">Issues found:</p>
+                          {blockedReason.assessment.flags.map((flag, idx) => (
+                            <p key={idx} className="text-xs text-destructive">
+                              {friendlyFlagMessage(flag.code, flag.message)}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <p className="text-muted-foreground">
+                  {blockedReason.reason || "This token has been flagged as potentially risky."}
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason}
             className="w-full"
             data-testid="button-execute-swap"
           >
@@ -861,6 +1167,16 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Swapping...
+              </>
+            ) : blockedReason ? (
+              <>
+                <ShieldAlert className="w-4 h-4 mr-2" />
+                Blocked by Risk Shield
+              </>
+            ) : isQuoteStale ? (
+              <>
+                <Clock className="w-4 h-4 mr-2" />
+                Refresh & Swap
               </>
             ) : (
               "Swap"
@@ -880,7 +1196,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           setRiskModalOpen(false);
           // Re-fetch quote or retry transaction after acknowledgement
           if (riskPendingStage === "quote") {
-            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, enabledCheckCodesKey] });
+            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey] });
           } else if (riskPendingStage === "transaction") {
             // retry swap
             executeSwap();
