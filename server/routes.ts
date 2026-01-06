@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as sessionAuth } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
-import { swapTokens, getSwapQuote, getAvailableTokens } from "./services/pumpfun";
+import { swapTokens, getSwapQuote } from "./services/pumpfun";
 import { 
   getTokens, 
   getTokenByMint, 
@@ -17,6 +17,8 @@ import {
   type DexOption
 } from "./services/jupiterSwap";
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
+import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
+import { decideTokenAction, getRiskShieldPolicy } from "./services/riskShield";
 import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -601,6 +603,7 @@ export async function registerRoutes(
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
       const { inputMint, outputMint, amount, slippage, dex } = req.query;
+
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
       }
@@ -609,14 +612,28 @@ export async function registerRoutes(
       const dexOption: DexOption = ["auto", "orca", "raydium"].includes(dex as string) 
         ? (dex as DexOption) 
         : "auto";
-      
-      const quote = await getJupiterQuote(
-        inputMint as string,
-        outputMint as string,
-        parseInt(amount as string),
-        slippage ? parseInt(slippage as string) : 50,
-        dexOption
-      );
+
+      // Risk Shield check and Jupiter quote run in PARALLEL for faster response
+      const ack = (req.query.ack as string) === "true";
+      const [riskDecision, quote] = await Promise.all([
+        outputMint ? decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true }) : Promise.resolve(null),
+        getJupiterQuote(
+          inputMint as string,
+          outputMint as string,
+          parseInt(amount as string),
+          slippage ? parseInt(slippage as string) : 50,
+          dexOption
+        )
+      ]);
+
+      // Check risk decision after parallel fetch
+      if (riskDecision && !riskDecision.allowed) {
+        return res.status(riskDecision.blocked ? 403 : 428).json({
+          message: riskDecision.reason,
+          decision: riskDecision,
+          hint: riskDecision.requiresAcknowledgement ? "Pass ?ack=true to acknowledge the risk for this token." : undefined,
+        });
+      }
       
       if (!quote) {
         const dexName = dexOption === "auto" ? "any DEX" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1);
@@ -644,6 +661,23 @@ export async function registerRoutes(
   app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const { quote, userPublicKey, priorityFee } = req.body;
+
+      // Risk Shield: require acknowledgement/block risky swaps
+      const ack = Boolean(req.body?.acknowledgeRisk || req.body?.riskAcknowledgement?.accepted);
+      const outMint = quote?.outputMint;
+      if (outMint) {
+        const decision = await decideTokenAction({ mint: outMint, action: "swap_tx_output", acknowledge: ack, includeAssessment: true });
+        if (!decision.allowed) {
+          return res.status(decision.blocked ? 403 : 428).json({
+            message: decision.reason,
+            decision,
+            hint: decision.requiresAcknowledgement
+              ? "Include { acknowledgeRisk: true } (or riskAcknowledgement.accepted=true) to proceed."
+              : undefined,
+          });
+        }
+      }
+
       
       if (!quote || !userPublicKey) {
         return res.status(400).json({ message: "Missing quote or userPublicKey" });
@@ -976,7 +1010,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Token not found" });
       }
       
-      res.json(metadata);
+      const risk = await assessTokenRisk(mint);
+      res.json({ ...metadata, risk });
     } catch (error) {
       console.error("Token metadata error:", error);
       res.status(500).json({ message: "Failed to fetch token metadata" });
@@ -1002,10 +1037,46 @@ export async function registerRoutes(
         metadataByMint[key] = value;
       });
       
+      const riskResults = await assessTokenRiskBatch(mints);
+      Object.entries(riskResults).forEach(([key, value]) => {
+        if (!metadataByMint[key]) metadataByMint[key] = { mint: key };
+        metadataByMint[key].risk = value;
+      });
+
       res.json(metadataByMint);
     } catch (error) {
       console.error("Batch metadata error:", error);
       res.status(500).json({ message: "Failed to fetch token metadata" });
+    }
+  });
+
+  // Token risk endpoints (heuristic, not a guarantee)
+  app.get("/api/tokens/risk/:mint", hybridAuth, async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const risk = await assessTokenRisk(mint);
+      if (!risk) return res.status(404).json({ message: "Token not found" });
+      res.json(risk);
+    } catch (error) {
+      console.error("Token risk error:", error);
+      res.status(500).json({ message: "Failed to assess token risk" });
+    }
+  });
+
+  app.post("/api/tokens/risk/batch", hybridAuth, async (req, res) => {
+    try {
+      const { mints } = req.body;
+      if (!Array.isArray(mints) || mints.length === 0) {
+        return res.status(400).json({ message: "Mints array required" });
+      }
+      if (mints.length > 20) {
+        return res.status(400).json({ message: "Maximum 20 tokens per batch" });
+      }
+      const results = await assessTokenRiskBatch(mints);
+      res.json(results);
+    } catch (error) {
+      console.error("Batch risk error:", error);
+      res.status(500).json({ message: "Failed to assess token risk" });
     }
   });
 

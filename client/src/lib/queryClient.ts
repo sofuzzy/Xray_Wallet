@@ -1,10 +1,35 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { tokenManager } from "./tokenManager";
 
+class ApiError extends Error {
+  status: number;
+  data?: any;
+  constructor(message: string, status: number, data?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let data: any = undefined;
+    let message = res.statusText || "Request failed";
+    try {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        data = await res.json();
+        message = data?.message || message;
+      } else {
+        const text = (await res.text()) || message;
+        message = text;
+        data = { message: text };
+      }
+    } catch {
+      // ignore parsing errors
+    }
+    throw new ApiError(message, res.status, data);
   }
 }
 
