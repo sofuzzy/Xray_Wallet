@@ -120,7 +120,11 @@ export async function decideTokenAction(opts: {
     };
   }
 
-  const requiresAcknowledgement = atOrAbove(assessment.level, policy.requireAckLevel);
+  // Require acknowledgement if:
+  // 1. Token is at or above the requireAckLevel (high by default), OR
+  // 2. Token has any risk flags (user expects to see warnings for any risky token)
+  const hasRiskFlags = assessment.flags && assessment.flags.length > 0;
+  const requiresAcknowledgement = atOrAbove(assessment.level, policy.requireAckLevel) || hasRiskFlags;
 
   const atBlock = atOrAbove(assessment.level, policy.blockLevel);
 
