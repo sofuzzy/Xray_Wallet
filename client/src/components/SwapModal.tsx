@@ -14,6 +14,7 @@ import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { RiskShieldModal, type RiskShieldDecision } from "@/components/RiskShieldModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import bs58 from "bs58";
 
@@ -1107,30 +1108,30 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               <AlertDescription className="text-xs">
                 <div className="flex items-center justify-between mb-1">
                   <p className="font-medium text-destructive">Swap Blocked by Risk Shield</p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button type="button" className="text-muted-foreground underline text-xs" data-testid="button-why-blocked">
                         Why blocked?
                       </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[320px] p-3">
+                    </PopoverTrigger>
+                    <PopoverContent className="max-w-[320px] p-3" side="top" align="end">
                       <p className="text-xs font-medium mb-2">Risk Analysis Details</p>
                       {blockedReason.assessment?.inputs && (
                         <div className="space-y-1 text-xs mb-2">
                           {blockedReason.assessment.inputs.liquidity !== undefined && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between gap-4">
                               <span className="text-muted-foreground">Liquidity:</span>
                               <span>{formatLiquidityUsd(blockedReason.assessment.inputs.liquidity)}</span>
                             </div>
                           )}
                           {blockedReason.assessment.inputs.top1HolderPct !== undefined && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between gap-4">
                               <span className="text-muted-foreground">Top holder owns:</span>
                               <span>{blockedReason.assessment.inputs.top1HolderPct.toFixed(1)}%</span>
                             </div>
                           )}
                           {blockedReason.assessment.inputs.mintAuthorityPresent !== undefined && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between gap-4">
                               <span className="text-muted-foreground">Mint authority:</span>
                               <span>{blockedReason.assessment.inputs.mintAuthorityPresent ? "Active" : "Revoked"}</span>
                             </div>
@@ -1147,8 +1148,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
                           ))}
                         </div>
                       )}
-                    </TooltipContent>
-                  </Tooltip>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <p className="text-muted-foreground">
                   {blockedReason.reason || "This token has been flagged as potentially risky."}
