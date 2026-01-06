@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
+import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { validateMnemonic } from "@/lib/solana";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SeedPhraseModalProps {
@@ -13,10 +15,39 @@ interface SeedPhraseModalProps {
   onClose: () => void;
 }
 
+function RiskCheckItem({ 
+  label, 
+  description, 
+  checked, 
+  onChange, 
+  testId 
+}: { 
+  label: string; 
+  description: string; 
+  checked: boolean; 
+  onChange: (checked: boolean) => void;
+  testId: string;
+}) {
+  return (
+    <div className="flex items-center justify-between p-2 rounded-lg hover-elevate">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground truncate">{description}</p>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        data-testid={testId}
+      />
+    </div>
+  );
+}
+
 export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const { getSeedPhrase, getPrivateKey, isPrivateKeyWallet, importWallet, importFromPrivateKey, resetWallet } = useWallet();
   const { toast } = useToast();
   const biometric = useBiometric();
+  const riskShield = useRiskShieldSettings();
   const [tab, setTab] = useState<"backup" | "restore" | "security">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
@@ -447,6 +478,125 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   )}
                 </Button>
               )}
+
+              <div className="border-t border-border pt-4 mt-4">
+                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex gap-3 mb-4">
+                  <ShieldAlert className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="text-sm text-foreground/80">
+                    <p className="font-medium text-foreground">X-Ray Shield</p>
+                    <p className="mt-1">Protect your swaps by analyzing tokens for risks before trading.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border mb-4">
+                  <div className="flex items-center gap-3">
+                    {riskShield.settings.enabled ? (
+                      <ShieldCheck className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <ShieldAlert className="w-5 h-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">Enable X-Ray Shield</p>
+                      <p className="text-xs text-muted-foreground">
+                        {riskShield.settings.enabled ? "Protection active" : "Protection disabled"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={riskShield.settings.enabled}
+                    onCheckedChange={riskShield.setEnabled}
+                    data-testid="switch-risk-shield"
+                  />
+                </div>
+
+                {riskShield.settings.enabled && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-muted-foreground">Risk Checks</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={riskShield.resetToDefaults}
+                        data-testid="button-reset-risk-checks"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Reset
+                      </Button>
+                    </div>
+
+                    <RiskCheckItem
+                      label="Low Liquidity"
+                      description="Warn when token has low trading liquidity"
+                      checked={riskShield.settings.checks.lowLiquidity}
+                      onChange={(v) => riskShield.setCheck("lowLiquidity", v)}
+                      testId="check-low-liquidity"
+                    />
+                    <RiskCheckItem
+                      label="Volume Anomaly"
+                      description="Detect suspicious volume vs liquidity"
+                      checked={riskShield.settings.checks.volumeAnomaly}
+                      onChange={(v) => riskShield.setCheck("volumeAnomaly", v)}
+                      testId="check-volume-anomaly"
+                    />
+                    <RiskCheckItem
+                      label="High Volatility"
+                      description="Flag extreme price movements"
+                      checked={riskShield.settings.checks.highVolatility}
+                      onChange={(v) => riskShield.setCheck("highVolatility", v)}
+                      testId="check-high-volatility"
+                    />
+                    <RiskCheckItem
+                      label="New Market"
+                      description="Warn about newly created tokens"
+                      checked={riskShield.settings.checks.newMarket}
+                      onChange={(v) => riskShield.setCheck("newMarket", v)}
+                      testId="check-new-market"
+                    />
+                    <RiskCheckItem
+                      label="FDV Disconnect"
+                      description="Detect inflated valuations"
+                      checked={riskShield.settings.checks.fdvDisconnect}
+                      onChange={(v) => riskShield.setCheck("fdvDisconnect", v)}
+                      testId="check-fdv-disconnect"
+                    />
+                    <RiskCheckItem
+                      label="LP Not Locked"
+                      description="Warn if liquidity is not locked"
+                      checked={riskShield.settings.checks.lpNotLocked}
+                      onChange={(v) => riskShield.setCheck("lpNotLocked", v)}
+                      testId="check-lp-not-locked"
+                    />
+                    <RiskCheckItem
+                      label="Mint Authority"
+                      description="Warn if supply can be increased"
+                      checked={riskShield.settings.checks.mintAuthority}
+                      onChange={(v) => riskShield.setCheck("mintAuthority", v)}
+                      testId="check-mint-authority"
+                    />
+                    <RiskCheckItem
+                      label="Freeze Authority"
+                      description="Warn if accounts can be frozen"
+                      checked={riskShield.settings.checks.freezeAuthority}
+                      onChange={(v) => riskShield.setCheck("freezeAuthority", v)}
+                      testId="check-freeze-authority"
+                    />
+                    <RiskCheckItem
+                      label="Holder Concentration"
+                      description="Detect whale concentration risk"
+                      checked={riskShield.settings.checks.topHolderConcentration}
+                      onChange={(v) => riskShield.setCheck("topHolderConcentration", v)}
+                      testId="check-holder-concentration"
+                    />
+                    <RiskCheckItem
+                      label="Unknown Program"
+                      description="Flag non-standard token programs"
+                      checked={riskShield.settings.checks.unknownProgram}
+                      onChange={(v) => riskShield.setCheck("unknownProgram", v)}
+                      testId="check-unknown-program"
+                    />
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </div>

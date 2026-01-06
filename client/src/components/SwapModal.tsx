@@ -7,6 +7,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
+import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
@@ -167,6 +168,7 @@ type DexOption = "auto" | "orca" | "raydium";
 export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProps) {
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
+  const { settings: riskShieldSettings, getEnabledCheckCodes } = useRiskShieldSettings();
   const [inputAmount, setInputAmount] = useState("");
   const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
   const [inputMint, setInputMint] = useState("SOL");
@@ -303,8 +305,14 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     }
   };
 
+  const enabledCheckCodesKey = useMemo(() => {
+    if (!riskShieldSettings.enabled) return "disabled";
+    // Create stable key from settings.checks object directly
+    return JSON.stringify(riskShieldSettings.checks);
+  }, [riskShieldSettings.enabled, riskShieldSettings.checks]);
+
   const { data: quote, isLoading: quoteLoading, error: quoteError } = useQuery({
-    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption],
+    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, enabledCheckCodesKey],
     queryFn: async () => {
       if (!debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return null;
       const inputDecimals = inputToken?.decimals || 9;
@@ -321,6 +329,16 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       // Add risk acknowledgement if needed
       if (riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint) {
         params.set("ack", "true");
+      }
+      
+      // Pass Risk Shield settings
+      if (!riskShieldSettings.enabled) {
+        params.set("riskShieldDisabled", "true");
+      } else {
+        const enabledCodes = getEnabledCheckCodes();
+        if (enabledCodes.length > 0) {
+          params.set("enabledCheckCodes", enabledCodes.join(","));
+        }
       }
       
       const response = await fetch(`/api/swaps/quote?${params}`, { credentials: "include" });
@@ -367,6 +385,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         userPublicKey: address,
         priorityFee: getActivePriorityFee(),
         acknowledgeRisk: riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint ? true : false,
+        riskShieldDisabled: !riskShieldSettings.enabled,
+        enabledCheckCodes: riskShieldSettings.enabled ? getEnabledCheckCodes() : [],
       });
       } catch (e: any) {
         const decision = e?.data?.decision || e?.decision;
@@ -860,7 +880,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
           setRiskModalOpen(false);
           // Re-fetch quote or retry transaction after acknowledgement
           if (riskPendingStage === "quote") {
-            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption] });
+            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, enabledCheckCodesKey] });
           } else if (riskPendingStage === "transaction") {
             // retry swap
             executeSwap();

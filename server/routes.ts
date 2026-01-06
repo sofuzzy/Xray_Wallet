@@ -602,7 +602,7 @@ export async function registerRoutes(
   // Jupiter Quote (supports direct DEX routing via 'dex' param: auto, orca, raydium)
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {
-      const { inputMint, outputMint, amount, slippage, dex } = req.query;
+      const { inputMint, outputMint, amount, slippage, dex, riskShieldDisabled, enabledCheckCodes } = req.query;
 
       if (!inputMint || !outputMint || !amount) {
         return res.status(400).json({ message: "Missing required parameters" });
@@ -613,10 +613,21 @@ export async function registerRoutes(
         ? (dex as DexOption) 
         : "auto";
 
+      // Check if Risk Shield is disabled by user
+      const isRiskShieldDisabled = riskShieldDisabled === "true";
+      
+      // Parse enabled check codes filter
+      const enabledCodesFilter = enabledCheckCodes 
+        ? (enabledCheckCodes as string).split(",").filter(Boolean)
+        : null;
+
       // Risk Shield check and Jupiter quote run in PARALLEL for faster response
       const ack = (req.query.ack as string) === "true";
       const [riskDecision, quote] = await Promise.all([
-        outputMint ? decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true }) : Promise.resolve(null),
+        // Skip Risk Shield if disabled by user
+        (!isRiskShieldDisabled && outputMint) 
+          ? decideTokenAction({ mint: outputMint as string, action: "swap_quote_output", acknowledge: ack, includeAssessment: true }) 
+          : Promise.resolve(null),
         getJupiterQuote(
           inputMint as string,
           outputMint as string,
@@ -627,12 +638,38 @@ export async function registerRoutes(
       ]);
 
       // Check risk decision after parallel fetch
+      // IMPORTANT: Always honor blocked status for security - user toggles only affect warnings
       if (riskDecision && !riskDecision.allowed) {
-        return res.status(riskDecision.blocked ? 403 : 428).json({
-          message: riskDecision.reason,
-          decision: riskDecision,
-          hint: riskDecision.requiresAcknowledgement ? "Pass ?ack=true to acknowledge the risk for this token." : undefined,
-        });
+        // If hard blocked, always block regardless of user filter settings
+        if (riskDecision.blocked) {
+          return res.status(403).json({
+            message: riskDecision.reason,
+            decision: riskDecision,
+          });
+        }
+        
+        // For warnings/acknowledgements, filter flags based on user's enabled check codes
+        if (enabledCodesFilter && riskDecision.assessment?.flags) {
+          const relevantFlags = riskDecision.assessment.flags.filter(
+            f => enabledCodesFilter.includes(f.code)
+          );
+          // If no relevant flags after filtering, allow the swap
+          if (relevantFlags.length === 0) {
+            // Proceed with quote - no blocking needed
+          } else if (riskDecision.requiresAcknowledgement) {
+            return res.status(428).json({
+              message: riskDecision.reason,
+              decision: { ...riskDecision, assessment: { ...riskDecision.assessment, flags: relevantFlags } },
+              hint: "Pass ?ack=true to acknowledge the risk for this token.",
+            });
+          }
+        } else if (riskDecision.requiresAcknowledgement) {
+          return res.status(428).json({
+            message: riskDecision.reason,
+            decision: riskDecision,
+            hint: "Pass ?ack=true to acknowledge the risk for this token.",
+          });
+        }
       }
       
       if (!quote) {
@@ -660,24 +697,53 @@ export async function registerRoutes(
   // Get swap transaction from Jupiter
   app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
-      const { quote, userPublicKey, priorityFee } = req.body;
+      const { quote, userPublicKey, priorityFee, riskShieldDisabled, enabledCheckCodes } = req.body;
 
-      // Risk Shield: require acknowledgement/block risky swaps
+      // Check if Risk Shield is disabled by user
+      const isRiskShieldDisabled = riskShieldDisabled === true || riskShieldDisabled === "true";
+      
+      // Parse enabled check codes filter
+      const enabledCodesFilter = enabledCheckCodes 
+        ? (Array.isArray(enabledCheckCodes) ? enabledCheckCodes : String(enabledCheckCodes).split(",")).filter(Boolean)
+        : null;
+
+      // Risk Shield: require acknowledgement/block risky swaps (skip if disabled)
       const ack = Boolean(req.body?.acknowledgeRisk || req.body?.riskAcknowledgement?.accepted);
       const outMint = quote?.outputMint;
-      if (outMint) {
+      if (!isRiskShieldDisabled && outMint) {
         const decision = await decideTokenAction({ mint: outMint, action: "swap_tx_output", acknowledge: ack, includeAssessment: true });
         if (!decision.allowed) {
-          return res.status(decision.blocked ? 403 : 428).json({
-            message: decision.reason,
-            decision,
-            hint: decision.requiresAcknowledgement
-              ? "Include { acknowledgeRisk: true } (or riskAcknowledgement.accepted=true) to proceed."
-              : undefined,
-          });
+          // IMPORTANT: Always honor blocked status for security - user toggles only affect warnings
+          if (decision.blocked) {
+            return res.status(403).json({
+              message: decision.reason,
+              decision,
+            });
+          }
+          
+          // For warnings/acknowledgements, filter flags based on user's enabled check codes
+          if (enabledCodesFilter && decision.assessment?.flags) {
+            const relevantFlags = decision.assessment.flags.filter(
+              f => enabledCodesFilter.includes(f.code)
+            );
+            if (relevantFlags.length === 0) {
+              // No relevant flags after filtering, proceed
+            } else if (decision.requiresAcknowledgement) {
+              return res.status(428).json({
+                message: decision.reason,
+                decision: { ...decision, assessment: { ...decision.assessment, flags: relevantFlags } },
+                hint: "Include { acknowledgeRisk: true } (or riskAcknowledgement.accepted=true) to proceed.",
+              });
+            }
+          } else if (decision.requiresAcknowledgement) {
+            return res.status(428).json({
+              message: decision.reason,
+              decision,
+              hint: "Include { acknowledgeRisk: true } (or riskAcknowledgement.accepted=true) to proceed.",
+            });
+          }
         }
       }
-
       
       if (!quote || !userPublicKey) {
         return res.status(400).json({ message: "Missing quote or userPublicKey" });
