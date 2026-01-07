@@ -19,7 +19,6 @@ import {
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
 import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
 import { decideTokenAction, getRiskShieldPolicy } from "./services/riskShield";
-import { registerStripeRoutes } from "./stripeRoutes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
   extractClientInfo, 
@@ -409,9 +408,6 @@ export async function registerRoutes(
       res.status(500).json({ error: "DELETE_FAILED", message: "Failed to delete credential" });
     }
   });
-  
-  // Register Stripe routes for Apple Pay / card payments
-  registerStripeRoutes(app);
   
   // Register Object Storage routes for file uploads
   registerObjectStorageRoutes(app);

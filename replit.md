@@ -104,11 +104,6 @@ The server follows a modular pattern:
 - **Buffer polyfill**: CDN-loaded buffer for browser SPL token compatibility
 - **Network**: Solana Devnet (clusterApiUrl)
 
-### Payments
-- **Stripe**: Payment processing for SOL purchases
-- **stripe-replit-sync**: Stripe webhook and schema management
-- Credentials fetched from Replit Connectors API
-
 ### Authentication & Security
 - **Passkey Authentication (Primary)**: WebAuthn-based passwordless authentication
   - Supports Touch ID, Face ID, Windows Hello, and security keys
