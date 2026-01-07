@@ -50,6 +50,14 @@ function buildWebauthnOrigins(): string[] {
     origins.push(...parseCommaSeparated(process.env.XRAY_WEBAUTHN_ORIGINS));
   }
 
+  // Include all Replit domains (production and dev)
+  if (process.env.REPLIT_DOMAINS) {
+    const domains = parseCommaSeparated(process.env.REPLIT_DOMAINS);
+    for (const domain of domains) {
+      origins.push(`https://${domain}`);
+    }
+  }
+
   if (process.env.REPLIT_DEV_DOMAIN) {
     origins.push(`https://${process.env.REPLIT_DEV_DOMAIN}`);
   }
@@ -77,6 +85,25 @@ function buildWebauthnRpId(): string {
     return `${process.env.REPL_SLUG}.${process.env.REPL_OWNER.toLowerCase()}.repl.co`;
   }
   return "localhost";
+}
+
+export function getRpIdFromOrigin(origin: string): string {
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    
+    // For Replit domains, use the full hostname as RP ID
+    if (hostname.endsWith('.replit.app') || 
+        hostname.endsWith('.replit.dev') || 
+        hostname.endsWith('.riker.replit.dev') ||
+        hostname.endsWith('.repl.co')) {
+      return hostname;
+    }
+    
+    return hostname;
+  } catch {
+    return env.webauthnRpId;
+  }
 }
 
 function loadConfig(): EnvConfig {

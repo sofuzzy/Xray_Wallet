@@ -156,8 +156,9 @@ export async function registerRoutes(
     try {
       const { username } = req.body;
       const sessionId = req.sessionID || crypto.randomUUID();
+      const origin = req.headers.origin || req.headers.referer;
       
-      const options = await generatePasskeyRegistrationOptions(sessionId, username);
+      const options = await generatePasskeyRegistrationOptions(sessionId, username, origin);
       
       res.json({
         ...options,
@@ -211,7 +212,8 @@ export async function registerRoutes(
   app.post("/api/auth/passkey/login/options", authRateLimiter, async (req, res) => {
     try {
       const sessionId = req.sessionID || crypto.randomUUID();
-      const options = generatePasskeyLoginOptions(sessionId);
+      const origin = req.headers.origin || req.headers.referer;
+      const options = generatePasskeyLoginOptions(sessionId, origin);
       
       res.json({
         ...options,
@@ -291,7 +293,8 @@ export async function registerRoutes(
   app.post("/api/webauthn/register/options", hybridAuth, async (req, res) => {
     try {
       const userId = req.tokenUser!.sub;
-      const options = generateRegistrationChallenge(userId);
+      const origin = req.headers.origin || req.headers.referer;
+      const options = generateRegistrationChallenge(userId, origin);
       res.json(options);
     } catch (error) {
       res.status(500).json({ error: "OPTIONS_FAILED", message: "Failed to generate registration options" });
@@ -335,7 +338,8 @@ export async function registerRoutes(
         return res.status(400).json({ error: "NO_CREDENTIALS", message: "No biometric credentials registered" });
       }
 
-      const options = generateAuthenticationChallenge(userId);
+      const origin = req.headers.origin || req.headers.referer;
+      const options = generateAuthenticationChallenge(userId, origin);
       res.json({
         ...options,
         allowCredentials: credentials.map(c => ({

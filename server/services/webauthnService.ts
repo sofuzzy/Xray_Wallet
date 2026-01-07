@@ -12,20 +12,19 @@ import {
   type VerifiedAuthenticationResponse,
 } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
-import { env } from "../config/env";
+import { env, getRpIdFromOrigin } from "../config/env";
 
 const CHALLENGE_TTL_MS = 90 * 1000;
 
-const registrationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
-const authenticationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
-const passkeyRegistrationChallenges = new Map<string, { challenge: string; expiresAt: number; username?: string; nonce: string }>();
-const passkeyLoginChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string }>();
+const registrationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string; rpId: string }>();
+const authenticationChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string; rpId: string }>();
+const passkeyRegistrationChallenges = new Map<string, { challenge: string; expiresAt: number; username?: string; nonce: string; rpId: string }>();
+const passkeyLoginChallenges = new Map<string, { challenge: string; expiresAt: number; nonce: string; rpId: string }>();
 
 const usedChallenges = new Set<string>();
 
 const RP_NAME = "Xray Wallet";
 
-const RP_ID = env.webauthnRpId;
 const ALLOWED_ORIGINS = env.webauthnOrigins;
 
 function isOriginAllowed(origin: string): boolean {
@@ -56,7 +55,7 @@ function validateCredentialScope(credentialUserId: string, requestUserId: string
   return credentialUserId === requestUserId;
 }
 
-export function generateRegistrationChallenge(userId: string): {
+export function generateRegistrationChallenge(userId: string, origin?: string): {
   challenge: string;
   rp: { name: string; id: string };
   user: { id: string; name: string; displayName: string };
@@ -69,16 +68,18 @@ export function generateRegistrationChallenge(userId: string): {
   };
 } {
   const challenge = crypto.randomBytes(32).toString("base64url");
+  const rpId = origin ? getRpIdFromOrigin(origin) : env.webauthnRpId;
   
   registrationChallenges.set(userId, {
     challenge,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     nonce: generateNonce(),
+    rpId,
   });
 
   return {
     challenge,
-    rp: { name: RP_NAME, id: RP_ID },
+    rp: { name: RP_NAME, id: rpId },
     user: {
       id: Buffer.from(userId).toString("base64url"),
       name: userId,
@@ -97,23 +98,25 @@ export function generateRegistrationChallenge(userId: string): {
   };
 }
 
-export function generateAuthenticationChallenge(userId: string): {
+export function generateAuthenticationChallenge(userId: string, origin?: string): {
   challenge: string;
   rpId: string;
   timeout: number;
   userVerification: string;
 } {
   const challenge = crypto.randomBytes(32).toString("base64url");
+  const rpId = origin ? getRpIdFromOrigin(origin) : env.webauthnRpId;
   
   authenticationChallenges.set(userId, {
     challenge,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     nonce: generateNonce(),
+    rpId,
   });
 
   return {
     challenge,
-    rpId: RP_ID,
+    rpId,
     timeout: 60000,
     userVerification: "required",
   };
@@ -152,7 +155,7 @@ export async function verifyRegistration(
         response,
         expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ALLOWED_ORIGINS,
-        expectedRPID: RP_ID,
+        expectedRPID: storedChallenge.rpId,
         requireUserVerification: true,
       });
     } catch (error) {
@@ -229,7 +232,7 @@ export async function verifyAuthentication(
         response,
         expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ALLOWED_ORIGINS,
-        expectedRPID: RP_ID,
+        expectedRPID: storedChallenge.rpId,
         requireUserVerification: true,
         credential: {
           id: credential.credentialId,
@@ -277,7 +280,7 @@ export async function deleteCredential(id: number, userId: string): Promise<bool
   return storage.deleteWebAuthnCredential(id, userId);
 }
 
-export async function generatePasskeyRegistrationOptions(sessionId: string, username?: string): Promise<{
+export async function generatePasskeyRegistrationOptions(sessionId: string, username?: string, origin?: string): Promise<{
   challenge: string;
   rp: { name: string; id: string };
   user: { id: string; name: string; displayName: string };
@@ -293,17 +296,19 @@ export async function generatePasskeyRegistrationOptions(sessionId: string, user
 }> {
   const challenge = crypto.randomBytes(32).toString("base64url");
   const tempUserId = crypto.randomBytes(16).toString("base64url");
+  const rpId = origin ? getRpIdFromOrigin(origin) : env.webauthnRpId;
   
   passkeyRegistrationChallenges.set(sessionId, {
     challenge,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     username,
     nonce: generateNonce(),
+    rpId,
   });
 
   return {
     challenge,
-    rp: { name: RP_NAME, id: RP_ID },
+    rp: { name: RP_NAME, id: rpId },
     user: {
       id: tempUserId,
       name: username || `user_${Date.now()}`,
@@ -355,7 +360,7 @@ export async function verifyPasskeyRegistration(
         response,
         expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ALLOWED_ORIGINS,
-        expectedRPID: RP_ID,
+        expectedRPID: storedChallenge.rpId,
         requireUserVerification: true,
       });
     } catch (error) {
@@ -401,7 +406,7 @@ export async function verifyPasskeyRegistration(
   }
 }
 
-export function generatePasskeyLoginOptions(sessionId: string): {
+export function generatePasskeyLoginOptions(sessionId: string, origin?: string): {
   challenge: string;
   rpId: string;
   timeout: number;
@@ -409,16 +414,18 @@ export function generatePasskeyLoginOptions(sessionId: string): {
   allowCredentials: never[];
 } {
   const challenge = crypto.randomBytes(32).toString("base64url");
+  const rpId = origin ? getRpIdFromOrigin(origin) : env.webauthnRpId;
   
   passkeyLoginChallenges.set(sessionId, {
     challenge,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     nonce: generateNonce(),
+    rpId,
   });
 
   return {
     challenge,
-    rpId: RP_ID,
+    rpId,
     timeout: 120000,
     userVerification: "required",
     allowCredentials: [],
@@ -465,7 +472,7 @@ export async function verifyPasskeyLogin(
         response,
         expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ALLOWED_ORIGINS,
-        expectedRPID: RP_ID,
+        expectedRPID: storedChallenge.rpId,
         requireUserVerification: true,
         credential: {
           id: credential.credentialId,
