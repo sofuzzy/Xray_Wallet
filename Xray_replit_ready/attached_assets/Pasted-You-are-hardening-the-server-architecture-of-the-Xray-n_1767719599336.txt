@@ -1,0 +1,50 @@
+You are hardening the server architecture of the Xray non-custodial wallet app.
+
+Implement these security and reliability improvements:
+
+1. RPC Redundancy (currently thin)
+- Centralize RPC configuration in server/config/env.ts
+- Support a prioritized list of RPC endpoints:
+    SOLANA_RPCS as string[] or comma-separated list
+- Add automatic fallback:
+    - try primary RPC
+    - on timeout/5xx switch to next endpoint
+- Allow optional user-supplied RPC in request headers (X-User-RPC) with validation
+- Add runtime startup guard:
+    if no RPCs configured -> hard fail
+- Add exponential backoff for:
+    - getLatestBlockhash
+    - getTokenSupply
+    - getTokenLargestAccounts
+- Never log full user IP + signature combinations that could deanonymize users
+
+2. Metadata Trust from Public APIs
+- Do not rely on the first pair returned by public APIs
+- Validate and normalize all external token data:
+    - enforce decimals are between 0 and 18
+    - normalize symbols to ASCII A–Z0–9
+    - verify mint owner matches SPL or Token-2022 programs
+- Choose the most liquid pair by liquidity USD
+- Add cross-checks:
+    - FDV vs liquidity disconnect > 50% -> flag
+    - pair age < 24h -> high risk
+- Cache external metadata for max 60 seconds
+- If metadata source unavailable -> return token as “unverified” not valid
+
+3. WebAuthn Origin Checks (must be strict in production)
+- Enforce origin and RP ID validation:
+    - allowed origins from XRAY_WEBAUTHN_ORIGINS string[]
+- Reject any WebAuthn assertion where:
+    - origin mismatch
+    - challenge reused
+    - credential not scoped to user
+- Add production guard:
+    if NODE_ENV=production and no origin list -> hard fail
+- Store credentials only hashed and per device ID
+- Prevent replayed challenges with nonce + TTL 90 seconds
+
+Follow critical rules:
+- Never store or transmit user private keys server-side
+- All swaps and signing remain client-controlled
+- Add detailed TypeScript types for all new modules
+- Provide unit-testable services

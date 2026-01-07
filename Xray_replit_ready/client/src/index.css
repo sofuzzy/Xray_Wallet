@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-body: 'Inter', sans-serif;
+  --font-display: 'Space Mono', monospace;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --radius: 0.25rem;
+
+  /* Light Theme - Retro Terminal Light */
+  --background: 60 5% 96%;
+  --foreground: 150 10% 15%;
+
+  --card: 60 5% 92%;
+  --card-foreground: 150 10% 15%;
+
+  --popover: 60 5% 94%;
+  --popover-foreground: 150 10% 15%;
+
+  --primary: 142 70% 40%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 60 5% 88%;
+  --secondary-foreground: 150 10% 15%;
+
+  --muted: 60 5% 88%;
+  --muted-foreground: 150 5% 45%;
+
+  --accent: 35 90% 50%;
+  --accent-foreground: 0 0% 5%;
+
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 150 10% 80%;
+  --input: 150 10% 80%;
+  --ring: 142 70% 40%;
+}
+
+.dark {
+  /* Dark Theme - CRT Terminal */
+  --background: 160 20% 4%;
+  --foreground: 142 60% 75%;
+
+  --card: 160 25% 7%;
+  --card-foreground: 142 60% 75%;
+
+  --popover: 160 25% 8%;
+  --popover-foreground: 142 60% 75%;
+
+  --primary: 142 70% 50%;
+  --primary-foreground: 160 30% 5%;
+
+  --secondary: 160 20% 12%;
+  --secondary-foreground: 142 50% 70%;
+
+  --muted: 160 15% 15%;
+  --muted-foreground: 142 30% 50%;
+
+  --accent: 35 100% 55%;
+  --accent-foreground: 0 0% 5%;
+
+  --destructive: 0 70% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 160 20% 18%;
+  --input: 160 20% 18%;
+  --ring: 142 70% 50%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased selection:bg-primary/30;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+/* Retro CRT Scanline Effect */
+@layer utilities {
+  .crt-overlay {
+    position: relative;
+  }
+  
+  .crt-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .dark .crt-overlay::before {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.1) 2px,
+      rgba(0, 0, 0, 0.1) 4px
+    );
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.5), 0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  .glow-border {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.3), inset 0 0 10px hsl(var(--primary) / 0.05);
+  }
+
+  .retro-card {
+    @apply bg-card border-2 border-border shadow-lg;
+    box-shadow: 
+      4px 4px 0 hsl(var(--border)),
+      inset 0 0 20px hsl(var(--primary) / 0.03);
+  }
+
+  .dark .retro-card {
+    box-shadow: 
+      4px 4px 0 hsl(160 30% 10%),
+      0 0 30px hsl(var(--primary) / 0.1),
+      inset 0 0 30px hsl(var(--primary) / 0.03);
+  }
+
+  .pixel-border {
+    border: 2px solid;
+    border-image: repeating-linear-gradient(
+      90deg,
+      hsl(var(--border)) 0px,
+      hsl(var(--border)) 4px,
+      transparent 4px,
+      transparent 8px
+    ) 2;
+  }
+
+  .terminal-cursor {
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-emerald-400 to-accent;
+  }
+
+  .flicker {
+    animation: flicker 0.15s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.98; }
+  }
+}
+
+/* Retro Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/50 border-2 border-muted;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/70;
+}
+
+/* Terminal-style Input Focus */
+input:focus, textarea:focus, select:focus {
+  @apply outline-none ring-2 ring-primary/50;
+  box-shadow: 0 0 15px hsl(var(--primary) / 0.2);
+}
+
+/* Retro Button Styles */
+.dark button:not([disabled]):active {
+  transform: translate(2px, 2px);
+}
+
+/* ASCII-style decorative elements */
+.ascii-corner::before {
+  content: ">";
+  @apply text-primary font-mono mr-1;
+}
