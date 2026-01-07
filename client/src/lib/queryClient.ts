@@ -1,14 +1,19 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import { tokenManager } from "./tokenManager";
 
 class ApiError extends Error {
   status: number;
+  code?: string;
+  details?: unknown;
   data?: any;
   constructor(message: string, status: number, data?: any) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.data = data;
+    this.code = data?.error?.code;
+    this.details = data?.error?.details;
   }
 }
 
@@ -20,7 +25,8 @@ async function throwIfResNotOk(res: Response) {
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
         data = await res.json();
-        message = data?.message || message;
+        // Prefer our unified API error shape: { error: { code, message, details } }
+        message = data?.error?.message || data?.message || message;
       } else {
         const text = (await res.text()) || message;
         message = text;
@@ -31,6 +37,40 @@ async function throwIfResNotOk(res: Response) {
     }
     throw new ApiError(message, res.status, data);
   }
+}
+
+function toToastTitle(err: ApiError) {
+  // Prefer semantic codes (more helpful than HTTP status)
+  const code = (err.code || "").toUpperCase();
+  const codeTitleMap: Record<string, string> = {
+    VALIDATION_ERROR: "Check your info",
+    INVALID_INPUT: "Check your info",
+    INVALID_AMOUNT: "Check the amount",
+    RISK_ACK_REQUIRED: "Needs confirmation",
+    RISK_BLOCKED: "Swap blocked",
+    FORBIDDEN: "Blocked",
+    UNAUTHORIZED: "Session expired",
+    RATE_LIMITED: "Slow down",
+  };
+  if (code && codeTitleMap[code]) return codeTitleMap[code];
+
+  const status = err.status;
+  if (status === 401) return "Session expired";
+  if (status === 428) return "Needs confirmation";
+  if (status === 403) return "Blocked";
+  if (status === 404) return "Not found";
+  if (status === 408) return "Request timed out";
+  if (status === 422) return "Invalid input";
+  if (status === 429) return "Slow down";
+  if (status >= 500) return "Server error";
+  return "Something went wrong";
+}
+
+function shouldToastError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  // Avoid spamming users for background polling / auth edge cases
+  if (err.status === 401) return true;
+  return true;
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -155,6 +195,17 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      onError: (err) => {
+        if (!shouldToastError(err)) return;
+        const apiErr = err as ApiError;
+        toast({
+          title: toToastTitle(apiErr),
+          description: apiErr.message || "Request failed",
+          variant: "destructive",
+        });
+      },
     },
   },
 });
+
+export type { ApiError };

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { formatApiError } from "@/lib/formatApiError";
 import { useWallet } from "@/hooks/use-wallet";
 import { connection, getLocalKeypair } from "@/lib/solana";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -189,7 +190,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       
     } catch (error: unknown) {
       console.error("Token creation failed:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create token");
+      setErrorMessage(formatApiError(error, "Failed to create token"));
       setStep("error");
     }
   };

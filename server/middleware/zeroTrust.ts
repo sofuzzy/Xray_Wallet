@@ -130,6 +130,48 @@ export const strictRateLimiter = rateLimit({
   validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
 });
 
+
+// More granular limiters for expensive endpoints
+export const quoteRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: "RATE_LIMITED", message: "Too many quote requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientKey,
+  validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
+});
+
+export const swapTxRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "RATE_LIMITED", message: "Too many swap attempts, please try again shortly" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientKey,
+  validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
+});
+
+export const tokenLookupRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: "RATE_LIMITED", message: "Too many token requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientKey,
+  validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
+});
+
+export const riskAssessmentRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: "RATE_LIMITED", message: "Too many risk checks, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientKey,
+  validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
+});
+
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,

@@ -6,6 +6,7 @@ import { useCreateTransaction } from "@/hooks/use-transactions";
 import { useLookupUser } from "@/hooks/use-users";
 import { SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useToast } from "@/hooks/use-toast";
+import { formatApiError } from "@/lib/formatApiError";
 
 interface SendModalProps {
   isOpen: boolean;
@@ -111,7 +112,7 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
 
     } catch (error: any) {
       console.error(error);
-      toast({ title: "Transaction failed", description: error.message || "Could not complete transfer.", variant: "destructive" });
+      toast({ title: "Transaction failed", description: formatApiError(error, "Could not complete transfer."), variant: "destructive" });
       setIsProcessing(false);
     }
   };

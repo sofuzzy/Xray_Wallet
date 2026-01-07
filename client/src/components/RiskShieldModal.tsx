@@ -2,6 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Link } from "wouter";
+import { useState } from "react";
+import InlineError from "@/components/InlineError";
 import { AlertTriangle, ShieldAlert, ShieldCheck, Info } from "lucide-react";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
@@ -83,6 +86,9 @@ export function RiskShieldModal(props: {
   const decision = props.decision;
   const assessment = decision?.assessment;
 
+  const [showHelp, setShowHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const level = (assessment?.level || (decision?.blocked ? "critical" : "high")) as RiskLevel;
   const score = assessment?.score;
 
@@ -108,6 +114,14 @@ export function RiskShieldModal(props: {
             {description}
           </DialogDescription>
         </DialogHeader>
+
+        <InlineError
+          title="Why you’re seeing this"
+          message="Xray Shield flagged this token. Review the details below before you continue."
+          variant="warning"
+          className="mt-3"
+        />
+
 
         <div className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
@@ -211,6 +225,74 @@ export function RiskShieldModal(props: {
 
           <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
             Risk Shield provides automated safety checks but cannot guarantee token safety. Always do your own research and only invest what you can afford to lose.
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                className="text-xs underline underline-offset-4"
+                onClick={() => setShowHelp((v) => !v)}
+              >
+                {showHelp ? "Hide Xray Shield details" : "Learn more about Xray Shield"}
+              </button>
+
+              {decision?.mint && (
+                <button
+                  type="button"
+                  className="text-xs underline underline-offset-4"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(decision.mint);
+                      setCopied(true);
+                      window.setTimeout(() => setCopied(false), 1200);
+                    } catch {
+                      // If clipboard isn't available, fall back to no-op.
+                    }
+                  }}
+                  title="Copy mint address"
+                >
+                  {copied ? "Copied" : "Copy mint"}
+                </button>
+              )}
+
+              {decision?.mint && (
+                <a
+                  href={`https://solscan.io/token/${decision.mint}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs underline underline-offset-4"
+                  title="View token on Solscan"
+                >
+                  View on Solscan
+                </a>
+              )}
+
+              {decision?.mint && assessment?.inputs?.liquidity !== undefined && (
+                <a
+                  href={`https://dexscreener.com/solana?query=${encodeURIComponent(decision.mint)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs underline underline-offset-4"
+                  title="Search this token on DexScreener"
+                >
+                  View on DexScreener
+                </a>
+              )}
+            </div>
+            {showHelp && (
+              <div className="mt-3 text-xs text-muted-foreground bg-muted/40 p-3 rounded border">
+                <div className="font-medium text-foreground mb-1">How Xray Shield decides</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li><span className="font-medium text-foreground">Low/Medium:</span> informational warnings only.</li>
+                  <li><span className="font-medium text-foreground">High:</span> may require confirmation before swapping.</li>
+                  <li><span className="font-medium text-foreground">Critical:</span> can be blocked by policy (liquidity, concentration, mint authority, etc.).</li>
+                  <li>Scores and flags are heuristic and not financial advice.</li>
+                </ul>
+                <div className="mt-2">
+                  <Link href="/help/risk-shield" className="underline underline-offset-4">
+                    Open full guide
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

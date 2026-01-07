@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { sendApiError } from "../../utils/sendApiError";
 
 /**
  * Register object storage routes for file uploads.
@@ -40,9 +41,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       const { name, size, contentType } = req.body;
 
       if (!name) {
-        return res.status(400).json({
-          error: "Missing required field: name",
-        });
+        return sendApiError(res, 400, "VALIDATION_ERROR", "Missing required field: name");
       }
 
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
@@ -58,7 +57,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
+      return sendApiError(res, 500, "UPLOAD_URL_ERROR", "Failed to generate upload URL");
     }
   });
 
@@ -77,9 +76,9 @@ export function registerObjectStorageRoutes(app: Express): void {
     } catch (error) {
       console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ error: "Object not found" });
+        return sendApiError(res, 404, "OBJECT_NOT_FOUND", "Object not found");
       }
-      return res.status(500).json({ error: "Failed to serve object" });
+      return sendApiError(res, 500, "OBJECT_SERVE_ERROR", "Failed to serve object");
     }
   });
 }

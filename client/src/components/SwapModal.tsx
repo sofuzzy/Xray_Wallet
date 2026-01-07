@@ -6,9 +6,11 @@ import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCir
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatApiError } from "@/lib/formatApiError";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { InlineError } from "@/components/InlineError";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -98,7 +100,7 @@ function TransactionProgress({ step, errorMessage }: { step: TransactionStep; er
             <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
           <span className="text-lg font-medium">Transaction Failed</span>
-          {errorMessage && <span className="text-sm text-muted-foreground max-w-[250px]">{errorMessage}</span>}
+          {errorMessage && <div className="w-full max-w-[320px]"><InlineError title="What happened?" message={errorMessage} variant="error" /></div>}
         </motion.div>
       ) : (
         <div className="flex flex-col items-center gap-6 w-full max-w-[280px]">
@@ -448,7 +450,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       if (!response.ok) {
         let errorData: any = {};
         try { errorData = await response.json(); } catch {}
-        const err: any = new Error(errorData?.message || "Failed to get quote");
+        const err: any = new Error(errorData?.error?.message || errorData?.message || "Failed to get quote");
         err.status = response.status;
         err.data = errorData;
         // Surface Risk Shield decisions to the UI
@@ -571,10 +573,10 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     },
     onError: (error: any) => {
       setTxStep("error");
-      setTxError(error.message || "Failed to execute swap");
+      setTxError(formatApiError(error, "Failed to execute swap"));
       toast({
         title: "Swap Failed",
-        description: error.message || "Failed to execute swap",
+        description: formatApiError(error, "Failed to execute swap"),
         variant: "destructive",
       });
       // Reset after showing error

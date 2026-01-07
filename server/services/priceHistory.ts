@@ -1,3 +1,4 @@
+import { fetchJson } from "../utils/fetch";
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 
 export interface PricePoint {
@@ -49,13 +50,11 @@ export async function getTokenPriceHistory(
   }
 
   try {
-    const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
-    if (!response.ok) {
-      console.error(`DexScreener API error: ${response.status}`);
+    const data = await fetchJson<any>(`${DEXSCREENER_API}/tokens/${mint}`, { timeoutMs: 8000 });
+    if (!data) {
+      console.error(`DexScreener API error: timeout/network/non-2xx`);
       return null;
     }
-
-    const data = await response.json();
     
     if (!data.pairs || data.pairs.length === 0) {
       return null;
@@ -183,15 +182,13 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata | nu
   }
 
   try {
-    const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
-    if (!response.ok) {
-      console.error(`DexScreener API error for metadata: ${response.status}`);
+    const data = await fetchJson<any>(`${DEXSCREENER_API}/tokens/${mint}`, { timeoutMs: 8000 });
+    if (!data) {
+      console.error(`DexScreener API error for metadata: timeout/network/non-2xx`);
       return null;
     }
 
-    const data = await response.json();
-    
-    if (!data.pairs || data.pairs.length === 0) {
+if (!data.pairs || data.pairs.length === 0) {
       return null;
     }
 

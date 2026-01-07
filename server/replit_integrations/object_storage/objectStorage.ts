@@ -1,5 +1,6 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Response } from "express";
+import { sendApiError } from "../../utils/sendApiError";
 import { randomUUID } from "crypto";
 import {
   ObjectAclPolicy,
@@ -117,7 +118,7 @@ export class ObjectStorageService {
       stream.on("error", (err) => {
         console.error("Stream error:", err);
         if (!res.headersSent) {
-          res.status(500).json({ error: "Error streaming file" });
+          sendApiError(res, 500, "OBJECT_STORAGE_STREAM_ERROR", "Error streaming file");
         }
       });
 
@@ -125,7 +126,7 @@ export class ObjectStorageService {
     } catch (error) {
       console.error("Error downloading file:", error);
       if (!res.headersSent) {
-        res.status(500).json({ error: "Error downloading file" });
+        sendApiError(res, 500, "OBJECT_STORAGE_DOWNLOAD_ERROR", "Error downloading file");
       }
     }
   }
