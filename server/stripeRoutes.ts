@@ -1,7 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { isAuthenticated as authMiddleware } from "./replit_integrations/auth";
-import { sendApiError } from "./utils/sendApiError";
 
 export function registerStripeRoutes(app: Express) {
   // Get Stripe publishable key for frontend
@@ -11,7 +10,7 @@ export function registerStripeRoutes(app: Express) {
       res.json({ publishableKey });
     } catch (error) {
       console.error('Failed to get publishable key:', error);
-      return sendApiError(res, 500, "STRIPE_CONFIG_ERROR", "Failed to get Stripe configuration");
+      res.status(500).json({ error: 'Failed to get Stripe configuration' });
     }
   });
 
@@ -21,7 +20,7 @@ export function registerStripeRoutes(app: Express) {
       const { amount } = req.body;
       
       if (!amount || amount < 100) {
-        return sendApiError(res, 400, "INVALID_AMOUNT", "Minimum amount is $1.00");
+        return res.status(400).json({ error: 'Minimum amount is $1.00' });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -44,7 +43,7 @@ export function registerStripeRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error('Payment intent creation failed:', error);
-      return sendApiError(res, 500, "STRIPE_PAYMENT_INTENT_ERROR", error.message || "Failed to create payment");
+      res.status(500).json({ error: error.message || 'Failed to create payment' });
     }
   });
 

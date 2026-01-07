@@ -1,16 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
-import helmet from "helmet";
-import cors from "cors";
-import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
-import { validateStartupConfig } from "./config/env";
-import { isApiError } from "./utils/apiError";
-import { sendApiError } from "./utils/sendApiError";
+import { validateStartupConfig, env } from "./config/env";
 
 const app = express();
 const httpServer = createServer(app);
@@ -90,7 +85,7 @@ app.post(
     const signature = req.headers['stripe-signature'];
 
     if (!signature) {
-      return sendApiError(res, 400, "STRIPE_WEBHOOK_MISSING_SIGNATURE", "Missing stripe-signature header");
+      return res.status(400).json({ error: 'Missing stripe-signature' });
     }
 
     try {
@@ -98,7 +93,7 @@ app.post(
 
       if (!Buffer.isBuffer(req.body)) {
         console.error('STRIPE WEBHOOK ERROR: req.body is not a Buffer');
-        return sendApiError(res, 500, "STRIPE_WEBHOOK_BODY_INVALID", "Webhook body must be a raw Buffer");
+        return res.status(500).json({ error: 'Webhook processing error' });
       }
 
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
@@ -106,7 +101,7 @@ app.post(
       res.status(200).json({ received: true });
     } catch (error: any) {
       console.error('Webhook error:', error.message);
-      return sendApiError(res, 400, "STRIPE_WEBHOOK_PROCESSING_ERROR", "Webhook processing error");
+      res.status(400).json({ error: 'Webhook processing error' });
     }
   }
 );
@@ -120,42 +115,6 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
-
-// Security & traffic protection
-app.use(
-  helmet({
-    // Vite + embedded assets can conflict with strict CSP; keep CSP off unless you configure it intentionally.
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false,
-  }),
-);
-
-const allowedOrigins = (process.env.XRAY_CORS_ORIGINS ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      // Allow same-origin / server-to-server / tools without Origin header
-      if (!origin) return cb(null, true);
-      if (process.env.NODE_ENV !== "production") return cb(null, true);
-      if (allowedOrigins.length === 0) return cb(null, false);
-      return cb(null, allowedOrigins.includes(origin));
-    },
-    credentials: true,
-  }),
-);
-
-// Apply a general API rate limiter. Add tighter limiters per-route in routes.ts for expensive endpoints.
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 240, // 240 req/min per IP (tune as needed)
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api", apiLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -191,27 +150,11 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const fallbackStatus = err?.status || err?.statusCode || 500;
-    const status = Number.isFinite(fallbackStatus) ? fallbackStatus : 500;
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
 
-    if (isApiError(err)) {
-      return res.status(err.status).json({
-        error: {
-          code: err.code,
-          message: err.message,
-          details: err.details,
-        },
-      });
-    }
-
-    // Don't leak internals; keep details minimal.
-    const message = status >= 500 ? "Internal Server Error" : (err?.message ?? "Request failed");
-    return res.status(status).json({
-      error: {
-        code: status >= 500 ? "INTERNAL_ERROR" : "REQUEST_FAILED",
-        message,
-      },
-    });
+    res.status(status).json({ message });
+    throw err;
   });
 
   if (process.env.NODE_ENV === "production") {

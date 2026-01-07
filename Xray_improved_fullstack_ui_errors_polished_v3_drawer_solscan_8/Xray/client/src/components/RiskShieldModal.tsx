@@ -87,7 +87,6 @@ export function RiskShieldModal(props: {
   const assessment = decision?.assessment;
 
   const [showHelp, setShowHelp] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const level = (assessment?.level || (decision?.blocked ? "critical" : "high")) as RiskLevel;
   const score = assessment?.score;
@@ -233,26 +232,6 @@ export function RiskShieldModal(props: {
               >
                 {showHelp ? "Hide Xray Shield details" : "Learn more about Xray Shield"}
               </button>
-
-              {decision?.mint && (
-                <button
-                  type="button"
-                  className="text-xs underline underline-offset-4"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(decision.mint);
-                      setCopied(true);
-                      window.setTimeout(() => setCopied(false), 1200);
-                    } catch {
-                      // If clipboard isn't available, fall back to no-op.
-                    }
-                  }}
-                  title="Copy mint address"
-                >
-                  {copied ? "Copied" : "Copy mint"}
-                </button>
-              )}
-
               {decision?.mint && (
                 <a
                   href={`https://solscan.io/token/${decision.mint}`}
@@ -262,18 +241,6 @@ export function RiskShieldModal(props: {
                   title="View token on Solscan"
                 >
                   View on Solscan
-                </a>
-              )}
-
-              {decision?.mint && assessment?.inputs?.liquidity !== undefined && (
-                <a
-                  href={`https://dexscreener.com/solana?query=${encodeURIComponent(decision.mint)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs underline underline-offset-4"
-                  title="Search this token on DexScreener"
-                >
-                  View on DexScreener
                 </a>
               )}
             </div>

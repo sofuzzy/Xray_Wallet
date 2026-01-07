@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { formatApiError } from "@/lib/formatApiError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { AutoTradeRule } from "@shared/schema";
@@ -129,7 +128,7 @@ export function AutoTradeModal({ isOpen, onClose, tokenMint, tokenSymbol, curren
 
       setStep("success");
     } catch (error: any) {
-      setErrorMessage(formatApiError(error, "Failed to create auto-trade rule"));
+      setErrorMessage(error.message || "Failed to create auto-trade rule");
       setStep("error");
     }
   };

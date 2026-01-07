@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { fetchJson } from "../utils/fetch";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getMint } from "@solana/spl-token";
 import { getRpcService } from "./rpcService";
@@ -67,12 +66,18 @@ function isProbablyMint(str: string) {
 }
 
 function addFlag(flags: RiskFlag[], flag: RiskFlag) {
-  // de-duplicate by code to keep UX clean
-  if (!flags.some((f) => f.code === flag.code)) {
-    flags.push(flag);
-  }
+  flags.push(flag);
 }
 
+async function fetchJson(url: string): Promise<any | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
 
 async function assessOnChain(mint: PublicKey): Promise<{
   tokenProgram: "spl-token" | "token-2022" | "unknown";

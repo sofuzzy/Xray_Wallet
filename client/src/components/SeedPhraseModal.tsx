@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
-import { formatApiError } from "@/lib/formatApiError";
 import { useBiometric } from "@/hooks/use-biometric";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { validateMnemonic } from "@/lib/solana";
@@ -148,7 +147,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
         toast({ title: "Setup Failed", description: biometric.error || "Could not enable Face ID", variant: "destructive" });
       }
     } catch (e: any) {
-      toast({ title: "Setup Failed", description: formatApiError(e, "Could not enable Face ID"), variant: "destructive" });
+      toast({ title: "Setup Failed", description: e.message || "Could not enable Face ID", variant: "destructive" });
     } finally {
       setIsEnabling(false);
     }
