@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, TrendingUp, TrendingDown, Loader2, Plus, X, Flame } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -64,7 +63,8 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
       if (!response.ok) return [];
       return response.json();
     },
-    staleTime: 60000,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
@@ -176,7 +176,7 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
             )}
 
             {!searchLoading && !trendingLoading && (
-              <ScrollArea className="max-h-[300px]">
+              <div className="max-h-[300px] overflow-y-auto">
                 <div className="p-2 space-y-1">
                   {displayTokens.map((token) => (
                     <button
@@ -244,7 +244,7 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </motion.div>
         )}
