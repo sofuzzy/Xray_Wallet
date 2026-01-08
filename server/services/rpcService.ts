@@ -11,16 +11,24 @@ export interface RpcServiceOptions {
 
 const DEFAULT_OPTIONS: Required<RpcServiceOptions> = {
   commitment: "confirmed",
-  maxRetries: 3,
-  initialDelayMs: 500,
-  maxDelayMs: 8000,
-  timeoutMs: 30000,
+  maxRetries: 5,
+  initialDelayMs: 300,
+  maxDelayMs: 5000,
+  timeoutMs: 15000,
 };
+
+const PUBLIC_RPC_ENDPOINTS = [
+  "https://api.mainnet-beta.solana.com",
+  "https://rpc.ankr.com/solana",
+  "https://solana.public-rpc.com",
+];
 
 interface RpcEndpointState {
   url: string;
+  name: string;
   failureCount: number;
   lastFailure: number;
+  latencyMs: number;
   connection: Connection;
 }
 
@@ -28,64 +36,105 @@ class RpcService {
   private endpoints: RpcEndpointState[];
   private currentIndex: number = 0;
   private options: Required<RpcServiceOptions>;
+  private bestEndpointUrl: string | null = null;
 
   constructor(rpcs: string[], options: RpcServiceOptions = {}) {
-    if (rpcs.length === 0) {
+    this.options = { ...DEFAULT_OPTIONS, ...options };
+    
+    const normalizeUrl = (url: string) => url.replace(/\/+$/, "").toLowerCase();
+    const seen = new Set<string>();
+    const allRpcs: string[] = [];
+    
+    for (const url of [...rpcs, ...PUBLIC_RPC_ENDPOINTS]) {
+      const normalized = normalizeUrl(url);
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        allRpcs.push(url);
+      }
+    }
+    
+    if (allRpcs.length === 0) {
       throw new Error("RpcService requires at least one RPC endpoint");
     }
 
-    this.options = { ...DEFAULT_OPTIONS, ...options };
-
-    this.endpoints = rpcs.map((url) => ({
+    this.endpoints = allRpcs.map((url) => ({
       url,
+      name: this.getEndpointName(url),
       failureCount: 0,
       lastFailure: 0,
+      latencyMs: 1000,
       connection: new Connection(url, {
         commitment: this.options.commitment,
         confirmTransactionInitialTimeout: this.options.timeoutMs,
+        disableRetryOnRateLimit: true,
       }),
     }));
+    
+    console.log(`[rpc] Initialized with ${this.endpoints.length} endpoints:`);
+    this.endpoints.forEach((ep, i) => console.log(`  ${i + 1}. ${ep.name}`));
+  }
+  
+  private getEndpointName(url: string): string {
+    if (url.includes("helius")) return "Helius";
+    if (url.includes("quicknode")) return "QuickNode";
+    if (url.includes("alchemy")) return "Alchemy";
+    if (url.includes("ankr")) return "Ankr";
+    if (url.includes("mainnet-beta.solana.com")) return "Solana Mainnet";
+    if (url.includes("public-rpc")) return "Public RPC";
+    return url.slice(0, 30);
   }
 
   private getNextEndpoint(): RpcEndpointState {
     const now = Date.now();
+    
+    if (this.bestEndpointUrl) {
+      const best = this.endpoints.find(ep => ep.url === this.bestEndpointUrl);
+      if (best && best.failureCount === 0) {
+        return best;
+      }
+    }
 
-    for (let i = 0; i < this.endpoints.length; i++) {
-      const idx = (this.currentIndex + i) % this.endpoints.length;
-      const ep = this.endpoints[idx];
+    const sorted = [...this.endpoints].sort((a, b) => {
+      if (a.failureCount !== b.failureCount) {
+        return a.failureCount - b.failureCount;
+      }
+      return a.latencyMs - b.latencyMs;
+    });
 
+    for (const ep of sorted) {
       if (ep.failureCount === 0) {
-        this.currentIndex = idx;
+        this.currentIndex = this.endpoints.indexOf(ep);
         return ep;
       }
 
-      const cooldown = Math.min(ep.failureCount * 5000, 60000);
+      const cooldown = Math.min(ep.failureCount * 10000, 60000);
       if (now - ep.lastFailure > cooldown) {
         ep.failureCount = 0;
-        this.currentIndex = idx;
+        this.currentIndex = this.endpoints.indexOf(ep);
         return ep;
       }
     }
 
-    let best = this.endpoints[0];
-    for (const ep of this.endpoints) {
-      if (ep.failureCount < best.failureCount) {
-        best = ep;
-      }
-    }
-    return best;
+    return sorted[0];
   }
 
   private markFailure(ep: RpcEndpointState): void {
     ep.failureCount++;
     ep.lastFailure = Date.now();
-    console.warn(`[rpc] Endpoint ${ep.url.slice(0, 40)}... failed (count: ${ep.failureCount})`);
+    if (this.bestEndpointUrl === ep.url) {
+      this.bestEndpointUrl = null;
+    }
+    console.warn(`[rpc] ${ep.name} failed (count: ${ep.failureCount})`);
   }
 
-  private markSuccess(ep: RpcEndpointState): void {
+  private markSuccess(ep: RpcEndpointState, latencyMs: number): void {
+    ep.latencyMs = ep.latencyMs * 0.7 + latencyMs * 0.3;
     if (ep.failureCount > 0) {
       ep.failureCount = 0;
-      console.log(`[rpc] Endpoint ${ep.url.slice(0, 40)}... recovered`);
+      console.log(`[rpc] ${ep.name} recovered`);
+    }
+    if (!this.bestEndpointUrl || ep.latencyMs < (this.endpoints.find(e => e.url === this.bestEndpointUrl)?.latencyMs || Infinity)) {
+      this.bestEndpointUrl = ep.url;
     }
   }
 
@@ -112,13 +161,23 @@ class RpcService {
   ): Promise<T> {
     let lastError: Error | null = null;
     let delay = this.options.initialDelayMs;
+    const triedEndpoints = new Set<string>();
 
     for (let attempt = 0; attempt < this.options.maxRetries; attempt++) {
       const ep = this.getNextEndpoint();
+      triedEndpoints.add(ep.url);
+      const startTime = Date.now();
 
       try {
-        const result = await operation(ep.connection);
-        this.markSuccess(ep);
+        const result = await Promise.race([
+          operation(ep.connection),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("Request timeout")), this.options.timeoutMs)
+          ),
+        ]);
+        
+        const latency = Date.now() - startTime;
+        this.markSuccess(ep, latency);
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -137,6 +196,17 @@ class RpcService {
     }
 
     throw lastError || new Error(`${operationName} failed after ${this.options.maxRetries} attempts`);
+  }
+  
+  getHealthStatus(): { endpoints: Array<{ name: string; healthy: boolean; latencyMs: number; failures: number }> } {
+    return {
+      endpoints: this.endpoints.map(ep => ({
+        name: ep.name,
+        healthy: ep.failureCount < 3,
+        latencyMs: Math.round(ep.latencyMs),
+        failures: ep.failureCount,
+      })),
+    };
   }
 
   getConnection(): Connection {

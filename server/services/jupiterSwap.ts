@@ -1,24 +1,25 @@
 import { Connection, PublicKey, Transaction, VersionedTransaction, ComputeBudgetProgram } from "@solana/web3.js";
+import { getRpcService } from "./rpcService";
 
 const JUPITER_API_BASE = "https://lite-api.jup.ag/swap/v1";
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-
-const RPC_URL = process.env.HELIUS_RPC_URL || process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
 
 // Cache for token decimals fetched from chain
 const decimalsCache: Map<string, number> = new Map();
 
 // Fetch token decimals directly from Solana blockchain
 async function getTokenDecimals(mint: string): Promise<number> {
-  // Check cache first
   if (decimalsCache.has(mint)) {
     return decimalsCache.get(mint)!;
   }
   
   try {
-    const connection = new Connection(RPC_URL, "confirmed");
     const mintPubkey = new PublicKey(mint);
-    const mintInfo = await connection.getParsedAccountInfo(mintPubkey);
+    const rpc = getRpcService();
+    const mintInfo = await rpc.execute(
+      (connection) => connection.getParsedAccountInfo(mintPubkey),
+      "getTokenDecimals"
+    );
     
     if (mintInfo.value && 'parsed' in mintInfo.value.data) {
       const decimals = mintInfo.value.data.parsed.info.decimals;
@@ -29,7 +30,7 @@ async function getTokenDecimals(mint: string): Promise<number> {
     console.error(`Failed to fetch decimals for ${mint}:`, error);
   }
   
-  return 9; // Default fallback
+  return 9;
 }
 
 export interface Token {
@@ -444,33 +445,27 @@ export async function sendTransaction(
   skipPreflight: boolean = true,
   lastValidBlockHeight?: number
 ): Promise<SendTransactionResult> {
+  const txBuffer = Buffer.from(signedTransaction, "base64");
+  const rpc = getRpcService();
+  
   try {
-    const connection = new Connection(RPC_URL, "confirmed");
-    const txBuffer = Buffer.from(signedTransaction, "base64");
-    
-    let signature: string;
-    try {
-      signature = await connection.sendRawTransaction(txBuffer, {
-        skipPreflight,
-        maxRetries: 3,
-        preflightCommitment: "confirmed",
-      });
-    } catch (sendError: any) {
-      const errMsg = sendError?.message || String(sendError);
-      if (errMsg.includes("429") || errMsg.includes("Too Many Requests")) {
-        console.error("RPC rate limit hit during send:", errMsg);
-        return { signature: null, success: false, error: "Network is busy. Please try again in a few seconds." };
-      }
-      if (errMsg.includes("insufficient funds") || errMsg.includes("Insufficient") || errMsg.includes("0x1")) {
-        return { signature: null, success: false, error: "Insufficient SOL balance to complete this swap." };
-      }
-      console.error("Failed to send transaction:", sendError);
-      return { signature: null, success: false, error: "Failed to send transaction. Please try again." };
-    }
+    const signature = await rpc.execute(
+      async (connection) => {
+        return connection.sendRawTransaction(txBuffer, {
+          skipPreflight,
+          maxRetries: 2,
+          preflightCommitment: "confirmed",
+        });
+      },
+      "sendTransaction"
+    );
 
     let blockhashInfo;
     try {
-      blockhashInfo = await connection.getLatestBlockhash("confirmed");
+      blockhashInfo = await rpc.execute(
+        (connection) => connection.getLatestBlockhash("confirmed"),
+        "getLatestBlockhash"
+      );
     } catch (bErr: any) {
       console.log("Failed to get blockhash for confirmation, but tx was sent:", signature);
       return { signature, success: true, timedOut: true };
@@ -478,33 +473,44 @@ export async function sendTransaction(
     
     const confirmBlockHeight = lastValidBlockHeight || blockhashInfo.lastValidBlockHeight;
     
-    const confirmPromise = connection.confirmTransaction({
-      signature,
-      blockhash: blockhashInfo.blockhash,
-      lastValidBlockHeight: confirmBlockHeight,
-    }, "confirmed");
+    try {
+      const confirmPromise = rpc.execute(
+        (connection) => connection.confirmTransaction({
+          signature,
+          blockhash: blockhashInfo.blockhash,
+          lastValidBlockHeight: confirmBlockHeight,
+        }, "confirmed"),
+        "confirmTransaction"
+      );
 
-    const timeoutPromise = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 25000));
-    
-    const result = await Promise.race([confirmPromise, timeoutPromise]);
-    
-    if (result === "timeout") {
-      console.log("Transaction confirmation timed out, but tx may still succeed:", signature);
+      const timeoutPromise = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 25000));
+      
+      const result = await Promise.race([confirmPromise, timeoutPromise]);
+      
+      if (result === "timeout") {
+        console.log("Transaction confirmation timed out, but tx may still succeed:", signature);
+        return { signature, success: true, timedOut: true };
+      }
+
+      if (result.value.err) {
+        console.error("Transaction failed on-chain:", result.value.err);
+        return { signature, success: false, error: "Transaction failed on-chain. Check your balance and try again." };
+      }
+
+      return { signature, success: true };
+    } catch (confirmErr: any) {
+      console.log("Confirmation check failed, but tx was sent:", signature);
       return { signature, success: true, timedOut: true };
     }
-
-    if (result.value.err) {
-      console.error("Transaction failed on-chain:", result.value.err);
-      return { signature, success: false, error: "Transaction failed on-chain. Check your balance and try again." };
-    }
-
-    return { signature, success: true };
   } catch (error: any) {
     const errMsg = error?.message || String(error);
     console.error("Failed to send transaction:", error);
     
-    if (errMsg.includes("429") || errMsg.includes("Too Many Requests")) {
+    if (errMsg.includes("429") || errMsg.includes("Too Many Requests") || errMsg.includes("failed after")) {
       return { signature: null, success: false, error: "Network is busy. Please try again in a few seconds." };
+    }
+    if (errMsg.includes("insufficient funds") || errMsg.includes("Insufficient") || errMsg.includes("0x1")) {
+      return { signature: null, success: false, error: "Insufficient SOL balance to complete this swap." };
     }
     
     return { signature: null, success: false, error: "Transaction failed. Please try again." };

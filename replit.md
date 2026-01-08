@@ -93,7 +93,12 @@ The server follows a modular pattern:
   - `server/services/priceHistory.ts` - DexScreener token metadata and price history
   - `client/src/components/SwapModal.tsx` - Swap UI with token selection and trending
 - **Data Source**: DexScreener API (https://api.dexscreener.com) for all token metadata, prices, and trending data
-- **RPC**: Uses HELIUS_RPC_URL or QUICKNODE_RPC_URL env var, falls back to mainnet-beta
+- **RPC Manager**: Automatic fallback across multiple RPC endpoints with health tracking
+  - Prioritized endpoints: HELIUS_RPC_URL, QUICKNODE_RPC_URL (if configured), then public RPCs
+  - Public fallback endpoints: Solana Mainnet, Ankr, Public-RPC.com
+  - Latency-based routing: Prefers fastest healthy endpoint
+  - Automatic retry on timeout/rate-limit with exponential backoff
+  - Health status tracking per endpoint with cooldown periods
 
 ## External Dependencies
 
