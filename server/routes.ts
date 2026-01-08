@@ -775,20 +775,33 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing signed transaction" });
       }
 
-      const signature = await sendTransaction(
+      const result = await sendTransaction(
         signedTransaction,
         skipPreflight !== false,
         lastValidBlockHeight
       );
 
-      if (!signature) {
-        return res.status(400).json({ message: "Failed to send transaction" });
+      if (!result.success && !result.signature) {
+        return res.status(400).json({ message: result.error || "Failed to send transaction" });
+      }
+      
+      if (!result.success && result.signature) {
+        // Transaction was sent but failed on-chain
+        return res.status(400).json({ 
+          message: result.error || "Transaction failed on-chain",
+          signature: result.signature 
+        });
       }
 
-      res.json({ signature, success: true });
+      res.json({ 
+        signature: result.signature, 
+        success: true,
+        timedOut: result.timedOut,
+        message: result.timedOut ? "Transaction sent. Confirmation may take a moment." : undefined
+      });
     } catch (error) {
       console.error("Send transaction error:", error);
-      res.status(500).json({ message: "Failed to send transaction" });
+      res.status(500).json({ message: "Failed to send transaction. Please try again." });
     }
   });
 

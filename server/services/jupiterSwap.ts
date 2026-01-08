@@ -432,22 +432,50 @@ export async function getJupiterSwapTransaction(
   }
 }
 
+export interface SendTransactionResult {
+  signature: string | null;
+  success: boolean;
+  error?: string;
+  timedOut?: boolean;
+}
+
 export async function sendTransaction(
   signedTransaction: string,
   skipPreflight: boolean = true,
   lastValidBlockHeight?: number
-): Promise<string | null> {
+): Promise<SendTransactionResult> {
   try {
     const connection = new Connection(RPC_URL, "confirmed");
     const txBuffer = Buffer.from(signedTransaction, "base64");
     
-    const signature = await connection.sendRawTransaction(txBuffer, {
-      skipPreflight,
-      maxRetries: 3,
-      preflightCommitment: "confirmed",
-    });
+    let signature: string;
+    try {
+      signature = await connection.sendRawTransaction(txBuffer, {
+        skipPreflight,
+        maxRetries: 3,
+        preflightCommitment: "confirmed",
+      });
+    } catch (sendError: any) {
+      const errMsg = sendError?.message || String(sendError);
+      if (errMsg.includes("429") || errMsg.includes("Too Many Requests")) {
+        console.error("RPC rate limit hit during send:", errMsg);
+        return { signature: null, success: false, error: "Network is busy. Please try again in a few seconds." };
+      }
+      if (errMsg.includes("insufficient funds") || errMsg.includes("Insufficient") || errMsg.includes("0x1")) {
+        return { signature: null, success: false, error: "Insufficient SOL balance to complete this swap." };
+      }
+      console.error("Failed to send transaction:", sendError);
+      return { signature: null, success: false, error: "Failed to send transaction. Please try again." };
+    }
 
-    const blockhashInfo = await connection.getLatestBlockhash("confirmed");
+    let blockhashInfo;
+    try {
+      blockhashInfo = await connection.getLatestBlockhash("confirmed");
+    } catch (bErr: any) {
+      console.log("Failed to get blockhash for confirmation, but tx was sent:", signature);
+      return { signature, success: true, timedOut: true };
+    }
+    
     const confirmBlockHeight = lastValidBlockHeight || blockhashInfo.lastValidBlockHeight;
     
     const confirmPromise = connection.confirmTransaction({
@@ -456,18 +484,30 @@ export async function sendTransaction(
       lastValidBlockHeight: confirmBlockHeight,
     }, "confirmed");
 
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
+    const timeoutPromise = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 25000));
     
     const result = await Promise.race([confirmPromise, timeoutPromise]);
     
-    if (result === null) {
+    if (result === "timeout") {
       console.log("Transaction confirmation timed out, but tx may still succeed:", signature);
+      return { signature, success: true, timedOut: true };
     }
 
-    return signature;
-  } catch (error) {
+    if (result.value.err) {
+      console.error("Transaction failed on-chain:", result.value.err);
+      return { signature, success: false, error: "Transaction failed on-chain. Check your balance and try again." };
+    }
+
+    return { signature, success: true };
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
     console.error("Failed to send transaction:", error);
-    return null;
+    
+    if (errMsg.includes("429") || errMsg.includes("Too Many Requests")) {
+      return { signature: null, success: false, error: "Network is busy. Please try again in a few seconds." };
+    }
+    
+    return { signature: null, success: false, error: "Transaction failed. Please try again." };
   }
 }
 
