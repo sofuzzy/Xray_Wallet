@@ -476,22 +476,24 @@ export default function TokenExplorer() {
 
   if (selectedToken) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <AnimatePresence mode="wait">
-          <TokenDetail 
-            token={selectedToken} 
-            onBack={() => setSelectedToken(null)}
-            onAddToWatchlist={addToWatchlist}
-            onSwap={() => setIsSwapOpen(true)}
-          />
-        </AnimatePresence>
-        {isSwapOpen && (
-          <SwapModal 
-            isOpen={isSwapOpen} 
-            onClose={() => setIsSwapOpen(false)} 
-            initialOutputToken={selectedToken} 
-          />
-        )}
+      <div className="min-h-screen bg-background overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-6">
+          <AnimatePresence mode="wait">
+            <TokenDetail 
+              token={selectedToken} 
+              onBack={() => setSelectedToken(null)}
+              onAddToWatchlist={addToWatchlist}
+              onSwap={() => setIsSwapOpen(true)}
+            />
+          </AnimatePresence>
+          {isSwapOpen && (
+            <SwapModal 
+              isOpen={isSwapOpen} 
+              onClose={() => setIsSwapOpen(false)} 
+              initialOutputToken={selectedToken} 
+            />
+          )}
+        </div>
       </div>
     );
   }
