@@ -140,7 +140,10 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
         </button>
 
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold font-display">Send SOL</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold font-display">Send SOL</h2>
+            <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          </div>
 
           {step === "success" ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">

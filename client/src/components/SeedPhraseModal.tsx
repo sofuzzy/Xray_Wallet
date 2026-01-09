@@ -190,7 +190,10 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
         </button>
 
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold font-display">Wallet Settings</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold font-display">Wallet Settings</h2>
+            <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          </div>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security")}>
             <TabsList className="grid w-full grid-cols-3">

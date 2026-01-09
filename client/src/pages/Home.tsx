@@ -297,6 +297,9 @@ export default function Home() {
       <main className="max-w-2xl mx-auto pt-8 space-y-8 relative z-10">
         <div className="px-6">
           <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
+          <div className="flex justify-center mt-3 sm:hidden">
+            <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          </div>
         </div>
 
         <div className="px-6">

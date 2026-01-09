@@ -866,6 +866,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
                 <Zap className="w-3 h-3 mr-1" />
                 Jupiter
               </Badge>
+              <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
             </DialogTitle>
           </DialogHeader>
 

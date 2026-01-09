@@ -102,7 +102,10 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
                 </div>
               )}
               <div>
-                <DialogTitle className="text-lg font-bold">{currentToken.name}</DialogTitle>
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-lg font-bold">{currentToken.name}</DialogTitle>
+                  <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{currentToken.symbol}</span>
                   {!isSolToken && (

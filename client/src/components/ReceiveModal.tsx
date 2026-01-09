@@ -47,7 +47,10 @@ export function ReceiveModal({ isOpen, onClose }: ReceiveModalProps) {
         </button>
 
         <div className="space-y-8 flex flex-col items-center">
-          <h2 className="text-2xl font-bold font-display w-full text-left">Receive SOL</h2>
+          <div className="flex items-center gap-2 w-full">
+            <h2 className="text-2xl font-bold font-display">Receive SOL</h2>
+            <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          </div>
 
           <div className="p-4 bg-white rounded-3xl shadow-xl">
             {address && (
