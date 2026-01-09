@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownLeft, Shuffle, Rocket, Coins } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Shuffle, Rocket } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ActionButtonsProps {
@@ -6,16 +6,14 @@ interface ActionButtonsProps {
   onReceive: () => void;
   onSwap: () => void;
   onLaunch?: () => void;
-  onStake?: () => void;
 }
 
-export function ActionButtons({ onSend, onReceive, onSwap, onLaunch, onStake }: ActionButtonsProps) {
+export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionButtonsProps) {
   const buttons = [
     { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-primary text-primary-foreground", testId: "button-send" },
     { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-muted text-foreground", testId: "button-receive" },
     { label: "Swap", icon: Shuffle, onClick: onSwap, color: "bg-muted text-foreground", testId: "button-swap" },
     { label: "Launch", icon: Rocket, onClick: onLaunch || (() => {}), color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white", testId: "button-launch" },
-    { label: "Stake", icon: Coins, onClick: onStake || (() => {}), color: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white", testId: "button-stake" },
   ];
 
   return (

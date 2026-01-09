@@ -15,7 +15,6 @@ import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
 import { LaunchpadModal } from "@/components/LaunchpadModal";
-import { StakingModal } from "@/components/StakingModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
 import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
@@ -76,7 +75,6 @@ export default function Home() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isSwapOpen, setIsSwapOpen] = useState(false);
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
-  const [isStakeOpen, setIsStakeOpen] = useState(false);
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [showPasskeyOptions, setShowPasskeyOptions] = useState(false);
@@ -326,7 +324,6 @@ export default function Home() {
           onReceive={() => setIsReceiveOpen(true)}
           onSwap={() => setIsSwapOpen(true)}
           onLaunch={() => setIsLaunchOpen(true)}
-          onStake={() => setIsStakeOpen(true)}
         />
 
         <div className="px-6">
@@ -367,7 +364,6 @@ export default function Home() {
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
         {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => { setIsSwapOpen(false); setSelectedToken(null); }} initialOutputToken={selectedToken || undefined} />}
         {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
-        {isStakeOpen && <StakingModal isOpen={isStakeOpen} onClose={() => setIsStakeOpen(false)} />}
         {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
         {selectedToken && !isSwapOpen && (
           <TradingViewModal 
