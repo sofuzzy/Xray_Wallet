@@ -16,6 +16,7 @@ import { RiskShieldModal, type RiskShieldDecision } from "@/components/RiskShiel
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
 import bs58 from "bs58";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
@@ -601,6 +602,16 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     }
     if (!quote) {
       toast({ title: "No Quote", description: "Please wait for a quote", variant: "destructive" });
+      return;
+    }
+    
+    // Check legal acknowledgment before first swap
+    if (!hasAcknowledgedLegal()) {
+      toast({ 
+        title: "Acknowledgment Required", 
+        description: "Please acknowledge the Terms of Service and Risk Disclaimer before swapping.", 
+        variant: "destructive" 
+      });
       return;
     }
     
