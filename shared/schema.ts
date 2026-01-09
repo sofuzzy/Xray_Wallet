@@ -101,12 +101,34 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vaults = pgTable("vaults", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  ciphertext: text("ciphertext").notNull(), // Base64 encoded AES-GCM encrypted data
+  salt: text("salt").notNull(), // Base64 encoded salt for key derivation
+  iv: text("iv").notNull(), // Base64 encoded initialization vector
+  kdfParams: text("kdf_params").notNull(), // JSON with algorithm, iterations, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const vaultAudits = pgTable("vault_audits", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  action: text("action").notNull(), // created, restored, deleted
+  sourceIp: text("source_ip"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });
 export const insertAutoTradeRuleSchema = createInsertSchema(autoTradeRules).omit({ id: true, createdAt: true, triggeredAt: true });
 export const insertWatchlistTokenSchema = createInsertSchema(watchlistTokens).omit({ id: true, createdAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
+export const insertVaultSchema = createInsertSchema(vaults).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVaultAuditSchema = createInsertSchema(vaultAudits).omit({ id: true, createdAt: true });
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
@@ -120,3 +142,7 @@ export type WatchlistToken = typeof watchlistTokens.$inferSelect;
 export type InsertWatchlistToken = z.infer<typeof insertWatchlistTokenSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type Vault = typeof vaults.$inferSelect;
+export type InsertVault = z.infer<typeof insertVaultSchema>;
+export type VaultAudit = typeof vaultAudits.$inferSelect;
+export type InsertVaultAudit = z.infer<typeof insertVaultAuditSchema>;

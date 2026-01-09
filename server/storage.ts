@@ -8,6 +8,8 @@ import {
   webauthnCredentials,
   watchlistTokens,
   activityLogs,
+  vaults,
+  vaultAudits,
   type User,
   type Wallet,
   type InsertWallet,
@@ -21,6 +23,10 @@ import {
   type InsertWatchlistToken,
   type ActivityLog,
   type InsertActivityLog,
+  type Vault,
+  type InsertVault,
+  type VaultAudit,
+  type InsertVaultAudit,
 } from "@shared/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 
@@ -67,6 +73,13 @@ export interface IStorage {
 
   getActivityLogs(userId: string | null, walletAddress?: string): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+
+  getVault(userId: string): Promise<Vault | undefined>;
+  createVault(vault: InsertVault): Promise<Vault>;
+  updateVault(userId: string, vault: Partial<InsertVault>): Promise<Vault | undefined>;
+  deleteVault(userId: string): Promise<boolean>;
+  createVaultAudit(audit: InsertVaultAudit): Promise<VaultAudit>;
+  getVaultAudits(userId: string): Promise<VaultAudit[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -242,6 +255,44 @@ export class DatabaseStorage implements IStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const [created] = await db.insert(activityLogs).values(log).returning();
     return created;
+  }
+
+  async getVault(userId: string): Promise<Vault | undefined> {
+    const [vault] = await db.select().from(vaults).where(eq(vaults.userId, userId));
+    return vault;
+  }
+
+  async createVault(vault: InsertVault): Promise<Vault> {
+    const [created] = await db.insert(vaults).values(vault).returning();
+    return created;
+  }
+
+  async updateVault(userId: string, updates: Partial<InsertVault>): Promise<Vault | undefined> {
+    const [updated] = await db
+      .update(vaults)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vaults.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  async deleteVault(userId: string): Promise<boolean> {
+    await db.delete(vaults).where(eq(vaults.userId, userId));
+    return true;
+  }
+
+  async createVaultAudit(audit: InsertVaultAudit): Promise<VaultAudit> {
+    const [created] = await db.insert(vaultAudits).values(audit).returning();
+    return created;
+  }
+
+  async getVaultAudits(userId: string): Promise<VaultAudit[]> {
+    return await db
+      .select()
+      .from(vaultAudits)
+      .where(eq(vaultAudits.userId, userId))
+      .orderBy(desc(vaultAudits.createdAt))
+      .limit(50);
   }
 }
 

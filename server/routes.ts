@@ -672,6 +672,159 @@ export async function registerRoutes(
     }
   });
 
+  // Vault endpoints - encrypted key backup system
+  // GET /api/vault - Retrieve encrypted vault data for the authenticated user
+  app.get("/api/vault", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const vault = await storage.getVault(userId);
+      if (!vault) {
+        return res.status(404).json({ error: "VAULT_NOT_FOUND", message: "No vault found for this user" });
+      }
+
+      // Return vault data (ciphertext, salt, iv, kdfParams) - never the decryption key
+      res.json({
+        ciphertext: vault.ciphertext,
+        salt: vault.salt,
+        iv: vault.iv,
+        kdfParams: vault.kdfParams,
+        createdAt: vault.createdAt,
+        updatedAt: vault.updatedAt,
+      });
+    } catch (error) {
+      console.error("Failed to fetch vault:", error);
+      res.status(500).json({ error: "VAULT_FETCH_FAILED", message: "Failed to fetch vault" });
+    }
+  });
+
+  // PUT /api/vault - Create or update encrypted vault data
+  app.put("/api/vault", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const vaultSchema = z.object({
+        ciphertext: z.string().min(1),
+        salt: z.string().min(1),
+        iv: z.string().min(1),
+        kdfParams: z.string().min(1), // JSON string with algorithm, iterations, etc.
+      });
+
+      const parsed = vaultSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "INVALID_VAULT_DATA", message: "Invalid vault data format" });
+      }
+
+      const { ciphertext, salt, iv, kdfParams } = parsed.data;
+
+      // Check if vault exists
+      const existingVault = await storage.getVault(userId);
+      
+      let vault;
+      let action: "created" | "restored";
+      
+      if (existingVault) {
+        // Update existing vault
+        vault = await storage.updateVault(userId, { ciphertext, salt, iv, kdfParams });
+        action = "restored"; // Consider update as re-backup
+      } else {
+        // Create new vault
+        vault = await storage.createVault({ userId, ciphertext, salt, iv, kdfParams });
+        action = "created";
+      }
+
+      // Audit log - never log ciphertext or any sensitive data
+      await storage.createVaultAudit({
+        userId,
+        action,
+        sourceIp: req.clientInfo?.ip || null,
+        userAgent: req.clientInfo?.userAgent || null,
+      });
+
+      res.json({
+        success: true,
+        message: action === "created" ? "Vault created successfully" : "Vault updated successfully",
+        createdAt: vault?.createdAt,
+        updatedAt: vault?.updatedAt,
+      });
+    } catch (error) {
+      console.error("Failed to save vault:", error);
+      res.status(500).json({ error: "VAULT_SAVE_FAILED", message: "Failed to save vault" });
+    }
+  });
+
+  // DELETE /api/vault - Delete vault data
+  app.delete("/api/vault", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const existingVault = await storage.getVault(userId);
+      if (!existingVault) {
+        return res.status(404).json({ error: "VAULT_NOT_FOUND", message: "No vault found to delete" });
+      }
+
+      await storage.deleteVault(userId);
+
+      // Audit log
+      await storage.createVaultAudit({
+        userId,
+        action: "deleted",
+        sourceIp: req.clientInfo?.ip || null,
+        userAgent: req.clientInfo?.userAgent || null,
+      });
+
+      res.json({ success: true, message: "Vault deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete vault:", error);
+      res.status(500).json({ error: "VAULT_DELETE_FAILED", message: "Failed to delete vault" });
+    }
+  });
+
+  // GET /api/vault/status - Check if user has a vault (without fetching data)
+  app.get("/api/vault/status", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const vault = await storage.getVault(userId);
+      res.json({
+        hasVault: !!vault,
+        createdAt: vault?.createdAt || null,
+        updatedAt: vault?.updatedAt || null,
+      });
+    } catch (error) {
+      console.error("Failed to check vault status:", error);
+      res.status(500).json({ error: "VAULT_STATUS_FAILED", message: "Failed to check vault status" });
+    }
+  });
+
+  // GET /api/vault/audits - Get vault activity history
+  app.get("/api/vault/audits", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const audits = await storage.getVaultAudits(userId);
+      res.json(audits);
+    } catch (error) {
+      console.error("Failed to fetch vault audits:", error);
+      res.status(500).json({ error: "VAULT_AUDITS_FAILED", message: "Failed to fetch vault audits" });
+    }
+  });
+
   // Jupiter Quote (supports direct DEX routing via 'dex' param: auto, orca, raydium)
   app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
     try {

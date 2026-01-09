@@ -137,21 +137,39 @@ export default function Terms() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">8. Service Modifications</h2>
+            <h2 className="text-xl font-mono font-semibold">8. Encrypted Cloud Backup</h2>
+            <div className="space-y-2 text-muted-foreground">
+              <p>Xray offers an optional <strong className="text-foreground">encrypted cloud backup</strong> feature. By using this feature, you acknowledge:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Your wallet data is encrypted <strong className="text-foreground">entirely on your device</strong> using AES-256-GCM encryption</li>
+                <li>The encryption key is derived from your passphrase using PBKDF2 - <strong className="text-foreground">we never see your passphrase</strong></li>
+                <li>We store only the encrypted ciphertext, salt, and KDF parameters - never plaintext keys</li>
+                <li><strong className="text-destructive">If you lose your passphrase, we cannot recover your backup</strong></li>
+                <li>You are solely responsible for remembering your passphrase</li>
+                <li>Deleting your backup permanently removes the encrypted data from our servers</li>
+              </ul>
+              <p className="pt-2">
+                <strong className="text-foreground">Important:</strong> The cloud backup is designed for convenience in restoring your wallet across devices. It does not replace the need to securely store your seed phrase offline.
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-mono font-semibold">9. Service Modifications</h2>
             <p className="text-muted-foreground">
               We reserve the right to modify, suspend, or discontinue the Service at any time without prior notice. We are not liable for any modification, suspension, or discontinuation of the Service.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">9. Governing Law</h2>
+            <h2 className="text-xl font-mono font-semibold">10. Governing Law</h2>
             <p className="text-muted-foreground">
               These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which Xray operates, without regard to conflict of law principles. Any disputes arising from these Terms or your use of the Service shall be resolved in the appropriate courts of that jurisdiction.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">10. Contact</h2>
+            <h2 className="text-xl font-mono font-semibold">11. Contact</h2>
             <p className="text-muted-foreground">
               If you have questions about these Terms, please contact us through the appropriate channels provided within the Service.
             </p>

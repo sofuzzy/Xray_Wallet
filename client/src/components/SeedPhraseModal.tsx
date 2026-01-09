@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
-import { validateMnemonic } from "@/lib/solana";
+import { useVault } from "@/hooks/use-vault";
+import { validateMnemonic, getStoredWallets } from "@/lib/solana";
+import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SeedPhraseModalProps {
@@ -48,7 +51,8 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const { toast } = useToast();
   const biometric = useBiometric();
   const riskShield = useRiskShieldSettings();
-  const [tab, setTab] = useState<"backup" | "restore" | "security">("backup");
+  const vault = useVault();
+  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
@@ -58,6 +62,11 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
+  const [cloudPassphrase, setCloudPassphrase] = useState("");
+  const [cloudPassphraseConfirm, setCloudPassphraseConfirm] = useState("");
+  const [showCloudPassphrase, setShowCloudPassphrase] = useState(false);
+  const [cloudMode, setCloudMode] = useState<"backup" | "restore">("backup");
+  const [confirmDeleteVault, setConfirmDeleteVault] = useState(false);
 
   const seedPhrase = getSeedPhrase();
   const words = seedPhrase?.split(" ") || [];
@@ -195,19 +204,23 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security")}>
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud")}>
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="backup" data-testid="tab-backup">
-                <Download className="w-4 h-4 mr-2" />
-                Export
+                <Download className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Export</span>
               </TabsTrigger>
               <TabsTrigger value="restore" data-testid="tab-restore">
-                <Upload className="w-4 h-4 mr-2" />
-                Import
+                <Upload className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Import</span>
+              </TabsTrigger>
+              <TabsTrigger value="cloud" data-testid="tab-cloud">
+                <Cloud className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Cloud</span>
               </TabsTrigger>
               <TabsTrigger value="security" data-testid="tab-security">
-                <Shield className="w-4 h-4 mr-2" />
-                Security
+                <Shield className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
             </TabsList>
 
@@ -408,6 +421,238 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   </p>
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="cloud" className="space-y-4 mt-4">
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex gap-3">
+                <Cloud className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                <div className="text-sm text-foreground/80">
+                  <p className="font-medium text-foreground">Encrypted Cloud Backup</p>
+                  <p className="mt-1">Back up your wallet to the cloud with end-to-end encryption. Only you can decrypt it with your passphrase.</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive/80">
+                  <p className="font-bold text-destructive">Warning: If you lose your passphrase, your wallet CANNOT be recovered.</p>
+                  <p className="mt-1">We do not store your passphrase and cannot help you recover it.</p>
+                </div>
+              </div>
+
+              {vault.hasVault && (
+                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3">
+                  <Check className="w-5 h-5 text-green-500" />
+                  <div className="text-sm">
+                    <span className="text-green-200 font-medium">Cloud backup exists</span>
+                    {vault.vaultUpdatedAt && (
+                      <span className="text-muted-foreground ml-2">
+                        Last updated: {new Date(vault.vaultUpdatedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant={cloudMode === "backup" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setCloudMode("backup")}
+                  data-testid="button-cloud-backup-tab"
+                >
+                  <CloudUpload className="w-4 h-4 mr-2" />
+                  Backup
+                </Button>
+                <Button
+                  variant={cloudMode === "restore" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setCloudMode("restore")}
+                  disabled={!vault.hasVault}
+                  data-testid="button-cloud-restore-tab"
+                >
+                  <CloudDownload className="w-4 h-4 mr-2" />
+                  Restore
+                </Button>
+              </div>
+
+              {cloudMode === "backup" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Create Encryption Passphrase</label>
+                    <div className="relative">
+                      <Input
+                        type={showCloudPassphrase ? "text" : "password"}
+                        placeholder="Enter a strong passphrase"
+                        value={cloudPassphrase}
+                        onChange={(e) => setCloudPassphrase(e.target.value)}
+                        className="pr-10"
+                        data-testid="input-cloud-passphrase"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCloudPassphrase(!showCloudPassphrase)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showCloudPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {cloudPassphrase && (
+                      <div className="flex items-center gap-2">
+                        <div className={`h-2 flex-1 rounded-full ${
+                          getPassphraseStrength(cloudPassphrase) === "strong" ? "bg-green-500" :
+                          getPassphraseStrength(cloudPassphrase) === "medium" ? "bg-amber-500" : "bg-destructive"
+                        }`} />
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {getPassphraseStrength(cloudPassphrase)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Confirm Passphrase</label>
+                    <Input
+                      type={showCloudPassphrase ? "text" : "password"}
+                      placeholder="Confirm your passphrase"
+                      value={cloudPassphraseConfirm}
+                      onChange={(e) => setCloudPassphraseConfirm(e.target.value)}
+                      data-testid="input-cloud-passphrase-confirm"
+                    />
+                    {cloudPassphraseConfirm && cloudPassphrase !== cloudPassphraseConfirm && (
+                      <p className="text-xs text-destructive">Passphrases do not match</p>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={async () => {
+                      const validation = validatePassphrase(cloudPassphrase);
+                      if (!validation.valid) {
+                        toast({ title: "Invalid Passphrase", description: validation.message, variant: "destructive" });
+                        return;
+                      }
+                      if (cloudPassphrase !== cloudPassphraseConfirm) {
+                        toast({ title: "Passphrase Mismatch", description: "Passphrases do not match", variant: "destructive" });
+                        return;
+                      }
+                      const wallets = getStoredWallets();
+                      const walletData = JSON.stringify(wallets);
+                      await vault.backup({ walletData, passphrase: cloudPassphrase });
+                      setCloudPassphrase("");
+                      setCloudPassphraseConfirm("");
+                    }}
+                    disabled={vault.isBackingUp || !cloudPassphrase || cloudPassphrase !== cloudPassphraseConfirm}
+                    className="w-full"
+                    data-testid="button-cloud-backup"
+                  >
+                    {vault.isBackingUp ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Encrypting & Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        {vault.hasVault ? "Update Cloud Backup" : "Create Cloud Backup"}
+                      </>
+                    )}
+                  </Button>
+
+                  {vault.hasVault && (
+                    <div className="border-t border-border pt-4 mt-4">
+                      <Button
+                        variant="destructive"
+                        onClick={async () => {
+                          if (!confirmDeleteVault) {
+                            setConfirmDeleteVault(true);
+                            setTimeout(() => setConfirmDeleteVault(false), 3000);
+                            return;
+                          }
+                          await vault.deleteVault();
+                          setConfirmDeleteVault(false);
+                        }}
+                        disabled={vault.isDeleting}
+                        className="w-full"
+                        data-testid="button-delete-vault"
+                      >
+                        {vault.isDeleting ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : confirmDeleteVault ? (
+                          "Click again to confirm deletion"
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Cloud Backup
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {cloudMode === "restore" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Enter Your Passphrase</label>
+                    <div className="relative">
+                      <Input
+                        type={showCloudPassphrase ? "text" : "password"}
+                        placeholder="Enter your backup passphrase"
+                        value={cloudPassphrase}
+                        onChange={(e) => setCloudPassphrase(e.target.value)}
+                        className="pr-10"
+                        data-testid="input-cloud-restore-passphrase"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCloudPassphrase(!showCloudPassphrase)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showCloudPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const decryptedData = await vault.restore({ passphrase: cloudPassphrase });
+                        const wallets = JSON.parse(decryptedData);
+                        if (Array.isArray(wallets) && wallets.length > 0) {
+                          localStorage.setItem("xray_wallets", decryptedData);
+                          toast({ title: "Restore Successful", description: "Reloading to apply changes..." });
+                          setTimeout(() => window.location.reload(), 500);
+                        } else {
+                          toast({ title: "Invalid Data", description: "Backup data is corrupted", variant: "destructive" });
+                        }
+                      } catch (error: any) {
+                        console.error("Restore failed:", error);
+                      }
+                      setCloudPassphrase("");
+                    }}
+                    disabled={vault.isRestoring || !cloudPassphrase}
+                    className="w-full"
+                    data-testid="button-cloud-restore"
+                  >
+                    {vault.isRestoring ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Decrypting...
+                      </>
+                    ) : (
+                      <>
+                        <CloudDownload className="w-4 h-4 mr-2" />
+                        Restore Wallet from Cloud
+                      </>
+                    )}
+                  </Button>
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    This will replace your current wallet with the backed-up version.
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="security" className="space-y-4 mt-4">

@@ -114,9 +114,39 @@ export default function Privacy() {
           </section>
 
           <section className="space-y-3">
+            <h2 className="text-xl font-mono font-semibold">5. Encrypted Cloud Backup</h2>
+            <div className="space-y-4 text-muted-foreground">
+              <p>If you choose to use our optional encrypted cloud backup feature:</p>
+              
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">What We Store</h3>
+                <ul className="list-disc pl-6 space-y-1">
+                  <li><strong className="text-foreground">Encrypted data only:</strong> Your wallet is encrypted client-side using AES-256-GCM before transmission</li>
+                  <li><strong className="text-foreground">Encryption metadata:</strong> Salt and KDF parameters needed for decryption (but not your passphrase)</li>
+                  <li><strong className="text-foreground">Audit logs:</strong> Timestamps and action types (backup created, restored, deleted) for security monitoring</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">What We Never Store</h3>
+                <ul className="list-disc pl-6 space-y-1">
+                  <li>Your passphrase</li>
+                  <li>Unencrypted wallet data</li>
+                  <li>Private keys or seed phrases in any form we can read</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">Zero-Knowledge Design</h3>
+                <p>Encryption happens entirely in your browser. We receive only encrypted ciphertext that we cannot decrypt. If you forget your passphrase, we cannot recover your backup.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
             <h2 className="text-xl font-mono font-semibold flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-primary" />
-              5. Your Rights
+              6. Your Rights
             </h2>
             <div className="space-y-2 text-muted-foreground">
               <p>You have the right to:</p>
@@ -133,7 +163,7 @@ export default function Privacy() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">6. Cookies and Tracking</h2>
+            <h2 className="text-xl font-mono font-semibold">7. Cookies and Tracking</h2>
             <div className="space-y-2 text-muted-foreground">
               <p>We use minimal cookies necessary for:</p>
               <ul className="list-disc pl-6 space-y-1">
@@ -145,7 +175,7 @@ export default function Privacy() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">7. Security</h2>
+            <h2 className="text-xl font-mono font-semibold">8. Security</h2>
             <div className="space-y-2 text-muted-foreground">
               <p>We implement security measures including:</p>
               <ul className="list-disc pl-6 space-y-1">
@@ -158,21 +188,21 @@ export default function Privacy() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">8. Children's Privacy</h2>
+            <h2 className="text-xl font-mono font-semibold">9. Children's Privacy</h2>
             <p className="text-muted-foreground">
               Xray is not intended for users under 18 years of age. We do not knowingly collect information from children.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">9. Changes to This Policy</h2>
+            <h2 className="text-xl font-mono font-semibold">10. Changes to This Policy</h2>
             <p className="text-muted-foreground">
               We may update this Privacy Policy from time to time. Significant changes will be communicated through the Service. Continued use after changes constitutes acceptance of the updated policy.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-mono font-semibold">10. Contact</h2>
+            <h2 className="text-xl font-mono font-semibold">11. Contact</h2>
             <p className="text-muted-foreground">
               For privacy-related questions or to exercise your data rights, please contact us through the appropriate channels provided within the Service.
             </p>
