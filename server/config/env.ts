@@ -20,16 +20,21 @@ function parseCommaSeparated(value: string | undefined): string[] {
 function buildSolanaRpcs(): string[] {
   const rpcs: string[] = [];
 
-  if (process.env.SOLANA_RPCS) {
-    rpcs.push(...parseCommaSeparated(process.env.SOLANA_RPCS));
-  }
-
+  // Helius is the preferred primary RPC
   if (process.env.HELIUS_RPC_URL) {
     rpcs.push(process.env.HELIUS_RPC_URL);
   }
+  
+  // Then QuickNode as secondary premium option
   if (process.env.QUICKNODE_RPC_URL) {
     rpcs.push(process.env.QUICKNODE_RPC_URL);
   }
+  
+  // Then any custom RPCs
+  if (process.env.SOLANA_RPCS) {
+    rpcs.push(...parseCommaSeparated(process.env.SOLANA_RPCS));
+  }
+  
   if (process.env.SOLANA_RPC_URL) {
     rpcs.push(process.env.SOLANA_RPC_URL);
   }
