@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useWallet } from "@/hooks/use-wallet";
 import { usePasskey } from "@/hooks/use-passkey";
 import { useUpdateUser, useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
+import { type ActivityLog } from "@shared/schema";
 import { WalletCard } from "@/components/WalletCard";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -55,6 +57,17 @@ export default function Home() {
   const { mutate: updateUser } = useUpdateUser();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
+  const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
+    queryKey: ["/api/activity-logs", address],
+    queryFn: async () => {
+      const params = address ? `?walletAddress=${address}` : "";
+      const response = await fetch(`/api/activity-logs${params}`, { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: isAuthenticated || !!address,
+    staleTime: 30000,
+  });
   const { toast } = useToast();
   const { register: registerPasskey, login: loginPasskey, isLoading: passkeyLoading, isSupported: passkeySupported, getStoredUserId } = usePasskey();
 
@@ -325,7 +338,8 @@ export default function Home() {
         <TransactionList 
           transactions={transactions || []} 
           currentAddress={address} 
-          isLoading={txLoading} 
+          isLoading={txLoading}
+          activityLogs={activityLogs}
         />
       </main>
 

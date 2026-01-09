@@ -223,6 +223,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   const [dexOption, setDexOption] = useState<DexOption>("auto");
   const [riskModalOpen, setRiskModalOpen] = useState(false);
   const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
   const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
   
@@ -415,6 +416,44 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     return JSON.stringify(riskShieldSettings.checks);
   }, [riskShieldSettings.enabled, riskShieldSettings.checks]);
 
+  interface BalanceValidation {
+    valid: boolean;
+    reason: string;
+    code: string;
+    solBalance: number;
+    solStatus: string;
+    tokenBalances: { mint: string; balance: number; decimals: number }[];
+  }
+
+  const { data: balanceValidation, isLoading: balanceLoading } = useQuery<BalanceValidation | null>({
+    queryKey: ["/api/swaps/validate-balance", address, inputMint, debouncedInputAmount],
+    queryFn: async () => {
+      if (!address || !debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return null;
+      
+      const params = new URLSearchParams({
+        walletAddress: address,
+        inputMint: inputMint === "SOL" ? "So11111111111111111111111111111111111111112" : inputMint,
+        amount: debouncedInputAmount,
+      });
+      
+      const response = await fetch(`/api/swaps/validate-balance?${params}`, { credentials: "include" });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: isOpen && !!address && !!debouncedInputAmount && parseFloat(debouncedInputAmount) > 0,
+    staleTime: 5000,
+  });
+
+  useEffect(() => {
+    if (balanceValidation && !balanceValidation.valid) {
+      setBalanceError(balanceValidation.reason);
+    } else {
+      setBalanceError(null);
+    }
+  }, [balanceValidation]);
+
+  const isBalanceInsufficient = balanceValidation && !balanceValidation.valid;
+
   const { data: quote, isLoading: quoteLoading, error: quoteError, refetch: refetchQuote } = useQuery({
     queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey],
     queryFn: async () => {
@@ -602,6 +641,15 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     }
     if (!quote) {
       toast({ title: "No Quote", description: "Please wait for a quote", variant: "destructive" });
+      return;
+    }
+    
+    if (isBalanceInsufficient) {
+      toast({ 
+        title: "Insufficient Balance", 
+        description: balanceError || "You don't have enough funds for this swap.", 
+        variant: "destructive" 
+      });
       return;
     }
     
@@ -953,6 +1001,15 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
             </Alert>
           )}
 
+          {isBalanceInsufficient && balanceError && (
+            <Alert className="border-destructive/50 bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive text-xs">
+                {balanceError}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Slippage Tolerance</label>
@@ -1174,7 +1231,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
 
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || isBalanceInsufficient}
             className="w-full"
             data-testid="button-execute-swap"
           >
@@ -1182,6 +1239,11 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Swapping...
+              </>
+            ) : isBalanceInsufficient ? (
+              <>
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Insufficient Balance
               </>
             ) : blockedReason ? (
               <>

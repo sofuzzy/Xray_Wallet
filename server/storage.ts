@@ -65,7 +65,7 @@ export interface IStorage {
   removeWatchlistToken(id: number, userId: string): Promise<boolean>;
   getWatchlistTokenByMint(userId: string, tokenMint: string): Promise<WatchlistToken | undefined>;
 
-  getActivityLogs(userId: string, walletAddress?: string): Promise<ActivityLog[]>;
+  getActivityLogs(userId: string | null, walletAddress?: string): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 }
 
@@ -221,19 +221,20 @@ export class DatabaseStorage implements IStorage {
     return token;
   }
 
-  async getActivityLogs(userId: string, walletAddress?: string): Promise<ActivityLog[]> {
-    if (walletAddress) {
-      return await db
-        .select()
-        .from(activityLogs)
-        .where(or(eq(activityLogs.userId, userId), eq(activityLogs.walletAddress, walletAddress)))
-        .orderBy(desc(activityLogs.createdAt))
-        .limit(50);
+  async getActivityLogs(userId: string | null, walletAddress?: string): Promise<ActivityLog[]> {
+    // Build conditions based on available parameters
+    const conditions = [];
+    if (userId) conditions.push(eq(activityLogs.userId, userId));
+    if (walletAddress) conditions.push(eq(activityLogs.walletAddress, walletAddress));
+    
+    if (conditions.length === 0) {
+      return [];
     }
+    
     return await db
       .select()
       .from(activityLogs)
-      .where(eq(activityLogs.userId, userId))
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
       .orderBy(desc(activityLogs.createdAt))
       .limit(50);
   }

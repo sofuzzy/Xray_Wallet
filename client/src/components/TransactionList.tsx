@@ -1,6 +1,6 @@
-import { Transaction } from "@shared/schema";
+import { Transaction, ActivityLog } from "@shared/schema";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import { formatDistanceToNow } from "date-fns";
 
@@ -8,9 +8,21 @@ interface TransactionListProps {
   transactions: Transaction[];
   currentAddress?: string;
   isLoading: boolean;
+  activityLogs?: ActivityLog[];
 }
 
-export function TransactionList({ transactions, currentAddress, isLoading }: TransactionListProps) {
+function getBlockReasonText(code: string): string {
+  const reasons: Record<string, string> = {
+    BALANCE_UNAVAILABLE: "Balance check failed",
+    BALANCE_INSUFFICIENT: "Insufficient balance",
+    BALANCE_FETCH_FAILED: "Could not check balance",
+    BALANCE_ZERO: "Zero balance",
+    BALANCE_INSUFFICIENT_FEES: "Insufficient SOL for fees",
+  };
+  return reasons[code] || code;
+}
+
+export function TransactionList({ transactions, currentAddress, isLoading, activityLogs = [] }: TransactionListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4 px-4">
@@ -21,7 +33,9 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
     );
   }
 
-  if (transactions.length === 0) {
+  const hasNoActivity = transactions.length === 0 && activityLogs.length === 0;
+
+  if (hasNoActivity) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Clock className="w-12 h-12 mb-4 opacity-20" />
@@ -34,9 +48,53 @@ export function TransactionList({ transactions, currentAddress, isLoading }: Tra
     return `https://solscan.io/tx/${signature}`;
   };
 
+  const swapBlockLogs = activityLogs.filter(log => log.action === "swap_blocked");
+
   return (
     <div className="space-y-3 px-4 pb-20">
       <h3 className="text-lg font-bold mb-4 ml-1">Recent Activity</h3>
+      
+      {swapBlockLogs.length > 0 && (
+        <div className="space-y-2 mb-4">
+          <p className="text-xs text-muted-foreground ml-1">Blocked Swaps</p>
+          {swapBlockLogs.slice(0, 5).map((log, idx) => (
+            <motion.div
+              key={log.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className="flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20"
+              data-testid={`activity-log-${log.id}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive/20 text-destructive">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                    <AlertCircle className="w-3 h-3" />
+                    Swap Blocked
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {log.createdAt ? formatDistanceToNow(new Date(log.createdAt), { addSuffix: true }) : 'Just now'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-destructive font-medium">
+                  {getBlockReasonText(log.reason)}
+                </p>
+                {log.requestedAmount && (
+                  <p className="text-xs text-muted-foreground">
+                    {parseFloat(log.requestedAmount).toFixed(4)} requested
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       {transactions.map((tx, idx) => {
         const isReceived = tx.toAddr === currentAddress;
         const isSwap = tx.type === "swap";

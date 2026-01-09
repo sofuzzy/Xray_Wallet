@@ -653,13 +653,18 @@ export async function registerRoutes(
     }
   });
 
-  // Activity logs endpoint
+  // Activity logs endpoint - supports both authenticated users and wallet-based queries
   app.get("/api/activity-logs", hybridAuth, async (req, res) => {
     try {
-      const userId = req.tokenUser!.sub;
+      const userId = req.tokenUser?.sub;
       const { walletAddress } = req.query;
       
-      const logs = await storage.getActivityLogs(userId, walletAddress as string | undefined);
+      // Allow wallet-based queries even without full authentication
+      if (!userId && !walletAddress) {
+        return res.json([]);
+      }
+      
+      const logs = await storage.getActivityLogs(userId || null, walletAddress as string | undefined);
       res.json(logs);
     } catch (error) {
       console.error("Failed to fetch activity logs:", error);
