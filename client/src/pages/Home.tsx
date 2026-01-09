@@ -23,6 +23,7 @@ import { TradingViewModal } from "@/components/TradingViewModal";
 import { Watchlist } from "@/components/Watchlist";
 import { Footer } from "@/components/Footer";
 import { LegalAcknowledgmentModal, hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
+import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDisclaimerModal";
 import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -80,7 +81,8 @@ export default function Home() {
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [showPasskeyOptions, setShowPasskeyOptions] = useState(false);
   const [isInIframe] = useState(() => window.top !== window.self);
-  const [showLegalModal, setShowLegalModal] = useState(() => !hasAcknowledgedLegal());
+  const [showBetaModal, setShowBetaModal] = useState(() => !hasBetaAcknowledged());
+  const [showLegalModal, setShowLegalModal] = useState(() => hasBetaAcknowledged() && !hasAcknowledgedLegal());
 
   const passkeyUserId = getStoredUserId();
   const isPasskeyAuth = !!passkeyUserId;
@@ -345,8 +347,18 @@ export default function Home() {
 
       <Footer />
 
+      <BetaDisclaimerModal 
+        open={showBetaModal} 
+        onAccept={() => {
+          setShowBetaModal(false);
+          if (!hasAcknowledgedLegal()) {
+            setShowLegalModal(true);
+          }
+        }} 
+      />
+
       <LegalAcknowledgmentModal 
-        open={showLegalModal} 
+        open={showLegalModal && !showBetaModal} 
         onAcknowledge={() => setShowLegalModal(false)} 
       />
 

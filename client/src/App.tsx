@@ -9,6 +9,7 @@ import TokenExplorer from "@/pages/TokenExplorer";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import Disclaimer from "@/pages/Disclaimer";
+import BetaExit from "@/pages/BetaExit";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/disclaimer" component={Disclaimer} />
+      <Route path="/beta-exit" component={BetaExit} />
       <Route component={NotFound} />
     </Switch>
   );
