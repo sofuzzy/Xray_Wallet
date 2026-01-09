@@ -43,3 +43,7 @@ integrations = ["javascript_log_in_with_replit:2.0.0", "stripe:2.0.0", "javascri
 
 [objectStorage]
 defaultBucketID = "replit-objstore-fe49758f-4fee-41b6-acb5-24c9ea096343"
+
+[userenv]
+
+[userenv.shared]
