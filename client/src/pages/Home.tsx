@@ -253,9 +253,9 @@ export default function Home() {
     <div className="min-h-screen bg-background pb-10 relative overflow-hidden crt-overlay">
       <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
 
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-6 py-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-mono font-bold text-primary glow-text">&gt;_XRAY</h1>
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <h1 className="text-lg sm:text-xl font-mono font-bold text-primary glow-text whitespace-nowrap">&gt;_XRAY</h1>
           <WalletSwitcher
             wallets={wallets}
             activeWallet={activeWallet}
@@ -264,32 +264,32 @@ export default function Home() {
             onRemove={removeWallet}
             onRename={editWalletName}
           />
-          <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
+        <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+          <div className="text-right hidden md:block">
             <p className="text-sm font-medium text-foreground">{user?.firstName || "User"}</p>
             <p className="text-xs text-muted-foreground">@{user?.email?.split("@")[0] || "user"}</p>
           </div>
           {user?.profileImageUrl && (
-            <img src={user.profileImageUrl} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-border" />
+            <img src={user.profileImageUrl} alt="Profile" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-border hidden sm:block" />
           )}
           <ThemeToggle />
-          <Link href="/explore" className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
-            <Compass className="w-5 h-5" />
+          <Link href="/explore" className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
+            <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
           </Link>
           <button 
             onClick={() => setIsSeedPhraseOpen(true)}
-            className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             data-testid="button-settings"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button 
             onClick={() => logout()}
-            className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </header>
