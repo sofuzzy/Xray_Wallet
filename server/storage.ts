@@ -7,6 +7,7 @@ import {
   autoTradeRules,
   webauthnCredentials,
   watchlistTokens,
+  activityLogs,
   type User,
   type Wallet,
   type InsertWallet,
@@ -18,8 +19,10 @@ import {
   type InsertAutoTradeRule,
   type WatchlistToken,
   type InsertWatchlistToken,
+  type ActivityLog,
+  type InsertActivityLog,
 } from "@shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or } from "drizzle-orm";
 
 export interface WebAuthnCredential {
   id: number;
@@ -61,6 +64,9 @@ export interface IStorage {
   addWatchlistToken(token: InsertWatchlistToken): Promise<WatchlistToken>;
   removeWatchlistToken(id: number, userId: string): Promise<boolean>;
   getWatchlistTokenByMint(userId: string, tokenMint: string): Promise<WatchlistToken | undefined>;
+
+  getActivityLogs(userId: string, walletAddress?: string): Promise<ActivityLog[]>;
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -213,6 +219,28 @@ export class DatabaseStorage implements IStorage {
       .from(watchlistTokens)
       .where(and(eq(watchlistTokens.userId, userId), eq(watchlistTokens.tokenMint, tokenMint)));
     return token;
+  }
+
+  async getActivityLogs(userId: string, walletAddress?: string): Promise<ActivityLog[]> {
+    if (walletAddress) {
+      return await db
+        .select()
+        .from(activityLogs)
+        .where(or(eq(activityLogs.userId, userId), eq(activityLogs.walletAddress, walletAddress)))
+        .orderBy(desc(activityLogs.createdAt))
+        .limit(50);
+    }
+    return await db
+      .select()
+      .from(activityLogs)
+      .where(eq(activityLogs.userId, userId))
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(50);
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLogs).values(log).returning();
+    return created;
   }
 }
 

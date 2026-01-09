@@ -88,11 +88,25 @@ export const watchlistTokens = pgTable("watchlist_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const activityLogs = pgTable("activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  walletAddress: text("wallet_address").notNull(),
+  action: text("action").notNull(), // swap_blocked, balance_check_failed, etc.
+  reason: text("reason").notNull(), // BALANCE_UNAVAILABLE, BALANCE_INSUFFICIENT, BALANCE_FETCH_FAILED
+  inputMint: text("input_mint"),
+  outputMint: text("output_mint"),
+  requestedAmount: text("requested_amount"),
+  details: text("details"), // JSON string with additional context
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });
 export const insertAutoTradeRuleSchema = createInsertSchema(autoTradeRules).omit({ id: true, createdAt: true, triggeredAt: true });
 export const insertWatchlistTokenSchema = createInsertSchema(watchlistTokens).omit({ id: true, createdAt: true });
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
@@ -104,3 +118,5 @@ export type AutoTradeRule = typeof autoTradeRules.$inferSelect;
 export type InsertAutoTradeRule = z.infer<typeof insertAutoTradeRuleSchema>;
 export type WatchlistToken = typeof watchlistTokens.$inferSelect;
 export type InsertWatchlistToken = z.infer<typeof insertWatchlistTokenSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
