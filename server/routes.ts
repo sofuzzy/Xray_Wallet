@@ -48,6 +48,7 @@ import {
   getRpId
 } from "./services/webauthnService";
 import { getOnChainTransactions, getWalletBalance, getTokenAccounts, sendRawTransaction, getLatestBlockhash } from "./services/solanaTransactions";
+import { balanceCache } from "./services/balanceCache";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -596,6 +597,73 @@ export async function registerRoutes(
       res.json(tokens);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch trending tokens" });
+    }
+  });
+
+  // Pre-swap balance validation with caching
+  app.get("/api/swaps/validate-balance", hybridAuth, async (req, res) => {
+    try {
+      const { walletAddress, inputMint, amount } = req.query;
+      
+      if (!walletAddress || !inputMint || !amount) {
+        return res.status(400).json({ message: "Missing required parameters: walletAddress, inputMint, amount" });
+      }
+
+      const requestedAmount = parseFloat(amount as string);
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const [solBalance, tokenBalances] = await Promise.all([
+        balanceCache.getSolBalance(walletAddress as string),
+        balanceCache.getTokenBalances(walletAddress as string),
+      ]);
+
+      const validation = balanceCache.validateSwapBalance(
+        solBalance,
+        inputMint as string,
+        requestedAmount,
+        tokenBalances
+      );
+
+      if (!validation.valid) {
+        const userId = req.tokenUser?.sub;
+        await storage.createActivityLog({
+          userId: userId || null,
+          walletAddress: walletAddress as string,
+          action: "swap_blocked",
+          reason: validation.code,
+          inputMint: inputMint as string,
+          requestedAmount: amount as string,
+          details: JSON.stringify({ message: validation.reason, solBalance: solBalance.balance }),
+        });
+      }
+
+      res.json({
+        valid: validation.valid,
+        reason: validation.reason,
+        code: validation.code,
+        solBalance: solBalance.balance,
+        solStatus: solBalance.status,
+        tokenBalances,
+      });
+    } catch (error) {
+      console.error("Balance validation failed:", error);
+      res.status(500).json({ message: "Failed to validate balance" });
+    }
+  });
+
+  // Activity logs endpoint
+  app.get("/api/activity-logs", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser!.sub;
+      const { walletAddress } = req.query;
+      
+      const logs = await storage.getActivityLogs(userId, walletAddress as string | undefined);
+      res.json(logs);
+    } catch (error) {
+      console.error("Failed to fetch activity logs:", error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
     }
   });
 
