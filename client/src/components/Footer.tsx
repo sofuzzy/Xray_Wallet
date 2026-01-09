@@ -37,7 +37,7 @@ export function Footer() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/60 font-mono">
-          &gt; XRAY Wallet | Solana Mainnet
+          &gt; XRAY Wallet | Solana Mainnet | v.0.9.9
         </p>
       </div>
     </footer>

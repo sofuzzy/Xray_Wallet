@@ -264,6 +264,7 @@ export default function Home() {
             onRemove={removeWallet}
             onRename={editWalletName}
           />
+          <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
