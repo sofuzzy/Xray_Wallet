@@ -67,7 +67,7 @@ function isValidSolanaAddress(address: string): boolean {
 function TokenCard({ token, onClick, onAddToWatchlist }: { 
   token: Token; 
   onClick: () => void;
-  onAddToWatchlist: (mint: string) => void;
+  onAddToWatchlist: (token: { mint: string; symbol: string; name: string; decimals?: number }) => void;
 }) {
   return (
     <Card 
@@ -102,7 +102,7 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
           variant="ghost"
           onClick={(e) => {
             e.stopPropagation();
-            onAddToWatchlist(token.mint);
+            onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals });
           }}
           data-testid={`button-add-watchlist-${token.symbol}`}
         >
@@ -132,7 +132,7 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
 function TokenDetail({ token, onBack, onAddToWatchlist, onSwap }: { 
   token: Token; 
   onBack: () => void;
-  onAddToWatchlist: (mint: string) => void;
+  onAddToWatchlist: (token: { mint: string; symbol: string; name: string; decimals?: number }) => void;
   onSwap: () => void;
 }) {
   const { toast } = useToast();
@@ -187,7 +187,7 @@ function TokenDetail({ token, onBack, onAddToWatchlist, onSwap }: {
               <ArrowRightLeft className="w-4 h-4 mr-2" />
               Swap
             </Button>
-            <Button variant="outline" onClick={() => onAddToWatchlist(token.mint)} data-testid="button-add-watchlist-detail">
+            <Button variant="outline" onClick={() => onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals })} data-testid="button-add-watchlist-detail">
               <Star className="w-4 h-4 mr-2" />
               Add to Watchlist
             </Button>
@@ -435,15 +435,25 @@ export default function TokenExplorer() {
   };
 
   const { mutate: addToWatchlist } = useMutation({
-    mutationFn: async (mint: string) => {
-      return apiRequest("POST", "/api/watchlist", { tokenMint: mint });
+    mutationFn: async (token: { mint: string; symbol: string; name: string; decimals?: number }) => {
+      return apiRequest("POST", "/api/watchlist", {
+        tokenMint: token.mint,
+        tokenSymbol: token.symbol,
+        tokenName: token.name,
+        tokenDecimals: token.decimals || 9,
+      });
     },
     onSuccess: () => {
       toast({ title: "Added!", description: "Token added to your watchlist" });
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
     },
-    onError: () => {
-      toast({ title: "Already added", description: "Token is already in your watchlist", variant: "destructive" });
+    onError: (error: any) => {
+      const message = error?.message || "";
+      if (message.includes("409") || message.includes("already")) {
+        toast({ title: "Already added", description: "Token is already in your watchlist", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: "Failed to add token to watchlist", variant: "destructive" });
+      }
     },
   });
 
