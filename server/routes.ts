@@ -2,6 +2,9 @@ import type { Express } from "express";
 import type { Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
+import { db } from "./db";
+import { userWallets } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated as sessionAuth } from "./replit_integrations/auth";
@@ -822,6 +825,146 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to fetch vault audits:", error);
       res.status(500).json({ error: "VAULT_AUDITS_FAILED", message: "Failed to fetch vault audits" });
+    }
+  });
+
+  // ========== WALLET REGISTRY (Multi-Device Sync) ==========
+
+  // GET /api/wallets - List all user wallets from registry
+  app.get("/api/wallets", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const wallets = await storage.getUserWallets(userId);
+      res.json(wallets);
+    } catch (error) {
+      console.error("Failed to fetch user wallets:", error);
+      res.status(500).json({ error: "WALLETS_FETCH_FAILED", message: "Failed to fetch wallets" });
+    }
+  });
+
+  // POST /api/wallets - Register a wallet address
+  app.post("/api/wallets", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const schema = z.object({
+        walletAddress: z.string().min(32).max(64),
+        label: z.string().min(1).max(50).optional(),
+        source: z.enum(["created", "imported", "restored"]).optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: parsed.error.message });
+      }
+
+      const { walletAddress, label, source } = parsed.data;
+
+      // Check if already registered
+      const existing = await storage.getUserWalletByAddress(userId, walletAddress);
+      if (existing) {
+        // Update last seen and return existing
+        await storage.updateUserWalletLastSeen(userId, walletAddress);
+        return res.json({ ...existing, lastSeenAt: new Date() });
+      }
+
+      // Register new wallet
+      const wallet = await storage.registerUserWallet({
+        userId,
+        walletAddress,
+        label: label || "Wallet",
+        source: source || "created",
+      });
+
+      // Activity log
+      await storage.createActivityLog({
+        userId,
+        walletAddress,
+        action: "wallet_registered",
+        reason: "WALLET_SYNCED",
+        details: JSON.stringify({ label: wallet.label, source: wallet.source }),
+      });
+
+      res.status(201).json(wallet);
+    } catch (error) {
+      console.error("Failed to register wallet:", error);
+      res.status(500).json({ error: "WALLET_REGISTER_FAILED", message: "Failed to register wallet" });
+    }
+  });
+
+  // DELETE /api/wallets/:address - Unlink wallet from account
+  app.delete("/api/wallets/:address", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const { address } = req.params;
+      if (!address || address.length < 32) {
+        return res.status(400).json({ error: "INVALID_ADDRESS", message: "Invalid wallet address" });
+      }
+
+      // Check if exists
+      const existing = await storage.getUserWalletByAddress(userId, address);
+      if (!existing) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Wallet not registered" });
+      }
+
+      await storage.unlinkUserWallet(userId, address);
+
+      // Activity log
+      await storage.createActivityLog({
+        userId,
+        walletAddress: address,
+        action: "wallet_unlinked",
+        reason: "USER_ACTION",
+        details: JSON.stringify({ label: existing.label }),
+      });
+
+      res.json({ success: true, message: "Wallet unlinked" });
+    } catch (error) {
+      console.error("Failed to unlink wallet:", error);
+      res.status(500).json({ error: "WALLET_UNLINK_FAILED", message: "Failed to unlink wallet" });
+    }
+  });
+
+  // PUT /api/wallets/:address/label - Update wallet label
+  app.put("/api/wallets/:address/label", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      const { address } = req.params;
+      const schema = z.object({ label: z.string().min(1).max(50) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: parsed.error.message });
+      }
+
+      const existing = await storage.getUserWalletByAddress(userId, address);
+      if (!existing) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Wallet not registered" });
+      }
+
+      // Update label via raw query since we don't have a specific method
+      await db.update(userWallets)
+        .set({ label: parsed.data.label })
+        .where(and(eq(userWallets.userId, userId), eq(userWallets.walletAddress, address)));
+
+      res.json({ success: true, label: parsed.data.label });
+    } catch (error) {
+      console.error("Failed to update wallet label:", error);
+      res.status(500).json({ error: "WALLET_UPDATE_FAILED", message: "Failed to update wallet" });
     }
   });
 
