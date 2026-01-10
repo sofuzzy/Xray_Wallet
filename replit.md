@@ -90,9 +90,16 @@ The server follows a modular pattern:
   - AMM labels from Jupiter's program-id-to-label endpoint
 - **Key Files**:
   - `server/services/jupiterSwap.ts` - DexScreener token discovery, Jupiter swap execution
-  - `server/services/priceHistory.ts` - DexScreener token metadata and price history
+  - `server/services/priceHistory.ts` - DexScreener token metadata, price history with caching
   - `client/src/components/SwapModal.tsx` - Swap UI with token selection and trending
+  - `client/src/components/TokenChart.tsx` - Price chart with skeleton loading
 - **Data Source**: DexScreener API (https://api.dexscreener.com) for all token metadata, prices, and trending data
+- **Chart Caching**: Stale-while-revalidate pattern for price history
+  - 10-minute TTL with 60-second stale threshold
+  - Returns stale data immediately while refreshing in background
+  - Provider fallback: DexScreener (primary) → Birdeye (requires BIRDEYE_API_KEY)
+  - 3-second timeout per provider with AbortController
+  - Latency logging for monitoring provider health
 - **RPC Manager**: Automatic fallback across multiple RPC endpoints with health tracking
   - Prioritized endpoints: HELIUS_RPC_URL, QUICKNODE_RPC_URL (if configured), then public RPCs
   - Public fallback endpoints: Solana Mainnet, Ankr, Public-RPC.com
