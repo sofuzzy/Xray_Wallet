@@ -68,15 +68,17 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
-    queryKey: ["/api/swaps/tokens", searchQuery],
+    queryKey: ["/api/tokens/search", searchQuery],
     queryFn: async () => {
-      if (!searchQuery.trim()) return [];
-      const params = new URLSearchParams({ search: searchQuery, limit: "20" });
-      const response = await fetch(`/api/swaps/tokens?${params}`, { credentials: "include" });
+      const query = searchQuery.trim();
+      if (!query || query.length < 2) return [];
+      // Skip search for valid Solana addresses (handled by lookupMint)
+      if (isValidSolanaAddress(query)) return [];
+      const response = await fetch(`/api/tokens/search?q=${encodeURIComponent(query)}&limit=20`, { credentials: "include" });
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: searchQuery.length > 0,
+    enabled: searchQuery.trim().length >= 2 && !isValidSolanaAddress(searchQuery.trim()),
     staleTime: 30000,
   });
 

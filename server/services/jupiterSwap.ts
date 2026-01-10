@@ -168,51 +168,110 @@ function getFallbackTokens(): Token[] {
   ];
 }
 
-export async function fetchTrendingTokens(): Promise<Token[]> {
-  try {
-    // Use DexScreener search API with popular search terms to get trending tokens
-    const searches = ["pump", "sol", "meme"];
-    const tokenMap = new Map<string, Token>();
-    
-    for (const query of searches) {
-      try {
-        const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
-        if (!response.ok) continue;
-        const data = await response.json();
-        
-        if (!data.pairs || !Array.isArray(data.pairs)) continue;
-        
-        for (const pair of data.pairs.filter((p: any) => p.chainId === "solana").slice(0, 30)) {
-          const baseToken = pair.baseToken;
-          if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
-          
-          tokenMap.set(baseToken.address, {
-            mint: baseToken.address,
-            name: baseToken.name || "Unknown",
-            symbol: baseToken.symbol || "???",
-            decimals: 9,
-            logoURI: pair.info?.imageUrl,
-            volume24h: pair.volume?.h24 || 0,
-            liquidity: pair.liquidity?.usd || 0,
-            priceChange24h: pair.priceChange?.h24 || 0,
-            priceUsd: parseFloat(pair.priceUsd) || undefined,
-            marketCap: pair.marketCap || pair.fdv || undefined,
-            isTrending: true,
-          });
-        }
-      } catch (e) {
-        console.error(`Failed to search for ${query}:`, e);
-      }
-    }
+// Dedicated trending cache with longer TTL (90 seconds)
+let trendingCache: { tokens: Token[]; lastUpdated: number } = {
+  tokens: [],
+  lastUpdated: 0,
+};
+const TRENDING_CACHE_TTL = 90 * 1000;
 
-    const result = Array.from(tokenMap.values())
-      .filter(t => (t.volume24h || 0) > 5000 && (t.liquidity || 0) > 1000)
-      .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+export async function fetchTrendingTokens(): Promise<Token[]> {
+  const now = Date.now();
+  
+  // Return cached data if still fresh
+  if (now - trendingCache.lastUpdated < TRENDING_CACHE_TTL && trendingCache.tokens.length > 0) {
+    return trendingCache.tokens;
+  }
+
+  try {
+    // Use DexScreener's token-boosts endpoint for actual trending data
+    const response = await fetch("https://api.dexscreener.com/token-boosts/top/v1", {
+      signal: AbortSignal.timeout(5000),
+    });
+    
+    if (!response.ok) {
+      console.error("[trending] DexScreener boosts API failed:", response.status);
+      if (trendingCache.tokens.length > 0) return trendingCache.tokens;
+      return getTrendingFallback();
+    }
+    
+    const boostedTokens = await response.json();
+    if (!Array.isArray(boostedTokens) || boostedTokens.length === 0) {
+      if (trendingCache.tokens.length > 0) return trendingCache.tokens;
+      return getTrendingFallback();
+    }
+    
+    // Filter to Solana tokens only
+    const solanaMints = boostedTokens
+      .filter((t: any) => t.chainId === "solana" && t.tokenAddress)
+      .map((t: any) => t.tokenAddress)
       .slice(0, 30);
     
-    return result.length > 0 ? result : getTrendingFallback();
+    if (solanaMints.length === 0) {
+      if (trendingCache.tokens.length > 0) return trendingCache.tokens;
+      return getTrendingFallback();
+    }
+    
+    // Fetch token details from DexScreener tokens endpoint (max 30 per batch)
+    const tokenMap = new Map<string, Token>();
+    const BATCH_SIZE = 30;
+    
+    for (let i = 0; i < solanaMints.length; i += BATCH_SIZE) {
+      const batch = solanaMints.slice(i, i + BATCH_SIZE);
+      try {
+        const tokenResponse = await fetch(`${DEXSCREENER_API}/tokens/${batch.join(",")}`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        
+        if (tokenResponse.ok) {
+          const tokenData = await tokenResponse.json();
+          if (tokenData.pairs && Array.isArray(tokenData.pairs)) {
+            for (const pair of tokenData.pairs.filter((p: any) => p.chainId === "solana")) {
+              const baseToken = pair.baseToken;
+              if (!baseToken?.address || tokenMap.has(baseToken.address)) continue;
+              
+              tokenMap.set(baseToken.address, {
+                mint: baseToken.address,
+                name: baseToken.name || "Unknown",
+                symbol: baseToken.symbol || "???",
+                decimals: 9,
+                logoURI: pair.info?.imageUrl,
+                volume24h: pair.volume?.h24 || 0,
+                liquidity: pair.liquidity?.usd || 0,
+                priceChange24h: pair.priceChange?.h24 || 0,
+                priceUsd: parseFloat(pair.priceUsd) || undefined,
+                marketCap: pair.marketCap || pair.fdv || undefined,
+                isTrending: true,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[trending] Batch fetch failed:", e);
+      }
+    }
+    
+    // Preserve order from boosted list
+    const result: Token[] = [];
+    for (const mint of solanaMints) {
+      const token = tokenMap.get(mint);
+      if (token) result.push(token);
+    }
+    
+    if (result.length > 0) {
+      trendingCache = { tokens: result, lastUpdated: now };
+      console.log(`[trending] Updated cache with ${result.length} tokens from DexScreener boosts`);
+      return result;
+    }
+    
+    if (trendingCache.tokens.length > 0) return trendingCache.tokens;
+    return getTrendingFallback();
   } catch (error) {
-    console.error("Failed to fetch trending tokens:", error);
+    console.error("[trending] Failed to fetch:", error);
+    if (trendingCache.tokens.length > 0) {
+      console.log("[trending] Returning stale cache");
+      return trendingCache.tokens;
+    }
     return getTrendingFallback();
   }
 }
