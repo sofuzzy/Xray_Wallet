@@ -1,4 +1,8 @@
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
+const BIRDEYE_API = "https://public-api.birdeye.so";
+const PROVIDER_TIMEOUT = 3000;
+const CACHE_TTL = 10 * 60 * 1000;
+const STALE_TTL = 60 * 1000;
 
 export interface PricePoint {
   timestamp: number;
@@ -15,6 +19,8 @@ export interface TokenPriceHistory {
   history: PricePoint[];
   timeframe: string;
   isEstimated: boolean;
+  provider?: string;
+  cachedAt?: number;
 }
 
 export interface TokenMetadata {
@@ -31,31 +37,80 @@ export interface TokenMetadata {
 
 interface PriceCache {
   data: TokenPriceHistory;
-  expiry: number;
+  fetchedAt: number;
+  isRefreshing?: boolean;
 }
 
 const priceCache = new Map<string, PriceCache>();
-const CACHE_TTL = 60 * 1000;
+const providerLatencyLog: { provider: string; latency: number; success: boolean; timestamp: number }[] = [];
 
-export async function getTokenPriceHistory(
-  mint: string,
-  timeframe: "1h" | "24h" | "7d" | "30d" = "24h"
-): Promise<TokenPriceHistory | null> {
-  const cacheKey = `${mint}:${timeframe}`;
-  const cached = priceCache.get(cacheKey);
-  
-  if (cached && cached.expiry > Date.now()) {
-    return cached.data;
+function logProviderLatency(provider: string, latency: number, success: boolean) {
+  const entry = { provider, latency, success, timestamp: Date.now() };
+  providerLatencyLog.push(entry);
+  if (providerLatencyLog.length > 100) {
+    providerLatencyLog.shift();
   }
+  console.log(`[chart] ${provider}: ${latency}ms ${success ? "OK" : "FAIL"}`);
+}
 
+export function getProviderStats() {
+  const recent = providerLatencyLog.filter(e => Date.now() - e.timestamp < 5 * 60 * 1000);
+  const byProvider = new Map<string, { total: number; success: number; avgLatency: number }>();
+  
+  for (const entry of recent) {
+    const stats = byProvider.get(entry.provider) || { total: 0, success: 0, avgLatency: 0 };
+    stats.total++;
+    if (entry.success) stats.success++;
+    stats.avgLatency = (stats.avgLatency * (stats.total - 1) + entry.latency) / stats.total;
+    byProvider.set(entry.provider, stats);
+  }
+  
+  return Object.fromEntries(byProvider);
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
   try {
-    const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
+async function fetchFromDexScreener(
+  mint: string,
+  timeframe: "1h" | "24h" | "7d" | "30d"
+): Promise<TokenPriceHistory | null> {
+  const start = Date.now();
+  
+  try {
+    const response = await fetchWithTimeout(
+      `${DEXSCREENER_API}/tokens/${mint}`,
+      {},
+      PROVIDER_TIMEOUT
+    );
+    
+    const latency = Date.now() - start;
+    
     if (!response.ok) {
+      logProviderLatency("DexScreener", latency, false);
       console.error(`DexScreener API error: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
+    logProviderLatency("DexScreener", latency, true);
     
     if (!data.pairs || data.pairs.length === 0) {
       return null;
@@ -68,7 +123,7 @@ export async function getTokenPriceHistory(
 
     const history = generatePriceHistory(currentPrice, priceChange24h, timeframe);
 
-    const result: TokenPriceHistory = {
+    return {
       mint: baseToken.address,
       symbol: baseToken.symbol || "???",
       name: baseToken.name || "Unknown",
@@ -77,17 +132,154 @@ export async function getTokenPriceHistory(
       history,
       timeframe,
       isEstimated: true,
+      provider: "DexScreener",
+      cachedAt: Date.now(),
     };
+  } catch (error: any) {
+    const latency = Date.now() - start;
+    logProviderLatency("DexScreener", latency, false);
+    console.error("DexScreener fetch failed:", error.message);
+    return null;
+  }
+}
 
+async function fetchFromBirdeye(
+  mint: string,
+  timeframe: "1h" | "24h" | "7d" | "30d"
+): Promise<TokenPriceHistory | null> {
+  const apiKey = process.env.BIRDEYE_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+  
+  const start = Date.now();
+  
+  try {
+    const response = await fetchWithTimeout(
+      `${BIRDEYE_API}/defi/token_overview?address=${mint}`,
+      {
+        headers: {
+          "X-API-KEY": apiKey,
+          "x-chain": "solana",
+        },
+      },
+      PROVIDER_TIMEOUT
+    );
+    
+    const latency = Date.now() - start;
+    
+    if (!response.ok) {
+      logProviderLatency("Birdeye", latency, false);
+      console.error(`Birdeye API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    logProviderLatency("Birdeye", latency, true);
+    
+    if (!data.success || !data.data) {
+      return null;
+    }
+
+    const token = data.data;
+    const currentPrice = token.price || 0;
+    const priceChange24h = token.priceChange24hPercent || 0;
+
+    const history = generatePriceHistory(currentPrice, priceChange24h, timeframe);
+
+    return {
+      mint,
+      symbol: token.symbol || "???",
+      name: token.name || "Unknown",
+      currentPrice,
+      priceChange24h,
+      history,
+      timeframe,
+      isEstimated: true,
+      provider: "Birdeye",
+      cachedAt: Date.now(),
+    };
+  } catch (error: any) {
+    const latency = Date.now() - start;
+    logProviderLatency("Birdeye", latency, false);
+    console.error("Birdeye fetch failed:", error.message);
+    return null;
+  }
+}
+
+export async function getTokenPriceHistory(
+  mint: string,
+  timeframe: "1h" | "24h" | "7d" | "30d" = "24h"
+): Promise<TokenPriceHistory | null> {
+  const cacheKey = `${mint}:${timeframe}`;
+  const cached = priceCache.get(cacheKey);
+  const now = Date.now();
+  
+  if (cached) {
+    const age = now - cached.fetchedAt;
+    
+    if (age < STALE_TTL) {
+      return cached.data;
+    }
+    
+    if (age < CACHE_TTL) {
+      if (!cached.isRefreshing) {
+        cached.isRefreshing = true;
+        refreshCache(cacheKey, mint, timeframe).finally(() => {
+          const entry = priceCache.get(cacheKey);
+          if (entry) entry.isRefreshing = false;
+        });
+      }
+      return cached.data;
+    }
+  }
+  
+  return await fetchAndCache(cacheKey, mint, timeframe);
+}
+
+async function fetchAndCache(
+  cacheKey: string,
+  mint: string,
+  timeframe: "1h" | "24h" | "7d" | "30d"
+): Promise<TokenPriceHistory | null> {
+  let result = await fetchFromDexScreener(mint, timeframe);
+  
+  if (!result) {
+    result = await fetchFromBirdeye(mint, timeframe);
+  }
+  
+  if (result) {
     priceCache.set(cacheKey, {
       data: result,
-      expiry: Date.now() + CACHE_TTL,
+      fetchedAt: Date.now(),
+      isRefreshing: false,
     });
+  }
+  
+  return result;
+}
 
-    return result;
+async function refreshCache(
+  cacheKey: string,
+  mint: string,
+  timeframe: "1h" | "24h" | "7d" | "30d"
+): Promise<void> {
+  try {
+    let result = await fetchFromDexScreener(mint, timeframe);
+    
+    if (!result) {
+      result = await fetchFromBirdeye(mint, timeframe);
+    }
+    
+    if (result) {
+      priceCache.set(cacheKey, {
+        data: result,
+        fetchedAt: Date.now(),
+        isRefreshing: false,
+      });
+    }
   } catch (error) {
-    console.error("Failed to fetch token price history:", error);
-    return null;
+    console.error("Background cache refresh failed:", error);
   }
 }
 
@@ -183,7 +375,12 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata | nu
   }
 
   try {
-    const response = await fetch(`${DEXSCREENER_API}/tokens/${mint}`);
+    const response = await fetchWithTimeout(
+      `${DEXSCREENER_API}/tokens/${mint}`,
+      {},
+      PROVIDER_TIMEOUT
+    );
+    
     if (!response.ok) {
       console.error(`DexScreener API error for metadata: ${response.status}`);
       return null;
