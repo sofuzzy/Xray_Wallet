@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronDown, 
@@ -8,10 +8,14 @@ import {
   Trash2,
   Pencil,
   X,
-  Loader2 
+  Loader2,
+  Cloud,
+  CloudOff
 } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import type { StoredWallet } from "@/lib/solana";
+import type { RegisteredWallet } from "@/hooks/use-wallet-registry";
+import { Badge } from "@/components/ui/badge";
 
 interface WalletSwitcherProps {
   wallets: StoredWallet[];
@@ -20,6 +24,8 @@ interface WalletSwitcherProps {
   onAdd: (name: string) => Promise<StoredWallet>;
   onRemove: (walletId: string) => Promise<boolean>;
   onRename: (walletId: string, newName: string) => boolean;
+  registeredWallets?: RegisteredWallet[];
+  isAuthenticated?: boolean;
 }
 
 export function WalletSwitcher({ 
@@ -28,7 +34,9 @@ export function WalletSwitcher({
   onSwitch, 
   onAdd,
   onRemove,
-  onRename 
+  onRename,
+  registeredWallets = [],
+  isAuthenticated = false
 }: WalletSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -36,6 +44,16 @@ export function WalletSwitcher({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const localAddresses = useMemo(() => 
+    new Set(wallets.map(w => w.publicKey)), 
+    [wallets]
+  );
+
+  const remoteOnlyWallets = useMemo(() => 
+    registeredWallets.filter(rw => !localAddresses.has(rw.walletAddress)),
+    [registeredWallets, localAddresses]
+  );
 
   const handleCreateWallet = async () => {
     if (!newWalletName.trim()) return;
@@ -162,7 +180,12 @@ export function WalletSwitcher({
                             <Wallet className="w-4 h-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{wallet.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{wallet.name}</p>
+                              {isAuthenticated && localAddresses.has(wallet.publicKey) && (
+                                <Cloud className="w-3 h-3 text-green-500 shrink-0" />
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">{shortenAddress(wallet.publicKey)}</p>
                           </div>
                           {wallet.id === activeWallet?.id && (
@@ -195,6 +218,36 @@ export function WalletSwitcher({
                     )}
                   </div>
                 ))}
+
+                {isAuthenticated && remoteOnlyWallets.length > 0 && (
+                  <>
+                    <div className="py-2 mt-2 border-t border-border">
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <CloudOff className="w-3 h-3" />
+                        Other Devices
+                      </p>
+                    </div>
+                    {remoteOnlyWallets.map((wallet) => (
+                      <div
+                        key={wallet.walletAddress}
+                        className="flex items-center gap-2 p-2 rounded-lg opacity-60"
+                      >
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-muted/50 text-muted-foreground">
+                          <Wallet className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-muted-foreground truncate">{wallet.label}</p>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              Not on device
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground/70">{shortenAddress(wallet.walletAddress)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
 
               <div className="p-2 border-t border-border">

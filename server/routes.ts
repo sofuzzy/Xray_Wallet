@@ -830,8 +830,8 @@ export async function registerRoutes(
 
   // ========== WALLET REGISTRY (Multi-Device Sync) ==========
 
-  // GET /api/wallets - List all user wallets from registry
-  app.get("/api/wallets", hybridAuth, async (req, res) => {
+  // GET /api/wallet-registry - List all user wallets from registry
+  app.get("/api/wallet-registry", hybridAuth, async (req, res) => {
     try {
       const userId = req.tokenUser?.sub;
       if (!userId) {
@@ -846,8 +846,8 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/wallets - Register a wallet address
-  app.post("/api/wallets", hybridAuth, strictRateLimiter, async (req, res) => {
+  // POST /api/wallet-registry - Register a wallet address
+  app.post("/api/wallet-registry", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const userId = req.tokenUser?.sub;
       if (!userId) {
@@ -899,8 +899,8 @@ export async function registerRoutes(
     }
   });
 
-  // DELETE /api/wallets/:address - Unlink wallet from account
-  app.delete("/api/wallets/:address", hybridAuth, strictRateLimiter, async (req, res) => {
+  // DELETE /api/wallet-registry/:address - Unlink wallet from account
+  app.delete("/api/wallet-registry/:address", hybridAuth, strictRateLimiter, async (req, res) => {
     try {
       const userId = req.tokenUser?.sub;
       if (!userId) {
@@ -936,8 +936,8 @@ export async function registerRoutes(
     }
   });
 
-  // PUT /api/wallets/:address/label - Update wallet label
-  app.put("/api/wallets/:address/label", hybridAuth, async (req, res) => {
+  // PUT /api/wallet-registry/:address/label - Update wallet label
+  app.put("/api/wallet-registry/:address/label", hybridAuth, async (req, res) => {
     try {
       const userId = req.tokenUser?.sub;
       if (!userId) {

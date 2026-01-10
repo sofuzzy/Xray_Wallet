@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useWallet } from "@/hooks/use-wallet";
 import { usePasskey } from "@/hooks/use-passkey";
+import { useWalletRegistry } from "@/hooks/use-wallet-registry";
 import { useUpdateUser, useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { type ActivityLog } from "@shared/schema";
@@ -70,6 +71,61 @@ export default function Home() {
   });
   const { toast } = useToast();
   const { register: registerPasskey, login: loginPasskey, isLoading: passkeyLoading, isSupported: passkeySupported, getStoredUserId } = usePasskey();
+  const { registeredWallets, registerWallet } = useWalletRegistry(isAuthenticated);
+  const [syncRetryTick, setSyncRetryTick] = useState(0);
+  const inFlightAddresses = useRef<Set<string>>(new Set());
+  const failureInfo = useRef<Map<string, { attempts: number; lastAttempt: number }>>(new Map());
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(() => setSyncRetryTick(t => t + 1), 10000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || wallets.length === 0) return;
+    
+    const cloudAddresses = new Set(registeredWallets.map(rw => rw.walletAddress));
+    const localAddresses = new Set(wallets.map(w => w.publicKey));
+    const now = Date.now();
+    
+    [...failureInfo.current.keys()].forEach(addr => {
+      if (!localAddresses.has(addr) || cloudAddresses.has(addr)) {
+        failureInfo.current.delete(addr);
+      }
+    });
+    
+    wallets.forEach(async w => {
+      const inCloud = cloudAddresses.has(w.publicKey);
+      const inFlight = inFlightAddresses.current.has(w.publicKey);
+      
+      if (inCloud || inFlight) return;
+      
+      let info = failureInfo.current.get(w.publicKey);
+      if (info) {
+        if (now - info.lastAttempt > 300000) {
+          info = undefined;
+          failureInfo.current.delete(w.publicKey);
+        } else {
+          const cooldownMs = Math.min(60000, 5000 * Math.pow(2, info.attempts - 1));
+          if (now - info.lastAttempt < cooldownMs) return;
+        }
+      }
+      
+      inFlightAddresses.current.add(w.publicKey);
+      const result = await registerWallet({
+        walletAddress: w.publicKey,
+        label: w.name,
+        source: "created",
+      });
+      inFlightAddresses.current.delete(w.publicKey);
+      
+      if (!result) {
+        const prevAttempts = info?.attempts || 0;
+        failureInfo.current.set(w.publicKey, { attempts: prevAttempts + 1, lastAttempt: Date.now() });
+      }
+    });
+  }, [isAuthenticated, wallets, registeredWallets, registerWallet, syncRetryTick]);
 
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
@@ -263,6 +319,8 @@ export default function Home() {
             onAdd={addWallet}
             onRemove={removeWallet}
             onRename={editWalletName}
+            registeredWallets={registeredWallets}
+            isAuthenticated={isAuthenticated}
           />
           <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
         </div>

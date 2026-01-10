@@ -58,6 +58,12 @@ The server follows a modular pattern:
   - WalletSwitcher component in header for quick switching
   - Create, rename, and delete wallets (minimum 1 required)
   - Legacy single-wallet storage auto-migrated to multi-wallet format
+- **Multi-Device Wallet Sync**: Cloud registry for wallet visibility across devices
+  - `userWallets` table stores public addresses (never private keys) linked to user accounts
+  - API endpoints: `/api/wallet-registry` (GET/POST/DELETE/PUT)
+  - Frontend hook: `use-wallet-registry.ts` syncs local wallets on login
+  - WalletSwitcher shows cloud sync status and "Not on device" badges for remote-only wallets
+  - Activity logging tracks wallet_registered and wallet_unlinked events
 - **Seed Phrase Backup/Restore**: BIP39 12-word mnemonic with BIP44 derivation (m/44'/501'/0'/0')
   - Uses `bip39` and `ed25519-hd-key` packages for mnemonic-to-keypair derivation
   - Backup: View/copy seed phrase from Settings modal
