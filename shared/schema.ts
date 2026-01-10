@@ -121,6 +121,16 @@ export const vaultAudits = pgTable("vault_audits", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const userWallets = pgTable("user_wallets", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  walletAddress: text("wallet_address").notNull(),
+  label: text("label").notNull().default("Wallet"),
+  source: text("source").notNull().default("created"), // created, imported, restored
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+});
+
 export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, timestamp: true });
 export const insertTokenLaunchSchema = createInsertSchema(tokenLaunches).omit({ id: true, createdAt: true });
@@ -129,6 +139,7 @@ export const insertWatchlistTokenSchema = createInsertSchema(watchlistTokens).om
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 export const insertVaultSchema = createInsertSchema(vaults).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertVaultAuditSchema = createInsertSchema(vaultAudits).omit({ id: true, createdAt: true });
+export const insertUserWalletSchema = createInsertSchema(userWallets).omit({ id: true, createdAt: true, lastSeenAt: true });
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
@@ -146,3 +157,5 @@ export type Vault = typeof vaults.$inferSelect;
 export type InsertVault = z.infer<typeof insertVaultSchema>;
 export type VaultAudit = typeof vaultAudits.$inferSelect;
 export type InsertVaultAudit = z.infer<typeof insertVaultAuditSchema>;
+export type UserWallet = typeof userWallets.$inferSelect;
+export type InsertUserWallet = z.infer<typeof insertUserWalletSchema>;

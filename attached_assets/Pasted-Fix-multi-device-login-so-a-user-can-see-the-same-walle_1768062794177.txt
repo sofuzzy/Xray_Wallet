@@ -1,0 +1,51 @@
+Fix multi-device login so a user can see the same wallets across devices.
+
+Current issue:
+- If a user logs in from a different device, they do not see wallets created/used on another device.
+
+Goal:
+- A single user account (email/social login) should have a persistent wallet list that appears on any device after login.
+- Maintain non-custodial: do not store plaintext private keys server-side.
+
+Requirements:
+
+1) Account-linked wallet registry (server-side)
+- Add a server-side table/collection keyed by userId:
+    user_wallets: { id, userId, walletAddress, label, createdAt, lastSeenAt, source }
+- On wallet creation or wallet import on any device:
+    - register the walletAddress to the logged-in user
+- On login:
+    - fetch wallet list for userId and display it in the UI
+- Ensure no duplication:
+    - walletAddress unique per userId
+
+2) Encrypted cloud backup integration (if enabled)
+- If the user has an encrypted cloud vault backup:
+    - show a “Restore” option
+    - after restore, register the restored wallet address in the registry
+- The server must store only the encrypted blob + metadata, never private keys.
+
+3) UX behavior
+- On a new device after login:
+    - show “Your wallets” list from the server registry immediately
+    - wallets that are not yet restored locally should be marked:
+        “Not on this device (restore required)”
+    - Provide a clear Restore button that triggers the existing cloud restore flow.
+
+4) Reliability & security
+- Add Zod validation to any new endpoints.
+- Use existing unified API error format.
+- Add rate limiting for wallet registry endpoints.
+- Activity log entries:
+    - WALLET_REGISTERED
+    - WALLET_RESTORED
+    - WALLET_UNLINKED (if user removes a wallet)
+
+5) API endpoints (example)
+- GET /api/wallets  -> list user wallets
+- POST /api/wallets -> register wallet address (label optional)
+- DELETE /api/wallets/:address -> unlink wallet from account
+
+Constraints:
+- Do not require storing seed phrases or private keys on the server.
+- Do not show a wallet as “active/signable” unless the key exists locally on the current device.

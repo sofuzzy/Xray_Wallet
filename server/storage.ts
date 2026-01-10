@@ -10,6 +10,7 @@ import {
   activityLogs,
   vaults,
   vaultAudits,
+  userWallets,
   type User,
   type Wallet,
   type InsertWallet,
@@ -27,6 +28,8 @@ import {
   type InsertVault,
   type VaultAudit,
   type InsertVaultAudit,
+  type UserWallet,
+  type InsertUserWallet,
 } from "@shared/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 
@@ -80,6 +83,12 @@ export interface IStorage {
   deleteVault(userId: string): Promise<boolean>;
   createVaultAudit(audit: InsertVaultAudit): Promise<VaultAudit>;
   getVaultAudits(userId: string): Promise<VaultAudit[]>;
+
+  getUserWallets(userId: string): Promise<UserWallet[]>;
+  getUserWalletByAddress(userId: string, walletAddress: string): Promise<UserWallet | undefined>;
+  registerUserWallet(wallet: InsertUserWallet): Promise<UserWallet>;
+  updateUserWalletLastSeen(userId: string, walletAddress: string): Promise<void>;
+  unlinkUserWallet(userId: string, walletAddress: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -293,6 +302,41 @@ export class DatabaseStorage implements IStorage {
       .where(eq(vaultAudits.userId, userId))
       .orderBy(desc(vaultAudits.createdAt))
       .limit(50);
+  }
+
+  async getUserWallets(userId: string): Promise<UserWallet[]> {
+    return await db
+      .select()
+      .from(userWallets)
+      .where(eq(userWallets.userId, userId))
+      .orderBy(desc(userWallets.createdAt));
+  }
+
+  async getUserWalletByAddress(userId: string, walletAddress: string): Promise<UserWallet | undefined> {
+    const [wallet] = await db
+      .select()
+      .from(userWallets)
+      .where(and(eq(userWallets.userId, userId), eq(userWallets.walletAddress, walletAddress)));
+    return wallet;
+  }
+
+  async registerUserWallet(wallet: InsertUserWallet): Promise<UserWallet> {
+    const [created] = await db.insert(userWallets).values(wallet).returning();
+    return created;
+  }
+
+  async updateUserWalletLastSeen(userId: string, walletAddress: string): Promise<void> {
+    await db
+      .update(userWallets)
+      .set({ lastSeenAt: new Date() })
+      .where(and(eq(userWallets.userId, userId), eq(userWallets.walletAddress, walletAddress)));
+  }
+
+  async unlinkUserWallet(userId: string, walletAddress: string): Promise<boolean> {
+    await db
+      .delete(userWallets)
+      .where(and(eq(userWallets.userId, userId), eq(userWallets.walletAddress, walletAddress)));
+    return true;
   }
 }
 
