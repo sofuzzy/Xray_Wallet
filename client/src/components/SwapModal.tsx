@@ -610,6 +610,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         description: `Transaction: ${data.signature.slice(0, 8)}...`,
       });
       queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] });
       // Show success state briefly before closing
       setTimeout(() => {
         setInputAmount("");

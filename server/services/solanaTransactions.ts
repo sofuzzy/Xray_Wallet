@@ -2,6 +2,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getRpcService, createUserRpcService } from "./rpcService";
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 export async function getWalletBalance(
   walletAddress: string,
@@ -29,13 +30,23 @@ export async function getTokenAccounts(
     console.log("Fetching token accounts for:", walletAddress);
     const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const publicKey = new PublicKey(walletAddress);
-    const tokenAccounts = await rpc.getParsedTokenAccountsByOwner(publicKey, {
-      programId: TOKEN_PROGRAM_ID,
-    });
+    
+    // Fetch both SPL Token and Token-2022 accounts in parallel
+    const [tokenAccounts, token2022Accounts] = await Promise.all([
+      rpc.getParsedTokenAccountsByOwner(publicKey, {
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      rpc.getParsedTokenAccountsByOwner(publicKey, {
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+    ]);
 
-    console.log("Found", tokenAccounts.value.length, "token accounts");
+    console.log("Found", tokenAccounts.value.length, "SPL token accounts");
+    console.log("Found", token2022Accounts.value.length, "Token-2022 accounts");
 
-    const tokens = tokenAccounts.value
+    const allAccounts = [...tokenAccounts.value, ...token2022Accounts.value];
+    
+    const tokens = allAccounts
       .map((account) => {
         const parsed = account.account.data.parsed;
         const info = parsed?.info;
