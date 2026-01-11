@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronDown, 
@@ -44,6 +44,20 @@ export function WalletSwitcher({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   const localAddresses = useMemo(() => 
     new Set(wallets.map(w => w.publicKey)), 
@@ -96,7 +110,7 @@ export function WalletSwitcher({
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors"
@@ -111,18 +125,13 @@ export function WalletSwitcher({
 
       <AnimatePresence>
         {isOpen && (
-          <>
-            <div 
-              className="fixed inset-0 z-50" 
-              onClick={() => setIsOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
-              className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-2xl z-[60] overflow-hidden"
-            >
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-2xl z-[60] overflow-hidden"
+          >
               <div className="p-2 border-b border-border">
                 <p className="px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Your Wallets
@@ -295,7 +304,6 @@ export function WalletSwitcher({
                 )}
               </div>
             </motion.div>
-          </>
         )}
       </AnimatePresence>
     </div>
