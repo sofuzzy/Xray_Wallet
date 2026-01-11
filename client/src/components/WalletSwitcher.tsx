@@ -113,7 +113,7 @@ export function WalletSwitcher({
         {isOpen && (
           <>
             <div 
-              className="fixed inset-0 z-40" 
+              className="fixed inset-0 z-50" 
               onClick={() => setIsOpen(false)}
             />
             <motion.div
@@ -121,7 +121,7 @@ export function WalletSwitcher({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-2xl z-50 overflow-hidden"
+              className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-2xl z-[60] overflow-hidden"
             >
               <div className="p-2 border-b border-border">
                 <p className="px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
