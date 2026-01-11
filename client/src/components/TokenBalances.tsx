@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -48,9 +48,15 @@ export function TokenBalances() {
     queryKey: ["/api/swaps/tokens"],
   });
 
-  const walletMints = walletTokens.map((wt: TokenAccountInfo) => wt.mint);
+  const walletMints = useMemo(() => 
+    walletTokens.map((wt: TokenAccountInfo) => wt.mint).sort(),
+    [walletTokens]
+  );
+
+  const mintsKey = useMemo(() => walletMints.join(","), [walletMints]);
+
   const { data: dynamicMetadata = {}, isLoading: loadingMetadata } = useQuery<Record<string, TokenMetadata>>({
-    queryKey: ["/api/tokens/metadata/batch", walletMints],
+    queryKey: ["/api/tokens/metadata/batch", mintsKey],
     queryFn: async () => {
       if (walletMints.length === 0) return {};
       const res = await apiRequest("POST", "/api/tokens/metadata/batch", { mints: walletMints });
@@ -61,26 +67,29 @@ export function TokenBalances() {
     refetchInterval: 60000,
   });
 
-  const tokens: Token[] = walletTokens.map((wt: TokenAccountInfo) => {
-    const dynamic = dynamicMetadata[wt.mint];
-    const known = knownTokens.find((kt: Token) => kt.mint === wt.mint);
-    
-    const name = dynamic?.name || known?.name || `Token ${wt.mint.slice(0, 8)}...`;
-    const symbol = dynamic?.symbol || known?.symbol || wt.mint.slice(0, 4).toUpperCase();
-    
-    return {
-      mint: wt.mint,
-      name,
-      symbol,
-      decimals: wt.decimals,
-      balance: wt.balance,
-      imageUrl: dynamic?.imageUrl,
-      price: dynamic?.price,
-      priceChange24h: dynamic?.priceChange24h,
-    };
-  });
+  const tokens: Token[] = useMemo(() => {
+    return walletTokens.map((wt: TokenAccountInfo) => {
+      const dynamic = dynamicMetadata[wt.mint];
+      const known = knownTokens.find((kt: Token) => kt.mint === wt.mint);
+      
+      const name = dynamic?.name || known?.name || `Token ${wt.mint.slice(0, 8)}...`;
+      const symbol = dynamic?.symbol || known?.symbol || wt.mint.slice(0, 4).toUpperCase();
+      
+      return {
+        mint: wt.mint,
+        name,
+        symbol,
+        decimals: wt.decimals,
+        balance: wt.balance,
+        imageUrl: dynamic?.imageUrl,
+        price: dynamic?.price,
+        priceChange24h: dynamic?.priceChange24h,
+      };
+    });
+  }, [walletTokens, dynamicMetadata, knownTokens]);
 
   const isLoading = loadingWalletTokens || loadingKnownTokens;
+  const isLoadingMetadata = walletMints.length > 0 && loadingMetadata;
 
   const handleAutoTrade = (token: Token) => {
     setSelectedToken(token);
@@ -131,6 +140,7 @@ export function TokenBalances() {
               </h3>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <span className="text-sm">{tokens.length} tokens</span>
+                {isLoadingMetadata && <Loader2 className="w-3 h-3 animate-spin" />}
                 {isExpanded ? (
                   <ChevronUp className="w-5 h-5" />
                 ) : (
@@ -170,6 +180,10 @@ export function TokenBalances() {
                             alt={token.symbol} 
                             className="w-8 h-8 rounded-full flex-shrink-0"
                           />
+                        ) : isLoadingMetadata ? (
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                             <Coins className="w-4 h-4 text-primary" />
@@ -177,10 +191,14 @@ export function TokenBalances() {
                         )}
                         <div className="min-w-0">
                           <div className="font-medium truncate" data-testid={`text-token-name-${token.symbol}`}>
-                            {token.name}
+                            {isLoadingMetadata && !token.imageUrl ? (
+                              <span className="text-muted-foreground">Loading...</span>
+                            ) : (
+                              token.name
+                            )}
                           </div>
                           <div className="text-sm text-muted-foreground flex items-center gap-2" data-testid={`text-token-symbol-${token.symbol}`}>
-                            <span>{token.symbol}</span>
+                            <span>{isLoadingMetadata && !token.imageUrl ? "..." : token.symbol}</span>
                             {token.price && (
                               <span className="text-xs">{formatPrice(token.price)}</span>
                             )}
