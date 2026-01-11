@@ -8,7 +8,7 @@ const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 const decimalsCache: Map<string, number> = new Map();
 
 // Fetch token decimals directly from Solana blockchain
-async function getTokenDecimals(mint: string): Promise<number> {
+export async function getTokenDecimals(mint: string): Promise<number> {
   if (decimalsCache.has(mint)) {
     return decimalsCache.get(mint)!;
   }

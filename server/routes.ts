@@ -16,6 +16,7 @@ import {
   getJupiterQuote, 
   getJupiterSwapTransaction,
   sendTransaction,
+  getTokenDecimals,
   type Token,
   type DexOption
 } from "./services/jupiterSwap";
@@ -1046,12 +1047,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: `No route found on ${dexName} for this swap` });
       }
       
+      // Fetch output token decimals for accurate display on client
+      const outputDecimals = await getTokenDecimals(outputMint as string);
+      
       res.json({
         inputMint: quote.inputMint,
         outputMint: quote.outputMint,
         inAmount: quote.inAmount,
         outAmount: quote.outAmount,
         outputAmount: parseInt(quote.outAmount),
+        outputDecimals,
         priceImpact: parseFloat(quote.priceImpactPct),
         routePlan: quote.routePlan,
         dex: dexOption,

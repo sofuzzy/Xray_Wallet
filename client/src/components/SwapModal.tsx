@@ -586,8 +586,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       
       // Save swap transaction to database
       try {
-        const outputDecimals = outputToken?.decimals || 9;
-        const calculatedOutputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, outputDecimals)).toString() : "0";
+        const decimals = quote?.outputDecimals ?? outputToken?.decimals ?? 9;
+        const calculatedOutputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, decimals)).toString() : "0";
         
         await apiRequest("POST", "/api/transactions", {
           fromAddr: address,
@@ -705,7 +705,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     handleSwap();
   };
 
-  const outputDecimals = outputToken?.decimals || 9;
+  const outputDecimals = quote?.outputDecimals ?? outputToken?.decimals ?? 9;
   const outputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, outputDecimals)).toFixed(6) : "0";
 
   if (selectingFor) {
