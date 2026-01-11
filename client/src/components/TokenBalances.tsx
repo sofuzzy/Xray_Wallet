@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -6,28 +6,18 @@ import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart } from "lu
 import { AutoTradeModal } from "./AutoTradeModal";
 import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { getTokenAccounts, TokenAccountInfo } from "@/lib/solana";
 import { useWallet } from "@/hooks/use-wallet";
-import { apiRequest } from "@/lib/queryClient";
 
 interface Token {
   mint: string;
-  name: string;
-  symbol: string;
+  balance: number;
   decimals: number;
-  balance?: number;
-  imageUrl?: string | null;
-  price?: number;
-  priceChange24h?: number;
-}
-
-interface TokenMetadata {
-  mint: string;
-  name: string;
-  symbol: string;
+  name: string | null;
+  symbol: string | null;
   imageUrl: string | null;
-  price: number;
-  priceChange24h: number;
+  price: number | null;
+  priceChange24h: number | null;
+  marketCap: number | null;
 }
 
 export function TokenBalances() {
@@ -37,59 +27,17 @@ export function TokenBalances() {
   const [showChartModal, setShowChartModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const { data: walletTokens = [], isLoading: loadingWalletTokens } = useQuery({
+  const { data: tokens = [], isLoading } = useQuery<Token[]>({
     queryKey: ["wallet-tokens", address],
-    queryFn: () => address ? getTokenAccounts(address) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!address) return [];
+      const res = await fetch(`/api/wallet/tokens/${address}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!address,
     refetchInterval: 30000,
   });
-
-  const { data: knownTokens = [], isLoading: loadingKnownTokens } = useQuery<Token[]>({
-    queryKey: ["/api/swaps/tokens"],
-  });
-
-  const walletMints = useMemo(() => 
-    walletTokens.map((wt: TokenAccountInfo) => wt.mint).sort(),
-    [walletTokens]
-  );
-
-  const mintsKey = useMemo(() => walletMints.join(","), [walletMints]);
-
-  const { data: dynamicMetadata = {}, isLoading: loadingMetadata } = useQuery<Record<string, TokenMetadata>>({
-    queryKey: ["/api/tokens/metadata/batch", mintsKey],
-    queryFn: async () => {
-      if (walletMints.length === 0) return {};
-      const res = await apiRequest("POST", "/api/tokens/metadata/batch", { mints: walletMints });
-      return res.json();
-    },
-    enabled: walletMints.length > 0,
-    staleTime: 60000,
-    refetchInterval: 60000,
-  });
-
-  const tokens: Token[] = useMemo(() => {
-    return walletTokens.map((wt: TokenAccountInfo) => {
-      const dynamic = dynamicMetadata[wt.mint];
-      const known = knownTokens.find((kt: Token) => kt.mint === wt.mint);
-      
-      const name = dynamic?.name || known?.name || `Token ${wt.mint.slice(0, 8)}...`;
-      const symbol = dynamic?.symbol || known?.symbol || wt.mint.slice(0, 4).toUpperCase();
-      
-      return {
-        mint: wt.mint,
-        name,
-        symbol,
-        decimals: wt.decimals,
-        balance: wt.balance,
-        imageUrl: dynamic?.imageUrl,
-        price: dynamic?.price,
-        priceChange24h: dynamic?.priceChange24h,
-      };
-    });
-  }, [walletTokens, dynamicMetadata, knownTokens]);
-
-  const isLoading = loadingWalletTokens || loadingKnownTokens;
-  const isLoadingMetadata = walletMints.length > 0 && loadingMetadata;
 
   const handleAutoTrade = (token: Token) => {
     setSelectedToken(token);
@@ -101,21 +49,29 @@ export function TokenBalances() {
     setShowChartModal(true);
   };
 
-  const formatPrice = (price: number | undefined) => {
+  const formatPrice = (price: number | null) => {
     if (!price) return "";
     if (price < 0.00001) return `$${price.toExponential(2)}`;
     if (price < 1) return `$${price.toPrecision(4)}`;
     return `$${price.toFixed(2)}`;
   };
 
-  const formatValue = (balance: number | undefined, price: number | undefined) => {
-    if (!balance || !price) return null;
+  const formatValue = (balance: number, price: number | null) => {
+    if (!price) return null;
     const value = balance * price;
     if (value < 0.01) return "<$0.01";
     if (value < 1) return `$${value.toFixed(2)}`;
     if (value < 1000) return `$${value.toFixed(2)}`;
     if (value < 1000000) return `$${(value / 1000).toFixed(2)}K`;
     return `$${(value / 1000000).toFixed(2)}M`;
+  };
+
+  const getDisplayName = (token: Token) => {
+    return token.name || `Token ${token.mint.slice(0, 8)}...`;
+  };
+
+  const getDisplaySymbol = (token: Token) => {
+    return token.symbol || token.mint.slice(0, 4).toUpperCase();
   };
 
   if (isLoading) {
@@ -140,7 +96,6 @@ export function TokenBalances() {
               </h3>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <span className="text-sm">{tokens.length} tokens</span>
-                {isLoadingMetadata && <Loader2 className="w-3 h-3 animate-spin" />}
                 {isExpanded ? (
                   <ChevronUp className="w-5 h-5" />
                 ) : (
@@ -159,6 +114,8 @@ export function TokenBalances() {
                 </div>
               ) : (
                 tokens.map((token: Token) => {
+                  const displayName = getDisplayName(token);
+                  const displaySymbol = getDisplaySymbol(token);
                   const value = formatValue(token.balance, token.price);
                   const priceChange = token.priceChange24h;
                   const priceChangeColor = priceChange && priceChange > 0 
@@ -171,38 +128,30 @@ export function TokenBalances() {
                     <div
                       key={token.mint}
                       className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                      data-testid={`token-balance-${token.symbol}`}
+                      data-testid={`token-balance-${displaySymbol}`}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {token.imageUrl ? (
                           <img 
                             src={token.imageUrl} 
-                            alt={token.symbol} 
+                            alt={displaySymbol} 
                             className="w-8 h-8 rounded-full flex-shrink-0"
                           />
-                        ) : isLoadingMetadata ? (
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                          </div>
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                             <Coins className="w-4 h-4 text-primary" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="font-medium truncate" data-testid={`text-token-name-${token.symbol}`}>
-                            {isLoadingMetadata && !token.imageUrl ? (
-                              <span className="text-muted-foreground">Loading...</span>
-                            ) : (
-                              token.name
-                            )}
+                          <div className="font-medium truncate" data-testid={`text-token-name-${displaySymbol}`}>
+                            {displayName}
                           </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-2" data-testid={`text-token-symbol-${token.symbol}`}>
-                            <span>{isLoadingMetadata && !token.imageUrl ? "..." : token.symbol}</span>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2" data-testid={`text-token-symbol-${displaySymbol}`}>
+                            <span>{displaySymbol}</span>
                             {token.price && (
                               <span className="text-xs">{formatPrice(token.price)}</span>
                             )}
-                            {priceChange !== undefined && (
+                            {priceChange !== null && priceChange !== undefined && (
                               <span className={`text-xs ${priceChangeColor}`}>
                                 {priceChange > 0 ? "+" : ""}{priceChange.toFixed(1)}%
                               </span>
@@ -211,8 +160,8 @@ export function TokenBalances() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="font-semibold" data-testid={`text-token-amount-${token.symbol}`}>
-                          {token.balance?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || "0"}
+                        <div className="font-semibold" data-testid={`text-token-amount-${displaySymbol}`}>
+                          {token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                         </div>
                         {value && (
                           <div className="text-sm text-muted-foreground">{value}</div>
@@ -224,7 +173,7 @@ export function TokenBalances() {
                           variant="ghost"
                           onClick={() => handleShowChart(token)}
                           title="View price chart"
-                          data-testid={`button-chart-${token.symbol}`}
+                          data-testid={`button-chart-${displaySymbol}`}
                         >
                           <LineChart className="w-4 h-4" />
                         </Button>
@@ -233,7 +182,7 @@ export function TokenBalances() {
                           variant="ghost"
                           onClick={() => handleAutoTrade(token)}
                           title="Set auto-trade rules"
-                          data-testid={`button-autotrade-${token.symbol}`}
+                          data-testid={`button-autotrade-${displaySymbol}`}
                         >
                           <Settings2 className="w-4 h-4" />
                         </Button>
@@ -251,7 +200,7 @@ export function TokenBalances() {
         isOpen={showAutoTradeModal}
         onClose={() => setShowAutoTradeModal(false)}
         tokenMint={selectedToken?.mint}
-        tokenSymbol={selectedToken?.symbol}
+        tokenSymbol={selectedToken?.symbol || selectedToken?.mint.slice(0, 4).toUpperCase()}
         currentPrice={selectedToken?.price?.toString() || "0"}
       />
 
@@ -259,7 +208,7 @@ export function TokenBalances() {
         isOpen={showChartModal}
         onClose={() => setShowChartModal(false)}
         tokenMint={selectedToken?.mint || ""}
-        tokenSymbol={selectedToken?.symbol}
+        tokenSymbol={selectedToken?.symbol || undefined}
       />
     </>
   );

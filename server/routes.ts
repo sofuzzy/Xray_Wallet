@@ -477,12 +477,35 @@ export async function registerRoutes(
     }
   });
 
-  // Token accounts endpoint - proxies to Solana RPC
+  // Token accounts endpoint - proxies to Solana RPC with metadata
   app.get("/api/wallet/tokens/:address", async (req, res) => {
     try {
       const { address } = req.params;
       const tokens = await getTokenAccounts(address);
-      res.json(tokens);
+      
+      // Fetch metadata for all tokens
+      if (tokens.length > 0) {
+        const mints = tokens.map((t: any) => t.mint);
+        const metadataMap = await getMultipleTokenMetadata(mints);
+        
+        // Enhance tokens with metadata
+        const enhancedTokens = tokens.map((token: any) => {
+          const meta = metadataMap.get(token.mint);
+          return {
+            ...token,
+            name: meta?.name || null,
+            symbol: meta?.symbol || null,
+            imageUrl: meta?.imageUrl || null,
+            price: meta?.price || null,
+            priceChange24h: meta?.priceChange24h || null,
+            marketCap: meta?.marketCap || null,
+          };
+        });
+        
+        res.json(enhancedTokens);
+      } else {
+        res.json(tokens);
+      }
     } catch (error) {
       console.error("Error fetching token accounts:", error);
       res.json([]);
