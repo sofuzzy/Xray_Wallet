@@ -1,6 +1,7 @@
 import { Transaction, ActivityLog } from "@shared/schema";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle, ChevronRight } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import { formatDistanceToNow } from "date-fns";
 
@@ -9,6 +10,8 @@ interface TransactionListProps {
   currentAddress?: string;
   isLoading: boolean;
   activityLogs?: ActivityLog[];
+  limit?: number;
+  showViewAll?: boolean;
 }
 
 function getBlockReasonText(code: string): string {
@@ -22,7 +25,7 @@ function getBlockReasonText(code: string): string {
   return reasons[code] || code;
 }
 
-export function TransactionList({ transactions, currentAddress, isLoading, activityLogs = [] }: TransactionListProps) {
+export function TransactionList({ transactions, currentAddress, isLoading, activityLogs = [], limit, showViewAll }: TransactionListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4 px-4">
@@ -34,6 +37,8 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
   }
 
   const hasNoActivity = transactions.length === 0 && activityLogs.length === 0;
+  const displayTransactions = limit ? transactions.slice(0, limit) : transactions;
+  const hasMore = limit && transactions.length > limit;
 
   if (hasNoActivity) {
     return (
@@ -95,7 +100,7 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
         </div>
       )}
 
-      {transactions.map((tx, idx) => {
+      {displayTransactions.map((tx, idx) => {
         const isReceived = tx.toAddr === currentAddress;
         const isSwap = tx.type === "swap";
         
@@ -162,6 +167,21 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
           </motion.a>
         );
       })}
+
+      {showViewAll && hasMore && (
+        <Link href="/transactions">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+            data-testid="link-view-all-transactions"
+          >
+            <span className="text-sm font-medium">View all {transactions.length} transactions</span>
+            <ChevronRight className="w-4 h-4" />
+          </motion.div>
+        </Link>
+      )}
     </div>
   );
 }

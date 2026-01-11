@@ -401,6 +401,8 @@ export default function Home() {
           currentAddress={address} 
           isLoading={txLoading}
           activityLogs={activityLogs}
+          limit={10}
+          showViewAll={true}
         />
       </main>
 
