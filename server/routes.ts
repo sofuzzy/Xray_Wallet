@@ -699,6 +699,27 @@ export async function registerRoutes(
     }
   });
 
+  // Delete activity log (dismiss blocked swap notification)
+  app.delete("/api/activity-logs/:id", hybridAuth, async (req, res) => {
+    try {
+      const userId = req.tokenUser?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "INVALID_ID", message: "Invalid activity log ID" });
+      }
+      
+      await storage.deleteActivityLog(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete activity log:", error);
+      res.status(500).json({ message: "Failed to delete activity log" });
+    }
+  });
+
   // Vault endpoints - encrypted key backup system
   // GET /api/vault - Retrieve encrypted vault data for the authenticated user
   app.get("/api/vault", hybridAuth, async (req, res) => {

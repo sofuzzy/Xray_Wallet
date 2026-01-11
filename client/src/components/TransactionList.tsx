@@ -1,9 +1,12 @@
 import { Transaction, ActivityLog } from "@shared/schema";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle, ChevronRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle, ChevronRight, X } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import { formatDistanceToNow } from "date-fns";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -26,6 +29,20 @@ function getBlockReasonText(code: string): string {
 }
 
 export function TransactionList({ transactions, currentAddress, isLoading, activityLogs = [], limit, showViewAll }: TransactionListProps) {
+  const dismissMutation = useMutation({
+    mutationFn: async (logId: number) => {
+      await apiRequest("DELETE", `/api/activity-logs/${logId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/activity-logs"] });
+    },
+  });
+
+  const handleDismiss = (e: React.MouseEvent, logId: number) => {
+    e.stopPropagation();
+    dismissMutation.mutate(logId);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 px-4">
@@ -62,41 +79,56 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
       {swapBlockLogs.length > 0 && (
         <div className="space-y-2 mb-4">
           <p className="text-xs text-muted-foreground ml-1">Blocked Swaps</p>
-          {swapBlockLogs.slice(0, 5).map((log, idx) => (
-            <motion.div
-              key={log.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20"
-              data-testid={`activity-log-${log.id}`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive/20 text-destructive">
-                  <ShieldAlert className="w-4 h-4" />
+          <AnimatePresence mode="popLayout">
+            {swapBlockLogs.slice(0, 5).map((log, idx) => (
+              <motion.div
+                key={log.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20, height: 0, marginBottom: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20"
+                data-testid={`activity-log-${log.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive/20 text-destructive">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                      <AlertCircle className="w-3 h-3" />
+                      Swap Blocked
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {log.createdAt ? formatDistanceToNow(new Date(log.createdAt), { addSuffix: true }) : 'Just now'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
-                    <AlertCircle className="w-3 h-3" />
-                    Swap Blocked
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {log.createdAt ? formatDistanceToNow(new Date(log.createdAt), { addSuffix: true }) : 'Just now'}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-xs text-destructive font-medium">
+                      {getBlockReasonText(log.reason)}
+                    </p>
+                    {log.requestedAmount && (
+                      <p className="text-xs text-muted-foreground">
+                        {parseFloat(log.requestedAmount).toFixed(4)} requested
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => handleDismiss(e, log.id)}
+                    disabled={dismissMutation.isPending}
+                    data-testid={`button-dismiss-${log.id}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-destructive font-medium">
-                  {getBlockReasonText(log.reason)}
-                </p>
-                {log.requestedAmount && (
-                  <p className="text-xs text-muted-foreground">
-                    {parseFloat(log.requestedAmount).toFixed(4)} requested
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
 

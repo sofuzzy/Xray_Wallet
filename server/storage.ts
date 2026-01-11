@@ -76,6 +76,7 @@ export interface IStorage {
 
   getActivityLogs(userId: string | null, walletAddress?: string): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  deleteActivityLog(id: number, userId: string): Promise<boolean>;
 
   getVault(userId: string): Promise<Vault | undefined>;
   createVault(vault: InsertVault): Promise<Vault>;
@@ -264,6 +265,11 @@ export class DatabaseStorage implements IStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const [created] = await db.insert(activityLogs).values(log).returning();
     return created;
+  }
+
+  async deleteActivityLog(id: number, userId: string): Promise<boolean> {
+    await db.delete(activityLogs).where(and(eq(activityLogs.id, id), eq(activityLogs.userId, userId)));
+    return true;
   }
 
   async getVault(userId: string): Promise<Vault | undefined> {
