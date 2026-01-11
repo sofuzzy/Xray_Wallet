@@ -8,6 +8,7 @@ import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getTokenAccounts, TokenAccountInfo } from "@/lib/solana";
 import { useWallet } from "@/hooks/use-wallet";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Token {
   mint: string;
@@ -15,6 +16,18 @@ interface Token {
   symbol: string;
   decimals: number;
   balance?: number;
+  imageUrl?: string | null;
+  price?: number;
+  priceChange24h?: number;
+}
+
+interface TokenMetadata {
+  mint: string;
+  name: string;
+  symbol: string;
+  imageUrl: string | null;
+  price: number;
+  priceChange24h: number;
 }
 
 export function TokenBalances() {
@@ -24,28 +37,46 @@ export function TokenBalances() {
   const [showChartModal, setShowChartModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Fetch actual token accounts from the wallet
   const { data: walletTokens = [], isLoading: loadingWalletTokens } = useQuery({
     queryKey: ["wallet-tokens", address],
     queryFn: () => address ? getTokenAccounts(address) : Promise.resolve([]),
     enabled: !!address,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
-  // Fetch known token metadata from backend
   const { data: knownTokens = [], isLoading: loadingKnownTokens } = useQuery<Token[]>({
     queryKey: ["/api/swaps/tokens"],
   });
 
-  // Merge wallet tokens with known metadata
+  const walletMints = walletTokens.map((wt: TokenAccountInfo) => wt.mint);
+  const { data: dynamicMetadata = {}, isLoading: loadingMetadata } = useQuery<Record<string, TokenMetadata>>({
+    queryKey: ["/api/tokens/metadata/batch", walletMints],
+    queryFn: async () => {
+      if (walletMints.length === 0) return {};
+      const res = await apiRequest("POST", "/api/tokens/metadata/batch", { mints: walletMints });
+      return res.json();
+    },
+    enabled: walletMints.length > 0,
+    staleTime: 60000,
+    refetchInterval: 60000,
+  });
+
   const tokens: Token[] = walletTokens.map((wt: TokenAccountInfo) => {
+    const dynamic = dynamicMetadata[wt.mint];
     const known = knownTokens.find((kt: Token) => kt.mint === wt.mint);
+    
+    const name = dynamic?.name || known?.name || `Token ${wt.mint.slice(0, 8)}...`;
+    const symbol = dynamic?.symbol || known?.symbol || wt.mint.slice(0, 4).toUpperCase();
+    
     return {
       mint: wt.mint,
-      name: known?.name || `Token ${wt.mint.slice(0, 8)}...`,
-      symbol: known?.symbol || wt.mint.slice(0, 4).toUpperCase(),
+      name,
+      symbol,
       decimals: wt.decimals,
       balance: wt.balance,
+      imageUrl: dynamic?.imageUrl,
+      price: dynamic?.price,
+      priceChange24h: dynamic?.priceChange24h,
     };
   });
 
@@ -59,6 +90,23 @@ export function TokenBalances() {
   const handleShowChart = (token: Token) => {
     setSelectedToken(token);
     setShowChartModal(true);
+  };
+
+  const formatPrice = (price: number | undefined) => {
+    if (!price) return "";
+    if (price < 0.00001) return `$${price.toExponential(2)}`;
+    if (price < 1) return `$${price.toPrecision(4)}`;
+    return `$${price.toFixed(2)}`;
+  };
+
+  const formatValue = (balance: number | undefined, price: number | undefined) => {
+    if (!balance || !price) return null;
+    const value = balance * price;
+    if (value < 0.01) return "<$0.01";
+    if (value < 1) return `$${value.toFixed(2)}`;
+    if (value < 1000) return `$${value.toFixed(2)}`;
+    if (value < 1000000) return `$${(value / 1000).toFixed(2)}K`;
+    return `$${(value / 1000000).toFixed(2)}M`;
   };
 
   if (isLoading) {
@@ -100,47 +148,81 @@ export function TokenBalances() {
                   <p className="text-xs mt-1">Swap SOL for tokens or receive tokens from others.</p>
                 </div>
               ) : (
-                tokens.map((token: Token) => (
-                  <div
-                    key={token.mint}
-                    className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-testid={`token-balance-${token.symbol}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium" data-testid={`text-token-name-${token.symbol}`}>
-                        {token.name}
+                tokens.map((token: Token) => {
+                  const value = formatValue(token.balance, token.price);
+                  const priceChange = token.priceChange24h;
+                  const priceChangeColor = priceChange && priceChange > 0 
+                    ? "text-green-500" 
+                    : priceChange && priceChange < 0 
+                      ? "text-destructive" 
+                      : "text-muted-foreground";
+                  
+                  return (
+                    <div
+                      key={token.mint}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+                      data-testid={`token-balance-${token.symbol}`}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {token.imageUrl ? (
+                          <img 
+                            src={token.imageUrl} 
+                            alt={token.symbol} 
+                            className="w-8 h-8 rounded-full flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                            <Coins className="w-4 h-4 text-primary" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium truncate" data-testid={`text-token-name-${token.symbol}`}>
+                            {token.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2" data-testid={`text-token-symbol-${token.symbol}`}>
+                            <span>{token.symbol}</span>
+                            {token.price && (
+                              <span className="text-xs">{formatPrice(token.price)}</span>
+                            )}
+                            {priceChange !== undefined && (
+                              <span className={`text-xs ${priceChangeColor}`}>
+                                {priceChange > 0 ? "+" : ""}{priceChange.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground" data-testid={`text-token-symbol-${token.symbol}`}>
-                        {token.symbol}
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-semibold" data-testid={`text-token-amount-${token.symbol}`}>
+                          {token.balance?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || "0"}
+                        </div>
+                        {value && (
+                          <div className="text-sm text-muted-foreground">{value}</div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleShowChart(token)}
+                          title="View price chart"
+                          data-testid={`button-chart-${token.symbol}`}
+                        >
+                          <LineChart className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleAutoTrade(token)}
+                          title="Set auto-trade rules"
+                          data-testid={`button-autotrade-${token.symbol}`}
+                        >
+                          <Settings2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold" data-testid={`text-token-amount-${token.symbol}`}>
-                        {token.balance?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || "0"} {token.symbol}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleShowChart(token)}
-                        title="View price chart"
-                        data-testid={`button-chart-${token.symbol}`}
-                      >
-                        <LineChart className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleAutoTrade(token)}
-                        title="Set auto-trade rules"
-                        data-testid={`button-autotrade-${token.symbol}`}
-                      >
-                        <Settings2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </CollapsibleContent>
@@ -152,7 +234,7 @@ export function TokenBalances() {
         onClose={() => setShowAutoTradeModal(false)}
         tokenMint={selectedToken?.mint}
         tokenSymbol={selectedToken?.symbol}
-        currentPrice="0"
+        currentPrice={selectedToken?.price?.toString() || "0"}
       />
 
       <TokenChart
