@@ -224,7 +224,14 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   const [riskModalOpen, setRiskModalOpen] = useState(false);
   const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
-  const [riskAckedMint, setRiskAckedMint] = useState<string | null>(null);
+  const [riskAckedMints, setRiskAckedMints] = useState<Set<string>>(() => {
+    try {
+      const stored = sessionStorage.getItem("xray_risk_acked_mints");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
   
   // Slippage state
@@ -470,7 +477,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       });
       
       // Add risk acknowledgement if needed
-      if (riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint) {
+      const normalizedOutput = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
+      if (riskAckedMints.has(normalizedOutput)) {
         params.set("ack", "true");
       }
       
@@ -535,7 +543,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         quote: quote.quote,
         userPublicKey: address,
         priorityFee: getActivePriorityFee(),
-        acknowledgeRisk: riskAckedMint && (outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint) === riskAckedMint ? true : false,
+        acknowledgeRisk: riskAckedMints.has(outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint),
         riskShieldDisabled: !riskShieldSettings.enabled,
         enabledCheckCodes: riskShieldSettings.enabled ? getEnabledCheckCodes() : [],
       });
@@ -1232,7 +1240,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
 
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || isBalanceInsufficient}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient}
             className="w-full"
             data-testid="button-execute-swap"
           >
@@ -1270,7 +1278,12 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
         decision={riskDecision}
         onAcknowledge={() => {
           const normalizedOut = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
-          setRiskAckedMint(normalizedOut);
+          setRiskAckedMints(prev => {
+            const updated = new Set(prev);
+            updated.add(normalizedOut);
+            try { sessionStorage.setItem("xray_risk_acked_mints", JSON.stringify(Array.from(updated))); } catch {}
+            return updated;
+          });
           setRiskModalOpen(false);
           // Re-fetch quote or retry transaction after acknowledgement
           if (riskPendingStage === "quote") {
