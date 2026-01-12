@@ -159,37 +159,37 @@ function TokenDetail({ token, onBack, onAddToWatchlist, onSwap }: {
         <h2 className="text-xl font-bold text-foreground">Token Details</h2>
       </div>
 
-      <Card className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
+      <Card className="p-4 sm:p-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {token.logoURI ? (
-              <img src={token.logoURI} alt={token.symbol} className="w-16 h-16 rounded-full" />
+              <img src={token.logoURI} alt={token.symbol} className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex-shrink-0" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center text-lg sm:text-xl font-bold text-primary flex-shrink-0">
                 {token.symbol?.charAt(0) || "?"}
               </div>
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-foreground">{token.name}</h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{token.name}</h1>
                 {token.isTrending && (
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="flex-shrink-0">
                     <Flame className="w-3 h-3 mr-1 text-orange-500" />
                     Trending
                   </Badge>
                 )}
               </div>
-              <p className="text-muted-foreground">{token.symbol}</p>
+              <p className="text-muted-foreground text-sm sm:text-base">{token.symbol}</p>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={onSwap} data-testid="button-swap-token">
+            <Button onClick={onSwap} size="sm" data-testid="button-swap-token">
               <ArrowRightLeft className="w-4 h-4 mr-2" />
               Swap
             </Button>
-            <Button variant="outline" onClick={() => onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals })} data-testid="button-add-watchlist-detail">
+            <Button variant="outline" size="sm" onClick={() => onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals })} data-testid="button-add-watchlist-detail">
               <Star className="w-4 h-4 mr-2" />
-              Add to Watchlist
+              Watchlist
             </Button>
           </div>
         </div>
