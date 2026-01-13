@@ -434,6 +434,32 @@ export async function registerRoutes(
     res.json({ user, wallet: wallet || null });
   });
 
+  app.put(api.users.update.path, hybridAuth, async (req, res) => {
+    const userId = req.tokenUser!.sub;
+    
+    const parseResult = api.users.update.input.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ message: parseResult.error.errors[0]?.message || "Invalid input" });
+    }
+
+    const { username, firstName, lastName } = parseResult.data;
+    const updates: { username?: string; firstName?: string; lastName?: string } = {};
+    if (username !== undefined) updates.username = username;
+    if (firstName !== undefined) updates.firstName = firstName;
+    if (lastName !== undefined) updates.lastName = lastName;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No updates provided" });
+    }
+
+    const updatedUser = await authStorage.updateUser(userId, updates);
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(updatedUser);
+  });
+
   app.get(api.users.lookup.path, hybridAuth, async (req, res) => {
     const { username } = req.params;
     // Looking up by email/username - now requires authentication

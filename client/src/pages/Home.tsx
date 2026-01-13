@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWallet } from "@/hooks/use-wallet";
 import { usePasskey } from "@/hooks/use-passkey";
 import { useWalletRegistry } from "@/hooks/use-wallet-registry";
-import { useUpdateUser, useCurrentUser } from "@/hooks/use-users";
+import { useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { type ActivityLog } from "@shared/schema";
 import { WalletCard } from "@/components/WalletCard";
@@ -55,7 +55,6 @@ export default function Home() {
     removeWallet,
     editWalletName
   } = useWallet();
-  const { mutate: updateUser } = useUpdateUser();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
   const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
@@ -89,7 +88,7 @@ export default function Home() {
     const localAddresses = new Set(wallets.map(w => w.publicKey));
     const now = Date.now();
     
-    [...failureInfo.current.keys()].forEach(addr => {
+    Array.from(failureInfo.current.keys()).forEach(addr => {
       if (!localAddresses.has(addr) || cloudAddresses.has(addr)) {
         failureInfo.current.delete(addr);
       }
@@ -161,11 +160,6 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    if (dbUser && address && dbUser.wallet?.publicKey !== address) {
-      updateUser({ walletPublicKey: address });
-    }
-  }, [dbUser, address, updateUser]);
 
   if (authLoading || walletLoading) {
     return (

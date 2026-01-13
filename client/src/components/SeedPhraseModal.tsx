@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { useVault } from "@/hooks/use-vault";
+import { useCurrentUser, useUpdateUser } from "@/hooks/use-users";
 import { validateMnemonic, getStoredWallets } from "@/lib/solana";
 import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const biometric = useBiometric();
   const riskShield = useRiskShieldSettings();
   const vault = useVault();
-  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud">("backup");
+  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
@@ -67,6 +68,9 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const [showCloudPassphrase, setShowCloudPassphrase] = useState(false);
   const [cloudMode, setCloudMode] = useState<"backup" | "restore">("backup");
   const [confirmDeleteVault, setConfirmDeleteVault] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const { data: currentUser } = useCurrentUser();
+  const updateUserMutation = useUpdateUser();
 
   const seedPhrase = getSeedPhrase();
   const words = seedPhrase?.split(" ") || [];
@@ -204,8 +208,12 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud")}>
-            <TabsList className="grid w-full grid-cols-4">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud" | "profile")}>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="profile" data-testid="tab-profile">
+                <User className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Profile</span>
+              </TabsTrigger>
               <TabsTrigger value="backup" data-testid="tab-backup">
                 <Download className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Export</span>
@@ -223,6 +231,62 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="profile" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Current Username</label>
+                  <div className="p-3 rounded-lg bg-muted border border-border">
+                    <p className="text-sm font-mono">{currentUser?.user?.username || currentUser?.user?.firstName || "Not set"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">New Username</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter new username (3-30 characters)"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    data-testid="input-new-username"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Username must be 3-30 characters long.
+                  </p>
+                </div>
+
+                <Button
+                  onClick={async () => {
+                    if (newUsername.length < 3 || newUsername.length > 30) {
+                      toast({ title: "Invalid Username", description: "Username must be 3-30 characters.", variant: "destructive" });
+                      return;
+                    }
+                    try {
+                      await updateUserMutation.mutateAsync({ username: newUsername });
+                      toast({ title: "Username Updated", description: "Your username has been changed successfully." });
+                      setNewUsername("");
+                    } catch {
+                      toast({ title: "Update Failed", description: "Could not update username.", variant: "destructive" });
+                    }
+                  }}
+                  disabled={!newUsername.trim() || newUsername.length < 3 || updateUserMutation.isPending}
+                  className="w-full"
+                  data-testid="button-update-username"
+                >
+                  {updateUserMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Update Username
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
 
             <TabsContent value="backup" className="space-y-4 mt-4">
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">

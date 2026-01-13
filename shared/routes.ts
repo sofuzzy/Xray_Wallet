@@ -38,6 +38,19 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/users/me',
+      input: z.object({
+        username: z.string().min(3).max(30).optional(),
+        firstName: z.string().max(50).optional(),
+        lastName: z.string().max(50).optional(),
+      }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
   },
   wallets: {
     create: {
@@ -115,6 +128,9 @@ export const api = {
     },
   },
 };
+
+export const UpdateUserRequestSchema = api.users.update.input;
+export type UpdateUserRequest = z.infer<typeof UpdateUserRequestSchema>;
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;

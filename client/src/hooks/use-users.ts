@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
-import { UpdateUserRequest } from "@shared/schema";
+import { api, buildUrl, UpdateUserRequest } from "@shared/routes";
 
 export function useCurrentUser() {
   return useQuery({
