@@ -362,6 +362,13 @@ export default function Home() {
           />
         </div>
 
+        <ActionButtons 
+          onSend={() => setIsSendOpen(true)}
+          onReceive={() => setIsReceiveOpen(true)}
+          onSwap={() => setIsSwapOpen(true)}
+          onLaunch={() => setIsLaunchOpen(true)}
+        />
+
         <div className="px-6">
           <PortfolioSummary address={address} solBalance={balance} />
         </div>
@@ -374,13 +381,6 @@ export default function Home() {
             </span>
           </div>
         </div>
-
-        <ActionButtons 
-          onSend={() => setIsSendOpen(true)}
-          onReceive={() => setIsReceiveOpen(true)}
-          onSwap={() => setIsSwapOpen(true)}
-          onLaunch={() => setIsLaunchOpen(true)}
-        />
 
         <div className="px-6">
           <TokenBalances />

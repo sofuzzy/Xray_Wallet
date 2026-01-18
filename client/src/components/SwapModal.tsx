@@ -215,8 +215,22 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
   const [outputMint, setOutputMint] = useState(initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
-  const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">("medium");
-  const [customPriorityFee, setCustomPriorityFee] = useState("");
+  const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">(() => {
+    try {
+      const stored = localStorage.getItem("xray_priority_fee");
+      if (stored && ["low", "medium", "high", "custom"].includes(stored)) {
+        return stored as "low" | "medium" | "high" | "custom";
+      }
+    } catch {}
+    return "medium";
+  });
+  const [customPriorityFee, setCustomPriorityFee] = useState(() => {
+    try {
+      return localStorage.getItem("xray_custom_priority_fee") || "";
+    } catch {
+      return "";
+    }
+  });
   const [customTokens, setCustomTokens] = useState<Token[]>(initialOutputToken ? [initialOutputToken] : []);
   const [txStep, setTxStep] = useState<TransactionStep>("idle");
   const [txError, setTxError] = useState<string>("");
@@ -254,6 +268,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
     }, 500);
     return () => clearTimeout(timer);
   }, [inputAmount]);
+  
+  // Persist priority fee settings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("xray_priority_fee", priorityFee);
+    } catch {}
+  }, [priorityFee]);
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem("xray_custom_priority_fee", customPriorityFee);
+    } catch {}
+  }, [customPriorityFee]);
   
   // Check quote staleness every second
   useEffect(() => {
