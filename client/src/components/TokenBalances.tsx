@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart, ArrowRightLeft } from "lucide-react";
+import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart } from "lucide-react";
 import { AutoTradeModal } from "./AutoTradeModal";
 import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -128,11 +128,24 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
                       ? "text-destructive" 
                       : "text-muted-foreground";
                   
+                  const handleRowClick = () => {
+                    if (onSwapToken) {
+                      onSwapToken({
+                        mint: token.mint,
+                        symbol: token.symbol || token.mint.slice(0, 4).toUpperCase(),
+                        name: token.name || `Token ${token.mint.slice(0, 8)}`,
+                        decimals: token.decimals,
+                        logoURI: token.imageUrl || undefined,
+                      });
+                    }
+                  };
+                  
                   return (
                     <div
                       key={token.mint}
-                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+                      className={`flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 transition-colors ${onSwapToken ? 'cursor-pointer hover:bg-muted/70' : ''}`}
                       data-testid={`token-balance-${displaySymbol}`}
+                      onClick={handleRowClick}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {token.imageUrl ? (
@@ -171,24 +184,7 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
                           <div className="text-sm text-muted-foreground">{value}</div>
                         )}
                       </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        {onSwapToken && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => onSwapToken({
-                              mint: token.mint,
-                              symbol: token.symbol || token.mint.slice(0, 4).toUpperCase(),
-                              name: token.name || `Token ${token.mint.slice(0, 8)}`,
-                              decimals: token.decimals,
-                              logoURI: token.imageUrl || undefined,
-                            })}
-                            title="Swap for SOL"
-                            data-testid={`button-swap-${displaySymbol}`}
-                          >
-                            <ArrowRightLeft className="w-4 h-4" />
-                          </Button>
-                        )}
+                      <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="icon"
                           variant="ghost"
