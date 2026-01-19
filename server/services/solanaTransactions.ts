@@ -1,5 +1,6 @@
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getRpcService, createUserRpcService } from "./rpcService";
+import { broadcastAndConfirmTransaction, isHeliusSenderEnabled } from "./heliusSender";
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
@@ -123,12 +124,22 @@ export async function sendRawTransaction(
   userRpc?: string
 ): Promise<string> {
   try {
+    // Use Helius Sender for ultra-low latency if enabled
+    if (isHeliusSenderEnabled() && !userRpc) {
+      const { signature, usedSender } = await broadcastAndConfirmTransaction(serializedTransaction);
+      console.log(`[tx] Broadcast via ${usedSender ? "Helius Sender" : "standard RPC"}: ${signature}`);
+      return signature;
+    }
+    
+    // Fallback to standard RPC broadcast
     const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const buffer = Buffer.from(serializedTransaction, "base64");
     const signature = await rpc.sendRawTransaction(buffer, {
       skipPreflight: false,
       preflightCommitment: "confirmed",
     });
+    
+    console.log(`[tx] Broadcast via standard RPC: ${signature}`);
     
     const latestBlockhash = await rpc.getLatestBlockhash();
     await rpc.confirmTransaction(

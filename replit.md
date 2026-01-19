@@ -127,6 +127,15 @@ The server follows a modular pattern:
   - Structured error codes: BLOCKHASH_EXPIRED, INVALID_SIGNATURE, TX_MUTATED_AFTER_SIGN, INSUFFICIENT_FUNDS, RATE_LIMITED, SLIPPAGE_EXCEEDED
   - Server returns parseable error codes for user-friendly error messages
   - Base64 encoding consistency enforced end-to-end (no mutations after signing)
+- **Helius Sender Integration**: Ultra-low latency transaction broadcasting
+  - Feature flag: `ENABLE_HELIUS_SENDER=true` to enable
+  - Environment variables: `HELIUS_API_KEY`, `HELIUS_SENDER_URL` (defaults to https://sender.helius-rpc.com/fast)
+  - Used ONLY for sendTransaction broadcast, NOT for reads/quotes/blockhash
+  - Automatic fallback to standard RPC if Sender fails
+  - Confirmation still uses normal Helius RPC Connection
+  - Non-custodial: API keys never exposed to frontend
+  - Logs which broadcast path was used (Helius Sender vs standard RPC)
+  - Key files: `server/services/heliusSender.ts`, `server/services/solanaTransactions.ts`
 
 ## External Dependencies
 

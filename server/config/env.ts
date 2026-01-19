@@ -9,6 +9,9 @@ export interface EnvConfig {
   metadataCacheTtlMs: number;
   enableHeliusRebates: boolean;
   heliusRebateAddress: string | null;
+  enableHeliusSender: boolean;
+  heliusSenderUrl: string;
+  heliusApiKey: string | null;
 }
 
 function parseCommaSeparated(value: string | undefined): string[] {
@@ -120,6 +123,11 @@ function loadConfig(): EnvConfig {
   // Helius rebate configuration
   const enableHeliusRebates = process.env.ENABLE_HELIUS_REBATES === "true";
   const heliusRebateAddress = process.env.HELIUS_REBATE_ADDRESS || null;
+  
+  // Helius Sender configuration for ultra-low latency broadcast
+  const enableHeliusSender = process.env.ENABLE_HELIUS_SENDER === "true";
+  const heliusSenderUrl = process.env.HELIUS_SENDER_URL || "https://sender.helius-rpc.com/fast";
+  const heliusApiKey = process.env.HELIUS_API_KEY || null;
 
   const config: EnvConfig = {
     nodeEnv,
@@ -130,6 +138,9 @@ function loadConfig(): EnvConfig {
     metadataCacheTtlMs: 60_000,
     enableHeliusRebates,
     heliusRebateAddress,
+    enableHeliusSender,
+    heliusSenderUrl,
+    heliusApiKey,
   };
 
   return config;
@@ -160,5 +171,16 @@ export function validateStartupConfig(): void {
     }
   } else {
     console.log(`[config] Helius rebates: disabled`);
+  }
+  
+  // Log Helius Sender status
+  if (env.enableHeliusSender) {
+    if (env.heliusApiKey) {
+      console.log(`[config] Helius Sender: enabled (ultra-low latency mode)`);
+    } else {
+      console.warn(`[config] Helius Sender: enabled but HELIUS_API_KEY not set`);
+    }
+  } else {
+    console.log(`[config] Helius Sender: disabled`);
   }
 }
