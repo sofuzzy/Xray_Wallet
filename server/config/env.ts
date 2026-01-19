@@ -7,6 +7,8 @@ export interface EnvConfig {
   webauthnOrigins: string[];
   webauthnRpId: string;
   metadataCacheTtlMs: number;
+  enableHeliusRebates: boolean;
+  heliusRebateAddress: string | null;
 }
 
 function parseCommaSeparated(value: string | undefined): string[] {
@@ -115,6 +117,10 @@ function loadConfig(): EnvConfig {
   const nodeEnv = (process.env.NODE_ENV || "development") as EnvConfig["nodeEnv"];
   const isProduction = nodeEnv === "production";
 
+  // Helius rebate configuration
+  const enableHeliusRebates = process.env.ENABLE_HELIUS_REBATES === "true";
+  const heliusRebateAddress = process.env.HELIUS_REBATE_ADDRESS || null;
+
   const config: EnvConfig = {
     nodeEnv,
     isProduction,
@@ -122,6 +128,8 @@ function loadConfig(): EnvConfig {
     webauthnOrigins: buildWebauthnOrigins(),
     webauthnRpId: buildWebauthnRpId(),
     metadataCacheTtlMs: 60_000,
+    enableHeliusRebates,
+    heliusRebateAddress,
   };
 
   return config;
@@ -142,4 +150,15 @@ export function validateStartupConfig(): void {
   console.log(`[config] Solana RPCs configured: ${env.solanaRpcs.length}`);
   console.log(`[config] WebAuthn origins: ${env.webauthnOrigins.join(", ")}`);
   console.log(`[config] WebAuthn RP ID: ${env.webauthnRpId}`);
+  
+  // Log rebate status without exposing the address
+  if (env.enableHeliusRebates) {
+    if (env.heliusRebateAddress) {
+      console.log(`[config] Helius rebates: enabled (address configured)`);
+    } else {
+      console.warn(`[config] Helius rebates: enabled but HELIUS_REBATE_ADDRESS not set`);
+    }
+  } else {
+    console.log(`[config] Helius rebates: disabled`);
+  }
 }

@@ -9,6 +9,32 @@ export interface RpcServiceOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Builds a Helius RPC URL with rebate-address query param for post-trade rebates.
+ * Only appends the param if:
+ * 1. ENABLE_HELIUS_REBATES is true
+ * 2. HELIUS_REBATE_ADDRESS is set
+ * 3. The base URL is a Helius RPC endpoint
+ */
+function buildRebateRpcUrl(baseUrl: string): string | null {
+  if (!env.enableHeliusRebates || !env.heliusRebateAddress) {
+    return null;
+  }
+  
+  // Only apply to Helius endpoints
+  if (!baseUrl.includes("helius")) {
+    return null;
+  }
+  
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("rebate-address", env.heliusRebateAddress);
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_OPTIONS: Required<RpcServiceOptions> = {
   commitment: "confirmed",
   maxRetries: 5,
@@ -37,6 +63,7 @@ class RpcService {
   private currentIndex: number = 0;
   private options: Required<RpcServiceOptions>;
   private bestEndpointUrl: string | null = null;
+  private rebateConnection: Connection | null = null;
 
   constructor(rpcs: string[], options: RpcServiceOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -70,8 +97,33 @@ class RpcService {
       }),
     }));
     
+    // Initialize rebate-enabled connection for Helius if configured
+    this.initializeRebateConnection(rpcs);
+    
     console.log(`[rpc] Initialized with ${this.endpoints.length} endpoints:`);
     this.endpoints.forEach((ep, i) => console.log(`  ${i + 1}. ${ep.name}`));
+  }
+  
+  /**
+   * Initialize a rebate-enabled connection for sendTransaction operations.
+   * This connection is only used when sending transactions to capture post-trade rebates.
+   */
+  private initializeRebateConnection(rpcs: string[]): void {
+    // Find a Helius endpoint to use for rebates
+    const heliusUrl = rpcs.find(url => url.includes("helius"));
+    if (!heliusUrl) {
+      return;
+    }
+    
+    const rebateUrl = buildRebateRpcUrl(heliusUrl);
+    if (rebateUrl) {
+      this.rebateConnection = new Connection(rebateUrl, {
+        commitment: this.options.commitment,
+        confirmTransactionInitialTimeout: this.options.timeoutMs,
+        disableRetryOnRateLimit: true,
+      });
+      console.log(`[rpc] Rebate connection initialized for Helius`);
+    }
   }
   
   private getEndpointName(url: string): string {
@@ -246,10 +298,27 @@ class RpcService {
     );
   }
 
+  /**
+   * Send a raw transaction, using the rebate-enabled connection if available.
+   * This routes transactions through Helius with rebate-address param for post-trade rebates.
+   */
   async sendRawTransaction(
     rawTransaction: Buffer,
     options?: { skipPreflight?: boolean; preflightCommitment?: Commitment }
   ): Promise<string> {
+    // Use rebate connection for sendTransaction if available
+    if (this.rebateConnection) {
+      try {
+        const signature = await this.rebateConnection.sendRawTransaction(rawTransaction, options);
+        console.log(`[rpc] Transaction sent via rebate-enabled connection`);
+        return signature;
+      } catch (error) {
+        // Fall back to regular connection on error
+        console.warn(`[rpc] Rebate connection failed, falling back to regular connection:`, error);
+      }
+    }
+    
+    // Fallback to regular multi-endpoint execution
     return this.execute(
       (conn) => conn.sendRawTransaction(rawTransaction, options),
       "sendRawTransaction"

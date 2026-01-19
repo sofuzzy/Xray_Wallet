@@ -112,6 +112,14 @@ The server follows a modular pattern:
   - Latency-based routing: Prefers fastest healthy endpoint
   - Automatic retry on timeout/rate-limit with exponential backoff
   - Health status tracking per endpoint with cooldown periods
+- **Helius Post-Trade Rebates**: Server-side rebate support for Helius RPC
+  - Feature flag: `ENABLE_HELIUS_REBATES=true` to enable
+  - Rebate address: `HELIUS_REBATE_ADDRESS` (Solana address to receive rebates)
+  - Only applies to sendTransaction/sendRawTransaction operations
+  - Appends `rebate-address` query param to Helius RPC URL
+  - Non-custodial: Rebate address never exposed to frontend
+  - Fallback to regular connection if rebate connection fails
+  - Key files: `server/config/env.ts`, `server/services/rpcService.ts`
 
 ## External Dependencies
 
