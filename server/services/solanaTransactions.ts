@@ -92,6 +92,32 @@ export async function getTokenAccounts(
   }
 }
 
+export interface SendRawTransactionResult {
+  signature?: string;
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+}
+
+function parseTransactionError(error: any): { code: string; message: string } {
+  const errMsg = error?.message || String(error);
+  
+  if (errMsg.includes("blockhash") && (errMsg.includes("expired") || errMsg.includes("not found"))) {
+    return { code: "BLOCKHASH_EXPIRED", message: "Transaction blockhash has expired. Please try again." };
+  }
+  if (errMsg.includes("signature verification") || errMsg.includes("invalid signature") || errMsg.includes("INVALID")) {
+    return { code: "INVALID_SIGNATURE", message: "Transaction signature is invalid. The transaction may have been modified." };
+  }
+  if (errMsg.includes("429") || errMsg.includes("Too Many Requests")) {
+    return { code: "RATE_LIMITED", message: "Network is busy. Please try again in a few seconds." };
+  }
+  if (errMsg.includes("insufficient funds") || errMsg.includes("Insufficient") || errMsg.includes("0x1")) {
+    return { code: "INSUFFICIENT_FUNDS", message: "Insufficient SOL balance for this transaction." };
+  }
+  
+  return { code: "TRANSACTION_FAILED", message: errMsg || "Transaction failed. Please try again." };
+}
+
 export async function sendRawTransaction(
   serializedTransaction: string,
   userRpc?: string
@@ -112,9 +138,12 @@ export async function sendRawTransaction(
     );
     
     return signature;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending transaction:", error);
-    throw error;
+    const parsed = parseTransactionError(error);
+    const enhancedError = new Error(`${parsed.code}: ${parsed.message}`);
+    (enhancedError as any).code = parsed.code;
+    throw enhancedError;
   }
 }
 

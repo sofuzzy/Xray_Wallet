@@ -658,7 +658,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
       
       const integrityCheck = await verifyVersionedTransactionIntegrity(originalBase64, transaction);
       if (!integrityCheck.valid) {
-        throw new Error(integrityCheck.errorMessage || "Transaction integrity check failed");
+        const errorCode = integrityCheck.errorCode || "TX_MUTATED_AFTER_SIGN";
+        throw new Error(`${errorCode}: ${integrityCheck.errorMessage || "Transaction integrity check failed"}`);
       }
       
       const signedTx = serializeTransactionToBase64(transaction);

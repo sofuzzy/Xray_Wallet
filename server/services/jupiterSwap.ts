@@ -565,14 +565,23 @@ export async function sendTransaction(
     const errMsg = error?.message || String(error);
     console.error("Failed to send transaction:", error);
     
+    if (errMsg.includes("blockhash") && (errMsg.includes("expired") || errMsg.includes("not found"))) {
+      return { signature: null, success: false, error: "BLOCKHASH_EXPIRED: Transaction blockhash has expired. Please try again." };
+    }
+    if (errMsg.includes("signature verification") || errMsg.includes("invalid signature") || errMsg.includes("INVALID")) {
+      return { signature: null, success: false, error: "INVALID_SIGNATURE: Transaction signature is invalid. The transaction may have been modified." };
+    }
     if (errMsg.includes("429") || errMsg.includes("Too Many Requests") || errMsg.includes("failed after")) {
-      return { signature: null, success: false, error: "Network is busy. Please try again in a few seconds." };
+      return { signature: null, success: false, error: "RATE_LIMITED: Network is busy. Please try again in a few seconds." };
     }
     if (errMsg.includes("insufficient funds") || errMsg.includes("Insufficient") || errMsg.includes("0x1")) {
-      return { signature: null, success: false, error: "Insufficient SOL balance to complete this swap." };
+      return { signature: null, success: false, error: "INSUFFICIENT_FUNDS: Insufficient SOL balance to complete this swap." };
+    }
+    if (errMsg.includes("slippage") || errMsg.includes("Slippage")) {
+      return { signature: null, success: false, error: "SLIPPAGE_EXCEEDED: Price moved too much. Try increasing slippage tolerance." };
     }
     
-    return { signature: null, success: false, error: "Transaction failed. Please try again." };
+    return { signature: null, success: false, error: "TRANSACTION_FAILED: Transaction failed. Please try again." };
   }
 }
 

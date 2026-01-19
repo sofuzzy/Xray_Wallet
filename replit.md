@@ -120,6 +120,13 @@ The server follows a modular pattern:
   - Non-custodial: Rebate address never exposed to frontend
   - Fallback to regular connection if rebate connection fails
   - Key files: `server/config/env.ts`, `server/services/rpcService.ts`
+- **Transaction Integrity Verification**: SHA256 message hash checks to prevent signing errors
+  - Detects post-signing message mutations that would cause "INVALID signature" errors
+  - Client-side utility: `client/src/lib/transactionIntegrity.ts`
+  - SwapModal and SendModal verify integrity before broadcasting
+  - Structured error codes: BLOCKHASH_EXPIRED, INVALID_SIGNATURE, TX_MUTATED_AFTER_SIGN, INSUFFICIENT_FUNDS, RATE_LIMITED, SLIPPAGE_EXCEEDED
+  - Server returns parseable error codes for user-friendly error messages
+  - Base64 encoding consistency enforced end-to-end (no mutations after signing)
 
 ## External Dependencies
 

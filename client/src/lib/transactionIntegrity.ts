@@ -122,6 +122,13 @@ export async function verifyLegacyTransactionIntegrity(
 export function parseTransactionError(error: any): TransactionErrorResult {
   const message = error?.message || String(error);
   
+  if (message.includes("TX_MUTATED_AFTER_SIGN")) {
+    return {
+      code: "TX_MUTATED_AFTER_SIGN",
+      message: "Transaction was modified after signing. Please try again.",
+    };
+  }
+  
   if (message.includes("blockhash") && (message.includes("expired") || message.includes("not found"))) {
     return {
       code: "BLOCKHASH_EXPIRED",

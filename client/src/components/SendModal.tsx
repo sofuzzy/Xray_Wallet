@@ -8,6 +8,7 @@ import { SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } from "@solana
 import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { verifyLegacyTransactionIntegrity, parseTransactionError, serializeTransactionToBase64 } from "@/lib/transactionIntegrity";
 import {
   Select,
   SelectContent,
@@ -195,11 +196,17 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
         );
       }
 
-      // Sign locally
+      const preSignMessageBytes = new Uint8Array(transaction.serializeMessage());
+      
       transaction.sign(keypair);
       
-      // Serialize and send via backend
-      const serializedTransaction = transaction.serialize().toString("base64");
+      const integrityCheck = await verifyLegacyTransactionIntegrity(transaction, preSignMessageBytes);
+      if (!integrityCheck.valid) {
+        const errorCode = integrityCheck.errorCode || "TX_MUTATED_AFTER_SIGN";
+        throw new Error(`${errorCode}: ${integrityCheck.errorMessage || "Transaction integrity check failed"}`);
+      }
+      
+      const serializedTransaction = serializeTransactionToBase64(transaction);
       const sendRes = await fetch("/api/solana/send-transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -235,8 +242,9 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
       }, 2000);
 
     } catch (error: any) {
-      console.error(error);
-      toast({ title: "Transaction failed", description: error.message || "Could not complete transfer.", variant: "destructive" });
+      console.error("[send] Transaction failed:", error);
+      const parsedError = parseTransactionError(error);
+      toast({ title: "Transaction failed", description: parsedError.message, variant: "destructive" });
       setIsProcessing(false);
     }
   };
