@@ -202,6 +202,13 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
         onClose={() => setShowChartModal(false)}
         tokenMint={selectedToken?.mint || ""}
         tokenSymbol={selectedToken?.symbol || undefined}
+        onSwap={onSwapToken && selectedToken ? () => onSwapToken({
+          mint: selectedToken.mint,
+          symbol: selectedToken.symbol || selectedToken.mint.slice(0, 4).toUpperCase(),
+          name: selectedToken.name || `Token ${selectedToken.mint.slice(0, 8)}`,
+          decimals: selectedToken.decimals,
+          logoURI: selectedToken.imageUrl || undefined,
+        }) : undefined}
       />
     </>
   );

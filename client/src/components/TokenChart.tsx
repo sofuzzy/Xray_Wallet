@@ -1,37 +1,26 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, RefreshCw, AlertCircle } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { TrendingUp, TrendingDown, RefreshCw, ArrowRightLeft, ExternalLink } from "lucide-react";
 
 interface TokenChartProps {
   isOpen: boolean;
   onClose: () => void;
   tokenMint: string;
   tokenSymbol?: string;
+  onSwap?: () => void;
 }
 
-type Timeframe = "1h" | "24h" | "7d" | "30d";
-
-interface PricePoint {
-  timestamp: number;
-  price: number;
-}
-
-interface PriceData {
+interface TokenInfo {
   mint: string;
   symbol: string;
   name: string;
   currentPrice: number;
   priceChange24h: number;
-  history: PricePoint[];
-  timeframe: string;
-  isEstimated?: boolean;
-  provider?: string;
-  cachedAt?: number;
+  pairAddress?: string;
 }
 
 function formatPrice(price: number): string {
@@ -42,20 +31,6 @@ function formatPrice(price: number): string {
   return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function formatTime(timestamp: number, timeframe: Timeframe): string {
-  const date = new Date(timestamp);
-  switch (timeframe) {
-    case "1h":
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    case "24h":
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    case "7d":
-      return date.toLocaleDateString([], { weekday: "short", hour: "2-digit" });
-    case "30d":
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
-  }
-}
-
 function ChartSkeleton() {
   return (
     <div className="space-y-4" data-testid="chart-skeleton">
@@ -63,205 +38,130 @@ function ChartSkeleton() {
         <Skeleton className="h-9 w-32 mx-auto" />
         <Skeleton className="h-4 w-24 mx-auto" />
       </div>
-      <div className="flex gap-2 justify-center">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-8 w-12" />
-        ))}
-      </div>
-      <div className="h-64 w-full relative">
-        <div className="absolute inset-0 flex flex-col justify-between py-4">
-          <Skeleton className="h-px w-full opacity-30" />
-          <Skeleton className="h-px w-full opacity-30" />
-          <Skeleton className="h-px w-full opacity-30" />
-          <Skeleton className="h-px w-full opacity-30" />
-        </div>
-        <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
-          <path
-            d="M0,150 Q50,140 100,120 T200,100 T300,80 T400,60"
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth="2"
-            className="animate-pulse"
-          />
-        </svg>
+      <div className="h-[400px] w-full">
+        <Skeleton className="h-full w-full" />
       </div>
     </div>
   );
 }
 
-function ChartUnavailable({ onRefresh, isRefreshing }: { onRefresh: () => void; isRefreshing: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
-      <AlertCircle className="w-12 h-12 opacity-50" />
-      <div className="text-center">
-        <p className="font-medium">Chart unavailable</p>
-        <p className="text-sm">Unable to fetch price data from any provider</p>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onRefresh}
-        disabled={isRefreshing}
-        data-testid="button-retry-chart"
-      >
-        <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-        Try Again
-      </Button>
-    </div>
-  );
-}
+export function TokenChart({ isOpen, onClose, tokenMint, tokenSymbol, onSwap }: TokenChartProps) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
-export function TokenChart({ isOpen, onClose, tokenMint, tokenSymbol }: TokenChartProps) {
-  const [timeframe, setTimeframe] = useState<Timeframe>("24h");
-
-  const { data: priceData, isLoading, error, refetch, isFetching } = useQuery<PriceData>({
-    queryKey: ["/api/prices", tokenMint, timeframe],
+  const { data: tokenInfo, isLoading, refetch, isFetching } = useQuery<TokenInfo>({
+    queryKey: ["/api/prices", tokenMint, "info"],
     queryFn: async () => {
-      const response = await fetch(`/api/prices/${tokenMint}?timeframe=${timeframe}`, {
+      const response = await fetch(`/api/prices/${tokenMint}?timeframe=24h`, {
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to fetch price data");
-      return response.json();
+      if (!response.ok) throw new Error("Failed to fetch token info");
+      const data = await response.json();
+      return {
+        mint: data.mint,
+        symbol: data.symbol,
+        name: data.name,
+        currentPrice: data.currentPrice,
+        priceChange24h: data.priceChange24h,
+        pairAddress: data.pairAddress,
+      };
     },
     enabled: isOpen && !!tokenMint,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: 1,
   });
 
-  const handleRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
+  const isPositive = (tokenInfo?.priceChange24h ?? 0) >= 0;
+  
+  const dexScreenerUrl = `https://dexscreener.com/solana/${tokenMint}?embed=1&theme=dark&trades=0&info=0`;
+  const dexScreenerLink = `https://dexscreener.com/solana/${tokenMint}`;
 
-  const handleTimeframeChange = useCallback((tf: Timeframe) => {
-    setTimeframe(tf);
-  }, []);
-
-  const isPositive = (priceData?.priceChange24h ?? 0) >= 0;
-  const chartColor = isPositive ? "#22c55e" : "#ef4444";
-
-  const chartData = priceData?.history?.map((point) => ({
-    time: formatTime(point.timestamp, timeframe),
-    price: point.price,
-    timestamp: point.timestamp,
-  })) || [];
+  const handleSwap = () => {
+    if (onSwap) {
+      onSwap();
+      onClose();
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {priceData?.symbol || tokenSymbol || "Token"} Price Chart
-            {priceData && (
-              <Badge variant={isPositive ? "default" : "destructive"} className="ml-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <span>{tokenInfo?.symbol || tokenSymbol || "Token"} Price Chart</span>
+            {tokenInfo && (
+              <Badge variant={isPositive ? "default" : "destructive"}>
                 {isPositive ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                {isPositive ? "+" : ""}{priceData.priceChange24h.toFixed(2)}%
+                {isPositive ? "+" : ""}{tokenInfo.priceChange24h.toFixed(2)}%
               </Badge>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={isFetching}
-              className="ml-auto h-8 w-8"
-              data-testid="button-refresh-chart"
-            >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-            </Button>
+            <div className="ml-auto flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="h-8 w-8"
+                data-testid="button-refresh-chart"
+              >
+                <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open(dexScreenerLink, "_blank")}
+                className="h-8 w-8"
+                title="Open in DexScreener"
+                data-testid="button-open-dexscreener"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {isLoading ? (
             <ChartSkeleton />
-          ) : error ? (
-            <ChartUnavailable onRefresh={handleRefresh} isRefreshing={isFetching} />
           ) : (
             <>
-              {priceData && (
+              {tokenInfo && (
                 <div className="text-center">
-                  <p className="text-3xl font-bold">${formatPrice(priceData.currentPrice)}</p>
-                  <p className="text-sm text-muted-foreground">{priceData.name}</p>
+                  <p className="text-3xl font-bold">${formatPrice(tokenInfo.currentPrice)}</p>
+                  <p className="text-sm text-muted-foreground">{tokenInfo.name}</p>
                 </div>
               )}
 
-              <div className="flex gap-2 justify-center">
-                {(["1h", "24h", "7d", "30d"] as Timeframe[]).map((tf) => (
-                  <Button
-                    key={tf}
-                    variant={timeframe === tf ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleTimeframeChange(tf)}
-                    data-testid={`button-timeframe-${tf}`}
-                  >
-                    {tf}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="h-64 w-full">
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="time"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        domain={["auto", "auto"]}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                        tickFormatter={(value) => `$${formatPrice(value)}`}
-                        width={60}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        }}
-                        labelStyle={{ color: "hsl(var(--foreground))" }}
-                        formatter={(value: number) => [`$${formatPrice(value)}`, "Price"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="price"
-                        stroke={chartColor}
-                        strokeWidth={2}
-                        fill="url(#colorPrice)"
-                        dot={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No price data available
+              <div className="relative h-[400px] w-full rounded-lg overflow-hidden bg-black/50">
+                {!iframeLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Skeleton className="h-full w-full" />
                   </div>
                 )}
+                <iframe
+                  src={dexScreenerUrl}
+                  className="w-full h-full border-0"
+                  onLoad={() => setIframeLoaded(true)}
+                  title="DexScreener Chart"
+                  allow="clipboard-write"
+                  loading="lazy"
+                />
               </div>
 
-              <div className="text-center text-xs text-muted-foreground space-y-1">
-                <p>
-                  {priceData?.isEstimated 
-                    ? "Estimated trend based on current market data. Actual history may vary."
-                    : `Data from ${priceData?.provider || "DexScreener"}. Prices may be delayed.`}
-                </p>
-                {priceData?.provider && (
-                  <p className="opacity-60">Provider: {priceData.provider}</p>
+              <div className="flex gap-3 justify-center">
+                {onSwap && (
+                  <Button
+                    onClick={handleSwap}
+                    className="flex-1 max-w-xs"
+                    data-testid="button-swap-from-chart"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                    Swap {tokenInfo?.symbol || tokenSymbol || "Token"}
+                  </Button>
                 )}
+              </div>
+
+              <div className="text-center text-xs text-muted-foreground">
+                <p>Chart powered by DexScreener</p>
               </div>
             </>
           )}
