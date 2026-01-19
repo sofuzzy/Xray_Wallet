@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart } from "lucide-react";
-import { AutoTradeModal } from "./AutoTradeModal";
+import { Loader2, ChevronDown, ChevronUp, Coins, LineChart } from "lucide-react";
 import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useWallet } from "@/hooks/use-wallet";
@@ -27,7 +26,6 @@ interface TokenBalancesProps {
 export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
   const { address } = useWallet();
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
-  const [showAutoTradeModal, setShowAutoTradeModal] = useState(false);
   const [showChartModal, setShowChartModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -42,11 +40,6 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
     enabled: !!address,
     refetchInterval: 30000,
   });
-
-  const handleAutoTrade = (token: Token) => {
-    setSelectedToken(token);
-    setShowAutoTradeModal(true);
-  };
 
   const handleShowChart = (token: Token) => {
     setSelectedToken(token);
@@ -194,15 +187,6 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
                         >
                           <LineChart className="w-4 h-4" />
                         </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleAutoTrade(token)}
-                          title="Set auto-trade rules"
-                          data-testid={`button-autotrade-${displaySymbol}`}
-                        >
-                          <Settings2 className="w-4 h-4" />
-                        </Button>
                       </div>
                     </div>
                   );
@@ -212,14 +196,6 @@ export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
           </CollapsibleContent>
         </Collapsible>
       </Card>
-
-      <AutoTradeModal
-        isOpen={showAutoTradeModal}
-        onClose={() => setShowAutoTradeModal(false)}
-        tokenMint={selectedToken?.mint}
-        tokenSymbol={selectedToken?.symbol || selectedToken?.mint.slice(0, 4).toUpperCase()}
-        currentPrice={selectedToken?.price?.toString() || "0"}
-      />
 
       <TokenChart
         isOpen={showChartModal}
