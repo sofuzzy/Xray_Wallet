@@ -467,6 +467,45 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     return JSON.stringify(riskShieldSettings.checks);
   }, [riskShieldSettings.enabled, riskShieldSettings.checks]);
 
+  // Fetch wallet token balances for Max button
+  interface TokenBalance {
+    mint: string;
+    balance: number;
+    decimals: number;
+  }
+  
+  const { data: walletTokens = [] } = useQuery<TokenBalance[]>({
+    queryKey: ["wallet-tokens-balances", address],
+    queryFn: async () => {
+      if (!address) return [];
+      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: isOpen && !!address,
+    staleTime: 10000,
+  });
+
+  // Get the balance for the selected input token
+  const inputTokenBalance = useMemo(() => {
+    if (inputMint === "SOL") {
+      return balance;
+    }
+    const normalizedMint = inputMint === "SOL" ? "So11111111111111111111111111111111111111112" : inputMint;
+    const tokenData = walletTokens.find(t => t.mint === normalizedMint);
+    return tokenData?.balance ?? 0;
+  }, [inputMint, balance, walletTokens]);
+
+  const handleMaxClick = () => {
+    if (inputMint === "SOL") {
+      // Leave some SOL for transaction fees (0.01 SOL)
+      const maxAmount = Math.max(0, balance - 0.01);
+      setInputAmount(maxAmount > 0 ? maxAmount.toFixed(9).replace(/\.?0+$/, '') : "0");
+    } else {
+      setInputAmount(inputTokenBalance.toString());
+    }
+  };
+
   interface BalanceValidation {
     valid: boolean;
     reason: string;
@@ -927,7 +966,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
 
           <div className="space-y-4 mt-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">You send</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">You send</label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-primary hover:text-primary"
+                onClick={handleMaxClick}
+                disabled={isSwapping || inputTokenBalance <= 0}
+                data-testid="button-max-amount"
+              >
+                MAX
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Input
                 type="number"
@@ -958,7 +1009,9 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                 <Search className="w-3 h-3 opacity-50" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Balance: {balance.toFixed(4)} SOL</p>
+            <p className="text-xs text-muted-foreground">
+              Balance: {inputTokenBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} {inputToken?.symbol || "SOL"}
+            </p>
           </div>
 
           <div className="flex justify-center">
