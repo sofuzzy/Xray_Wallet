@@ -1,70 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
-import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { 
-  connection, 
-  getStoredWallets,
-  getActiveWallet,
-  setActiveWalletId,
-  getKeypairForWallet,
-  getPrivateKeyForWallet,
-  createWallet,
-  deleteWallet as deleteStoredWallet,
-  renameWallet as renameStoredWallet,
-  importWalletWithName,
-  importWalletFromPrivateKey,
-  migrateLegacyWallet,
-  type StoredWallet,
-} from "@/lib/solana";
+import { useCallback } from "react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { connection } from "@/lib/solana";
+import { useVaultContext, type StoredWallet } from "@/contexts/VaultContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import bs58 from "bs58";
 
 export function useWallet() {
-  const [keypair, setKeypair] = useState<Keypair | null>(null);
-  const [activeWallet, setActiveWallet] = useState<StoredWallet | null>(null);
-  const [wallets, setWallets] = useState<StoredWallet[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const vault = useVaultContext();
   const queryClient = useQueryClient();
 
-  const refreshWallets = useCallback(() => {
-    setWallets(getStoredWallets());
-  }, []);
-
-  useEffect(() => {
-    const initWallet = async () => {
-      setIsLoading(true);
-      try {
-        await migrateLegacyWallet();
-        
-        let storedWallets = getStoredWallets();
-        
-        if (storedWallets.length === 0) {
-          const newWallet = await createWallet("Main Wallet");
-          setActiveWalletId(newWallet.id);
-          storedWallets = [newWallet];
-        }
-        
-        setWallets(storedWallets);
-        
-        const active = getActiveWallet();
-        if (active) {
-          setActiveWallet(active);
-          const kp = await getKeypairForWallet(active);
-          setKeypair(kp);
-        }
-      } catch (e) {
-        console.error("Failed to initialize wallet:", e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    initWallet();
-  }, []);
-
   const { data: balance, refetch: refreshBalance } = useQuery({
-    queryKey: ["wallet-balance", keypair?.publicKey.toString()],
+    queryKey: ["wallet-balance", vault.keypair?.publicKey.toString()],
     queryFn: async () => {
-      if (!keypair) return 0;
+      if (!vault.keypair) return 0;
       try {
-        const response = await fetch(`/api/wallet/balance/${keypair.publicKey.toString()}`);
+        const response = await fetch(`/api/wallet/balance/${vault.keypair.publicKey.toString()}`);
         if (!response.ok) throw new Error("Failed to fetch balance");
         const data = await response.json();
         return data.balance as number;
@@ -73,7 +23,7 @@ export function useWallet() {
         throw error;
       }
     },
-    enabled: !!keypair,
+    enabled: !!vault.keypair,
     refetchInterval: 15000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
@@ -81,10 +31,10 @@ export function useWallet() {
   });
 
   const requestAirdrop = useCallback(async () => {
-    if (!keypair) return;
+    if (!vault.keypair) return;
     try {
       const signature = await connection.requestAirdrop(
-        keypair.publicKey,
+        vault.keypair.publicKey,
         1 * LAMPORTS_PER_SOL
       );
       await connection.confirmTransaction(signature);
@@ -93,104 +43,78 @@ export function useWallet() {
       console.error("Airdrop failed:", error);
       throw error;
     }
-  }, [keypair, refreshBalance]);
+  }, [vault.keypair, refreshBalance]);
 
   const getSeedPhrase = useCallback((): string | null => {
-    if (!activeWallet) return null;
-    if (activeWallet.mnemonic.startsWith('pk:')) return null;
-    return activeWallet.mnemonic;
-  }, [activeWallet]);
+    if (!vault.activeWallet) return null;
+    if (vault.activeWallet.mnemonic.startsWith('pk:')) return null;
+    return vault.activeWallet.mnemonic;
+  }, [vault.activeWallet]);
 
   const getPrivateKey = useCallback(async (): Promise<string | null> => {
-    if (!activeWallet) return null;
-    return await getPrivateKeyForWallet(activeWallet);
-  }, [activeWallet]);
+    if (!vault.keypair) return null;
+    return bs58.encode(vault.keypair.secretKey);
+  }, [vault.keypair]);
 
   const isPrivateKeyWallet = useCallback((): boolean => {
-    return activeWallet?.mnemonic.startsWith('pk:') || false;
-  }, [activeWallet]);
+    return vault.activeWallet?.mnemonic.startsWith('pk:') || false;
+  }, [vault.activeWallet]);
 
   const switchWallet = useCallback(async (walletId: string) => {
-    const currentWallets = getStoredWallets();
-    const wallet = currentWallets.find(w => w.id === walletId);
-    if (!wallet) return false;
-    
-    setActiveWalletId(walletId);
-    setActiveWallet(wallet);
-    setWallets(currentWallets);
-    const kp = await getKeypairForWallet(wallet);
-    setKeypair(kp);
+    await vault.switchWallet(walletId);
     queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
     return true;
-  }, [queryClient]);
+  }, [vault, queryClient]);
 
   const addWallet = useCallback(async (name: string): Promise<StoredWallet> => {
-    const newWallet = await createWallet(name);
-    refreshWallets();
-    await switchWallet(newWallet.id);
+    const newWallet = await vault.addWallet(name);
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
     return newWallet;
-  }, [refreshWallets, switchWallet]);
+  }, [vault, queryClient]);
 
   const importWallet = useCallback(async (mnemonic: string, name?: string): Promise<boolean> => {
-    const walletName = name || `Wallet ${wallets.length + 1}`;
-    const newWallet = await importWalletWithName(mnemonic, walletName);
+    const walletName = name || `Wallet ${vault.wallets.length + 1}`;
+    const newWallet = await vault.importWallet(mnemonic, walletName);
     if (newWallet) {
-      refreshWallets();
-      await switchWallet(newWallet.id);
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
       return true;
     }
     return false;
-  }, [wallets.length, refreshWallets, switchWallet]);
+  }, [vault, queryClient]);
 
   const importFromPrivateKey = useCallback(async (privateKey: string, name?: string): Promise<boolean> => {
-    const walletName = name || `Imported Wallet ${wallets.length + 1}`;
-    const newWallet = await importWalletFromPrivateKey(privateKey, walletName);
+    const walletName = name || `Imported Wallet ${vault.wallets.length + 1}`;
+    const newWallet = await vault.importFromPrivateKey(privateKey, walletName);
     if (newWallet) {
-      refreshWallets();
-      await switchWallet(newWallet.id);
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
       return true;
     }
     return false;
-  }, [wallets.length, refreshWallets, switchWallet]);
+  }, [vault, queryClient]);
 
   const removeWallet = useCallback(async (walletId: string): Promise<boolean> => {
-    if (wallets.length <= 1) return false;
-    
-    const success = deleteStoredWallet(walletId);
+    const success = await vault.removeWallet(walletId);
     if (success) {
-      const updatedWallets = getStoredWallets();
-      setWallets(updatedWallets);
-      
-      if (activeWallet?.id === walletId && updatedWallets.length > 0) {
-        await switchWallet(updatedWallets[0].id);
-      }
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
     }
     return success;
-  }, [wallets.length, activeWallet, switchWallet]);
+  }, [vault, queryClient]);
 
-  const editWalletName = useCallback((walletId: string, newName: string): boolean => {
-    const success = renameStoredWallet(walletId, newName);
-    if (success) {
-      refreshWallets();
-      if (activeWallet?.id === walletId) {
-        setActiveWallet(prev => prev ? { ...prev, name: newName } : null);
-      }
-    }
-    return success;
-  }, [refreshWallets, activeWallet]);
+  const editWalletName = useCallback(async (walletId: string, newName: string): Promise<boolean> => {
+    return await vault.renameWallet(walletId, newName);
+  }, [vault]);
 
   const resetWallet = useCallback(async () => {
-    const newWallet = await createWallet("New Wallet");
-    refreshWallets();
-    await switchWallet(newWallet.id);
-  }, [refreshWallets, switchWallet]);
+    const newWallet = await vault.addWallet("New Wallet");
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+  }, [vault, queryClient]);
 
   return {
-    keypair,
-    publicKey: keypair?.publicKey,
-    address: keypair?.publicKey.toString(),
+    keypair: vault.keypair,
+    publicKey: vault.keypair?.publicKey,
+    address: vault.keypair?.publicKey.toString(),
     balance: balance || 0,
-    isLoading,
+    isLoading: vault.status === "loading",
     refreshBalance,
     requestAirdrop,
     getSeedPhrase,
@@ -199,11 +123,12 @@ export function useWallet() {
     importWallet,
     importFromPrivateKey,
     resetWallet,
-    wallets,
-    activeWallet,
+    wallets: vault.wallets,
+    activeWallet: vault.activeWallet,
     switchWallet,
     addWallet,
     removeWallet,
     editWalletName,
+    lockVault: vault.lock,
   };
 }

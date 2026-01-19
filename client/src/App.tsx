@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
+import { VaultUnlockModal } from "@/components/VaultUnlockModal";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import TokenExplorer from "@/pages/TokenExplorer";
@@ -11,6 +13,7 @@ import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import Disclaimer from "@/pages/Disclaimer";
 import BetaExit from "@/pages/BetaExit";
+import { Loader2 } from "lucide-react";
 
 function Router() {
   return (
@@ -27,12 +30,55 @@ function Router() {
   );
 }
 
+function VaultGate({ children }: { children: React.ReactNode }) {
+  const vault = useVaultContext();
+
+  if (vault.status === "loading") {
+    return (
+      <div className="fixed inset-0 bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (vault.status === "locked") {
+    return (
+      <VaultUnlockModal
+        mode="unlock"
+        onUnlock={vault.unlock}
+        onSetup={vault.setupVault}
+        onReset={vault.resetVault}
+        error={vault.error}
+        isLoading={vault.isUnlocking}
+      />
+    );
+  }
+
+  if (vault.status === "needs_migration" || vault.status === "no_vault") {
+    return (
+      <VaultUnlockModal
+        mode={vault.status === "needs_migration" ? "migrate" : "setup"}
+        onUnlock={vault.unlock}
+        onSetup={vault.setupVault}
+        error={vault.error}
+        isLoading={vault.isSettingUp}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <VaultProvider>
+          <VaultGate>
+            <Toaster />
+            <Router />
+          </VaultGate>
+        </VaultProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

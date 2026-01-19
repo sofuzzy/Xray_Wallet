@@ -24,7 +24,7 @@ import { Watchlist } from "@/components/Watchlist";
 import { Footer } from "@/components/Footer";
 import { LegalAcknowledgmentModal, hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
 import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDisclaimerModal";
-import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass } from "lucide-react";
+import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -53,7 +53,8 @@ export default function Home() {
     switchWallet,
     addWallet,
     removeWallet,
-    editWalletName
+    editWalletName,
+    lockVault
   } = useWallet();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
@@ -337,6 +338,14 @@ export default function Home() {
             data-testid="button-settings"
           >
             <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          <button 
+            onClick={() => lockVault()}
+            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="button-lock-vault"
+            title="Lock Wallet"
+          >
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button 
             onClick={() => logout()}

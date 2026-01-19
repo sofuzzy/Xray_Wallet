@@ -49,15 +49,21 @@ The server follows a modular pattern:
 
 ### Wallet Implementation
 - Keypairs are generated client-side using `@solana/web3.js`
-- Private keys stored in browser localStorage (base58 encoded)
 - Public keys synced to server database for user lookups
 - Connects to Solana mainnet-beta for all operations
+- **Encrypted Local Vault**: All wallet data encrypted at rest with user PIN
+  - AES-256-GCM encryption with PBKDF2 key derivation (100k iterations)
+  - Stored as `xray_encrypted_vault` in localStorage
+  - Decrypted data kept only in React state (memory) while unlocked - never persisted
+  - VaultUnlockModal prompts for PIN on app startup or page refresh
+  - Lock button in header clears memory and requires re-authentication
+  - Legacy plaintext wallets auto-migrated to encrypted vault on first use
+  - Key files: `client/src/lib/localVault.ts`, `client/src/lib/vaultCrypto.ts`, `client/src/contexts/VaultContext.tsx`
 - **Multi-Wallet Support**: Create and manage multiple wallets
-  - Wallet data stored in localStorage as JSON array
+  - Wallet data stored encrypted in vault as JSON array
   - Each wallet has id, name, mnemonic, publicKey, and createdAt
   - WalletSwitcher component in header for quick switching
   - Create, rename, and delete wallets (minimum 1 required)
-  - Legacy single-wallet storage auto-migrated to multi-wallet format
 - **Multi-Device Wallet Sync**: Cloud registry for wallet visibility across devices
   - `userWallets` table stores public addresses (never private keys) linked to user accounts
   - API endpoints: `/api/wallet-registry` (GET/POST/DELETE/PUT)

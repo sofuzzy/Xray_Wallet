@@ -6,8 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { useVault } from "@/hooks/use-vault";
+import { useVaultContext } from "@/contexts/VaultContext";
 import { useCurrentUser, useUpdateUser } from "@/hooks/use-users";
-import { validateMnemonic, getStoredWallets } from "@/lib/solana";
+import { validateMnemonic } from "@/lib/solana";
 import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -48,11 +49,12 @@ function RiskCheckItem({
 }
 
 export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
-  const { getSeedPhrase, getPrivateKey, isPrivateKeyWallet, importWallet, importFromPrivateKey, resetWallet } = useWallet();
+  const { getSeedPhrase, getPrivateKey, isPrivateKeyWallet, importWallet, importFromPrivateKey, resetWallet, wallets } = useWallet();
   const { toast } = useToast();
   const biometric = useBiometric();
   const riskShield = useRiskShieldSettings();
   const vault = useVault();
+  const localVault = useVaultContext();
   const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
@@ -599,7 +601,6 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                         toast({ title: "Passphrase Mismatch", description: "Passphrases do not match", variant: "destructive" });
                         return;
                       }
-                      const wallets = getStoredWallets();
                       const walletData = JSON.stringify(wallets);
                       await vault.backup({ walletData, passphrase: cloudPassphrase });
                       setCloudPassphrase("");
@@ -657,64 +658,76 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
 
               {cloudMode === "restore" && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Enter Your Passphrase</label>
-                    <div className="relative">
-                      <Input
-                        type={showCloudPassphrase ? "text" : "password"}
-                        placeholder="Enter your backup passphrase"
-                        value={cloudPassphrase}
-                        onChange={(e) => setCloudPassphrase(e.target.value)}
-                        className="pr-10"
-                        data-testid="input-cloud-restore-passphrase"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCloudPassphrase(!showCloudPassphrase)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showCloudPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                  {!localVault.pin ? (
+                    <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                      <p className="text-sm text-destructive font-medium">Vault Locked</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Please unlock your vault first to restore from cloud backup. Close this modal and enter your PIN.
+                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Enter Your Passphrase</label>
+                        <div className="relative">
+                          <Input
+                            type={showCloudPassphrase ? "text" : "password"}
+                            placeholder="Enter your backup passphrase"
+                            value={cloudPassphrase}
+                            onChange={(e) => setCloudPassphrase(e.target.value)}
+                            className="pr-10"
+                            data-testid="input-cloud-restore-passphrase"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCloudPassphrase(!showCloudPassphrase)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showCloudPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
 
-                  <Button
-                    onClick={async () => {
-                      try {
-                        const decryptedData = await vault.restore({ passphrase: cloudPassphrase });
-                        const wallets = JSON.parse(decryptedData);
-                        if (Array.isArray(wallets) && wallets.length > 0) {
-                          localStorage.setItem("xray_wallets", decryptedData);
-                          toast({ title: "Restore Successful", description: "Reloading to apply changes..." });
-                          setTimeout(() => window.location.reload(), 500);
-                        } else {
-                          toast({ title: "Invalid Data", description: "Backup data is corrupted", variant: "destructive" });
-                        }
-                      } catch (error: any) {
-                        console.error("Restore failed:", error);
-                      }
-                      setCloudPassphrase("");
-                    }}
-                    disabled={vault.isRestoring || !cloudPassphrase}
-                    className="w-full"
-                    data-testid="button-cloud-restore"
-                  >
-                    {vault.isRestoring ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Decrypting...
-                      </>
-                    ) : (
-                      <>
-                        <CloudDownload className="w-4 h-4 mr-2" />
-                        Restore Wallet from Cloud
-                      </>
-                    )}
-                  </Button>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const decryptedData = await vault.restore({ passphrase: cloudPassphrase });
+                            const restoredWallets = JSON.parse(decryptedData);
+                            if (Array.isArray(restoredWallets) && restoredWallets.length > 0) {
+                              const { updateVaultData } = await import("@/lib/localVault");
+                              await updateVaultData(decryptedData, localVault.pin!);
+                              toast({ title: "Restore Successful", description: "Reloading to apply changes..." });
+                              setTimeout(() => window.location.reload(), 500);
+                            } else {
+                              toast({ title: "Invalid Data", description: "Backup data is corrupted", variant: "destructive" });
+                            }
+                          } catch (error: any) {
+                            console.error("Restore failed:", error);
+                          }
+                          setCloudPassphrase("");
+                        }}
+                        disabled={vault.isRestoring || !cloudPassphrase}
+                        className="w-full"
+                        data-testid="button-cloud-restore"
+                      >
+                        {vault.isRestoring ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Decrypting...
+                          </>
+                        ) : (
+                          <>
+                            <CloudDownload className="w-4 h-4 mr-2" />
+                            Restore Wallet from Cloud
+                          </>
+                        )}
+                      </Button>
 
-                  <p className="text-xs text-muted-foreground text-center">
-                    This will replace your current wallet with the backed-up version.
-                  </p>
+                      <p className="text-xs text-muted-foreground text-center">
+                        This will replace your current wallet with the backed-up version.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </TabsContent>

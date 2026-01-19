@@ -23,7 +23,7 @@ interface WalletSwitcherProps {
   onSwitch: (walletId: string) => Promise<boolean>;
   onAdd: (name: string) => Promise<StoredWallet>;
   onRemove: (walletId: string) => Promise<boolean>;
-  onRename: (walletId: string, newName: string) => boolean;
+  onRename: (walletId: string, newName: string) => boolean | Promise<boolean>;
   registeredWallets?: RegisteredWallet[];
   isAuthenticated?: boolean;
 }
