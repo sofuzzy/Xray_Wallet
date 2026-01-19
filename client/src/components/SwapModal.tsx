@@ -505,8 +505,11 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
 
   const isBalanceInsufficient = balanceValidation && !balanceValidation.valid;
 
+  const normalizedOutputMint = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
+  const isRiskAcked = riskAckedMints.has(normalizedOutputMint);
+  
   const { data: quote, isLoading: quoteLoading, error: quoteError, refetch: refetchQuote } = useQuery({
-    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey],
+    queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey, isRiskAcked],
     queryFn: async () => {
       if (!debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return null;
       const inputDecimals = inputToken?.decimals || 9;
@@ -521,8 +524,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
       });
       
       // Add risk acknowledgement if needed
-      const normalizedOutput = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
-      if (riskAckedMints.has(normalizedOutput)) {
+      if (isRiskAcked) {
         params.set("ack", "true");
       }
       
@@ -587,7 +589,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         quote: quote.quote,
         userPublicKey: address,
         priorityFee: getActivePriorityFee(),
-        acknowledgeRisk: riskAckedMints.has(outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint),
+        acknowledgeRisk: isRiskAcked,
         riskShieldDisabled: !riskShieldSettings.enabled,
         enabledCheckCodes: riskShieldSettings.enabled ? getEnabledCheckCodes() : [],
       });
@@ -1322,21 +1324,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         onOpenChange={setRiskModalOpen}
         decision={riskDecision}
         onAcknowledge={() => {
-          const normalizedOut = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
           setRiskAckedMints(prev => {
             const updated = new Set(prev);
-            updated.add(normalizedOut);
+            updated.add(normalizedOutputMint);
             try { sessionStorage.setItem("xray_risk_acked_mints", JSON.stringify(Array.from(updated))); } catch {}
             return updated;
           });
           setRiskModalOpen(false);
-          // Re-fetch quote or retry transaction after acknowledgement
-          if (riskPendingStage === "quote") {
-            queryClient.invalidateQueries({ queryKey: ["/api/swaps/quote", inputMint, outputMint, debouncedInputAmount, dexOption, effectiveSlippageBps, enabledCheckCodesKey] });
-          } else if (riskPendingStage === "transaction") {
-            // retry swap
-            executeSwap();
+          setRiskDecision(null);
+          // For transaction stage, retry swap after a brief delay to ensure state is updated
+          if (riskPendingStage === "transaction") {
+            setTimeout(() => executeSwap(), 100);
           }
+          // For quote stage, the query will auto-refetch because isRiskAcked is in the queryKey
           setRiskPendingStage(null);
         }}
       />
