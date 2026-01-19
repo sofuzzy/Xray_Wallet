@@ -549,6 +549,26 @@ export async function registerRoutes(
     }
   });
 
+  // Check if an account exists (for ATA creation checks)
+  app.get("/api/solana/account-info", async (req, res) => {
+    try {
+      const { address } = req.query;
+      if (!address || typeof address !== "string") {
+        return res.status(400).json({ error: "Missing address" });
+      }
+      
+      const { Connection, PublicKey } = await import("@solana/web3.js");
+      const connection = new Connection(getRpcUrl(), "confirmed");
+      const pubkey = new PublicKey(address);
+      const accountInfo = await connection.getAccountInfo(pubkey);
+      
+      res.json({ exists: accountInfo !== null });
+    } catch (error) {
+      console.error("Error checking account:", error);
+      res.json({ exists: false });
+    }
+  });
+
   // Send signed transaction
   app.post("/api/solana/send-transaction", async (req, res) => {
     try {
