@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
+import { verifyVersionedTransactionIntegrity, serializeTransactionToBase64, parseTransactionError } from "@/lib/transactionIntegrity";
 import bs58 from "bs58";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
@@ -648,10 +649,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
       }
 
       setTxStep("signing");
-      const swapTransactionBuf = Buffer.from(txResponse.swapTransaction, "base64");
+      
+      const originalBase64 = txResponse.swapTransaction;
+      const swapTransactionBuf = Buffer.from(originalBase64, "base64");
       const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+      
       transaction.sign([keypair]);
-      const signedTx = Buffer.from(transaction.serialize()).toString("base64");
+      
+      const integrityCheck = await verifyVersionedTransactionIntegrity(originalBase64, transaction);
+      if (!integrityCheck.valid) {
+        throw new Error(integrityCheck.errorMessage || "Transaction integrity check failed");
+      }
+      
+      const signedTx = serializeTransactionToBase64(transaction);
 
       setTxStep("sending");
       const result = await apiRequest("POST", "/api/swaps/send", {
@@ -705,13 +715,14 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     },
     onError: (error: any) => {
       setTxStep("error");
-      setTxError(error.message || "Failed to execute swap");
+      const parsedError = parseTransactionError(error);
+      setTxError(parsedError.message);
       toast({
         title: "Swap Failed",
-        description: error.message || "Failed to execute swap",
+        description: parsedError.message,
         variant: "destructive",
       });
-      // Reset after showing error
+      console.error("[swap] Transaction failed:", parsedError.code, parsedError.message);
       setTimeout(() => {
         setTxStep("idle");
       }, 3000);
