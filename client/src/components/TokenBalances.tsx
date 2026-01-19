@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart } from "lucide-react";
+import { Loader2, Settings2, ChevronDown, ChevronUp, Coins, LineChart, ArrowRightLeft } from "lucide-react";
 import { AutoTradeModal } from "./AutoTradeModal";
 import { TokenChart } from "./TokenChart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -20,7 +20,11 @@ interface Token {
   marketCap: number | null;
 }
 
-export function TokenBalances() {
+interface TokenBalancesProps {
+  onSwapToken?: (token: { mint: string; symbol: string; name: string; decimals: number; logoURI?: string }) => void;
+}
+
+export function TokenBalances({ onSwapToken }: TokenBalancesProps) {
   const { address } = useWallet();
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [showAutoTradeModal, setShowAutoTradeModal] = useState(false);
@@ -168,6 +172,23 @@ export function TokenBalances() {
                         )}
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
+                        {onSwapToken && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => onSwapToken({
+                              mint: token.mint,
+                              symbol: token.symbol || token.mint.slice(0, 4).toUpperCase(),
+                              name: token.name || `Token ${token.mint.slice(0, 8)}`,
+                              decimals: token.decimals,
+                              logoURI: token.imageUrl || undefined,
+                            })}
+                            title="Swap for SOL"
+                            data-testid={`button-swap-${displaySymbol}`}
+                          >
+                            <ArrowRightLeft className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"

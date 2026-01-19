@@ -155,6 +155,7 @@ interface SwapModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialOutputToken?: Token;
+  initialInputToken?: Token;
 }
 
 interface Token {
@@ -205,14 +206,14 @@ function formatVolume(volume?: number): string {
 
 type DexOption = "auto" | "orca" | "raydium";
 
-export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProps) {
+export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputToken }: SwapModalProps) {
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const { settings: riskShieldSettings, getEnabledCheckCodes } = useRiskShieldSettings();
   const [inputAmount, setInputAmount] = useState("");
   const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
-  const [inputMint, setInputMint] = useState("SOL");
-  const [outputMint, setOutputMint] = useState(initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const [inputMint, setInputMint] = useState(initialInputToken?.mint || "SOL");
+  const [outputMint, setOutputMint] = useState(initialInputToken ? "SOL" : (initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
   const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">(() => {
@@ -231,7 +232,12 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       return "";
     }
   });
-  const [customTokens, setCustomTokens] = useState<Token[]>(initialOutputToken ? [initialOutputToken] : []);
+  const [customTokens, setCustomTokens] = useState<Token[]>(() => {
+    const tokens: Token[] = [];
+    if (initialOutputToken) tokens.push(initialOutputToken);
+    if (initialInputToken) tokens.push(initialInputToken);
+    return tokens;
+  });
   const [txStep, setTxStep] = useState<TransactionStep>("idle");
   const [txError, setTxError] = useState<string>("");
   const [dexOption, setDexOption] = useState<DexOption>("auto");
@@ -339,6 +345,17 @@ export function SwapModal({ isOpen, onClose, initialOutputToken }: SwapModalProp
       });
     }
   }, [initialOutputToken, isOpen]);
+  
+  useEffect(() => {
+    if (initialInputToken && isOpen) {
+      setInputMint(initialInputToken.mint);
+      setOutputMint("SOL");
+      setCustomTokens(prev => {
+        if (prev.some(t => t.mint === initialInputToken.mint)) return prev;
+        return [...prev, initialInputToken];
+      });
+    }
+  }, [initialInputToken, isOpen]);
 
   const priorityFeeAmounts = { low: 5000, medium: 25000, high: 100000, custom: 0 };
   

@@ -132,6 +132,7 @@ export default function Home() {
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
   const [isSeedPhraseOpen, setIsSeedPhraseOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [inputToken, setInputToken] = useState<Token | null>(null);
   const [showPasskeyOptions, setShowPasskeyOptions] = useState(false);
   const [isInIframe] = useState(() => window.top !== window.self);
   const [showBetaModal, setShowBetaModal] = useState(() => !hasBetaAcknowledged());
@@ -383,7 +384,13 @@ export default function Home() {
         </div>
 
         <div className="px-6">
-          <TokenBalances />
+          <TokenBalances 
+            onSwapToken={(token) => {
+              setInputToken(token);
+              setSelectedToken(null);
+              setIsSwapOpen(true);
+            }}
+          />
         </div>
 
         <div className="px-6">
@@ -420,7 +427,7 @@ export default function Home() {
       <AnimatePresence>
         {isSendOpen && <SendModal isOpen={isSendOpen} onClose={() => setIsSendOpen(false)} />}
         {isReceiveOpen && <ReceiveModal isOpen={isReceiveOpen} onClose={() => setIsReceiveOpen(false)} />}
-        {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => { setIsSwapOpen(false); setSelectedToken(null); }} initialOutputToken={selectedToken || undefined} />}
+        {isSwapOpen && <SwapModal isOpen={isSwapOpen} onClose={() => { setIsSwapOpen(false); setSelectedToken(null); setInputToken(null); }} initialOutputToken={selectedToken || undefined} initialInputToken={inputToken || undefined} />}
         {isLaunchOpen && <LaunchpadModal isOpen={isLaunchOpen} onClose={() => setIsLaunchOpen(false)} />}
         {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
         {selectedToken && !isSwapOpen && (
