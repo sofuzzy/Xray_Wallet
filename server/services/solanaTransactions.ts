@@ -25,7 +25,7 @@ export async function getWalletBalance(
 export async function getTokenAccounts(
   walletAddress: string,
   userRpc?: string
-): Promise<Array<{ mint: string; balance: number; decimals: number }>> {
+): Promise<Array<{ mint: string; balance: number; decimals: number; tokenProgram: string }>> {
   try {
     console.log("Fetching token accounts for:", walletAddress);
     const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
@@ -44,9 +44,8 @@ export async function getTokenAccounts(
     console.log("Found", tokenAccounts.value.length, "SPL token accounts");
     console.log("Found", token2022Accounts.value.length, "Token-2022 accounts");
 
-    const allAccounts = [...tokenAccounts.value, ...token2022Accounts.value];
-    
-    const tokens = allAccounts
+    // Process SPL Token accounts
+    const splTokens = tokenAccounts.value
       .map((account) => {
         const parsed = account.account.data.parsed;
         const info = parsed?.info;
@@ -59,9 +58,31 @@ export async function getTokenAccounts(
           mint: info.mint,
           balance,
           decimals: info.tokenAmount?.decimals || 0,
+          tokenProgram: TOKEN_PROGRAM_ID.toString(),
         };
       })
-      .filter((t): t is { mint: string; balance: number; decimals: number } => t !== null);
+      .filter((t) => t !== null);
+    
+    // Process Token-2022 accounts
+    const token2022Tokens = token2022Accounts.value
+      .map((account) => {
+        const parsed = account.account.data.parsed;
+        const info = parsed?.info;
+        if (!info) return null;
+
+        const balance = parseFloat(info.tokenAmount?.uiAmountString || "0");
+        if (balance === 0) return null;
+
+        return {
+          mint: info.mint,
+          balance,
+          decimals: info.tokenAmount?.decimals || 0,
+          tokenProgram: TOKEN_2022_PROGRAM_ID.toString(),
+        };
+      })
+      .filter((t) => t !== null);
+    
+    const tokens = [...splTokens, ...token2022Tokens] as { mint: string; balance: number; decimals: number; tokenProgram: string }[];
     
     console.log("Returning", tokens.length, "tokens with non-zero balance");
     return tokens;

@@ -52,6 +52,7 @@ import {
   getRpId
 } from "./services/webauthnService";
 import { getOnChainTransactions, getWalletBalance, getTokenAccounts, sendRawTransaction, getLatestBlockhash } from "./services/solanaTransactions";
+import { getRpcService } from "./services/rpcService";
 import { balanceCache } from "./services/balanceCache";
 
 export async function registerRoutes(
@@ -557,10 +558,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing address" });
       }
       
-      const { Connection, PublicKey } = await import("@solana/web3.js");
-      const connection = new Connection(getRpcUrl(), "confirmed");
+      const { PublicKey } = await import("@solana/web3.js");
+      const rpc = getRpcService();
       const pubkey = new PublicKey(address);
-      const accountInfo = await connection.getAccountInfo(pubkey);
+      const accountInfo = await rpc.getAccountInfo(pubkey);
       
       res.json({ exists: accountInfo !== null });
     } catch (error) {

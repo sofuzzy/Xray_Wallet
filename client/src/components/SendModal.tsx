@@ -5,7 +5,7 @@ import { useWallet } from "@/hooks/use-wallet";
 import { useCreateTransaction } from "@/hooks/use-transactions";
 import { useLookupUser } from "@/hooks/use-users";
 import { SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,6 +28,7 @@ interface TokenBalance {
   name: string | null;
   symbol: string | null;
   imageUrl: string | null;
+  tokenProgram?: string;
 }
 
 export function SendModal({ isOpen, onClose }: SendModalProps) {
@@ -127,13 +128,29 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
           })
         );
       } else {
-        // SPL Token transfer
+        // SPL Token transfer - detect Token-2022 vs regular SPL Token
         const mintPubkey = new PublicKey(selectedToken);
         const decimals = currentToken?.decimals || 9;
         const tokenAmount = Math.floor(amountNum * Math.pow(10, decimals));
         
-        const fromAta = await getAssociatedTokenAddress(mintPubkey, keypair.publicKey);
-        const toAta = await getAssociatedTokenAddress(mintPubkey, new PublicKey(destAddr));
+        // Use the correct token program based on the token's program
+        const isToken2022 = currentToken?.tokenProgram === TOKEN_2022_PROGRAM_ID.toString();
+        const tokenProgramId = isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+        
+        const fromAta = await getAssociatedTokenAddress(
+          mintPubkey, 
+          keypair.publicKey,
+          false,
+          tokenProgramId,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const toAta = await getAssociatedTokenAddress(
+          mintPubkey, 
+          new PublicKey(destAddr),
+          false,
+          tokenProgramId,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        );
         
         // Check if destination ATA exists, if not create it
         try {
@@ -146,7 +163,9 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
                 keypair.publicKey,
                 toAta,
                 new PublicKey(destAddr),
-                mintPubkey
+                mintPubkey,
+                tokenProgramId,
+                ASSOCIATED_TOKEN_PROGRAM_ID
               )
             );
           }
@@ -157,7 +176,9 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
               keypair.publicKey,
               toAta,
               new PublicKey(destAddr),
-              mintPubkey
+              mintPubkey,
+              tokenProgramId,
+              ASSOCIATED_TOKEN_PROGRAM_ID
             )
           );
         }
@@ -169,7 +190,7 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
             keypair.publicKey,
             BigInt(tokenAmount),
             [],
-            TOKEN_PROGRAM_ID
+            tokenProgramId
           )
         );
       }
