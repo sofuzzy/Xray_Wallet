@@ -8,11 +8,10 @@ import { useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { type ActivityLog } from "@shared/schema";
 import { WalletCard } from "@/components/WalletCard";
-import { PortfolioSummary } from "@/components/PortfolioSummary";
+import { Holdings } from "@/components/Holdings";
 import { ActionButtons } from "@/components/ActionButtons";
 import { Button } from "@/components/ui/button";
 import { TransactionList } from "@/components/TransactionList";
-import { TokenBalances } from "@/components/TokenBalances";
 import { SendModal } from "@/components/SendModal";
 import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
@@ -392,7 +391,14 @@ export default function Home() {
         />
 
         <div className="px-6">
-          <PortfolioSummary address={address} solBalance={balance} />
+          <Holdings 
+            solBalance={balance}
+            onSwapToken={(token) => {
+              setInputToken(token);
+              setSelectedToken(null);
+              setIsSwapOpen(true);
+            }}
+          />
         </div>
 
         <div className="px-6">
@@ -402,16 +408,6 @@ export default function Home() {
               <span className="text-primary font-bold">NON_CUSTODIAL:</span> Server cannot sign transactions. Your keys are stored locally.
             </span>
           </div>
-        </div>
-
-        <div className="px-6">
-          <TokenBalances 
-            onSwapToken={(token) => {
-              setInputToken(token);
-              setSelectedToken(null);
-              setIsSwapOpen(true);
-            }}
-          />
         </div>
 
         <div className="px-6">
