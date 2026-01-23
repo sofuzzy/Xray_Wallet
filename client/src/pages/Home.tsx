@@ -24,6 +24,7 @@ import { Watchlist } from "@/components/Watchlist";
 import { Footer } from "@/components/Footer";
 import { LegalAcknowledgmentModal, hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
 import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDisclaimerModal";
+import { OnboardingWalkthrough, hasCompletedWalkthrough } from "@/components/OnboardingWalkthrough";
 import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -139,6 +140,7 @@ export default function Home() {
   const [isInIframe] = useState(() => window.top !== window.self);
   const [showBetaModal, setShowBetaModal] = useState(() => !hasBetaAcknowledged());
   const [showLegalModal, setShowLegalModal] = useState(() => hasBetaAcknowledged() && !hasAcknowledgedLegal());
+  const [showWalkthrough, setShowWalkthrough] = useState(() => hasBetaAcknowledged() && hasAcknowledgedLegal() && !hasCompletedWalkthrough());
 
   const isPasskeyAuth = isPasskeyAuthenticated();
 
@@ -438,7 +440,17 @@ export default function Home() {
 
       <LegalAcknowledgmentModal 
         open={showLegalModal && !showBetaModal} 
-        onAcknowledge={() => setShowLegalModal(false)} 
+        onAcknowledge={() => {
+          setShowLegalModal(false);
+          if (!hasCompletedWalkthrough()) {
+            setShowWalkthrough(true);
+          }
+        }} 
+      />
+
+      <OnboardingWalkthrough
+        open={showWalkthrough && !showBetaModal && !showLegalModal}
+        onComplete={() => setShowWalkthrough(false)}
       />
 
       <AnimatePresence>
