@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { PublicKey } from "@solana/web3.js";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { tokenManager } from "@/lib/tokenManager";
 
 interface Token {
   mint: string;
@@ -296,12 +297,21 @@ export default function TokenExplorer() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const token = await tokenManager.getValidAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   // Live search using DexScreener API
   const { data: liveSearchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
     queryKey: ["/api/tokens/search", debouncedQuery],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return [];
-      const response = await fetch(`/api/tokens/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/tokens/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`, {
+        credentials: "include",
+        headers,
+      });
       if (!response.ok) return [];
       return response.json();
     },
@@ -342,11 +352,12 @@ export default function TokenExplorer() {
       
       const results: Record<string, TokenMetadata> = {};
       
+      const authHeaders = await getAuthHeaders();
       for (const batch of batches) {
         try {
           const response = await fetch("/api/tokens/metadata/batch", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders },
             body: JSON.stringify({ mints: batch }),
             credentials: "include",
           });
@@ -412,7 +423,8 @@ export default function TokenExplorer() {
 
   const { mutate: lookupMint, isPending: isLookingUp } = useMutation({
     mutationFn: async (mint: string) => {
-      const response = await fetch(`/api/swaps/tokens/${mint}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/swaps/tokens/${mint}`, { credentials: "include", headers });
       if (!response.ok) throw new Error("Token not found");
       return response.json();
     },
