@@ -36,7 +36,8 @@ import {
   generateTokenPair, 
   refreshAccessToken, 
   revokeToken, 
-  revokeAllUserTokens 
+  revokeAllUserTokens,
+  verifyAccessToken
 } from "./services/tokenService";
 import {
   generateRegistrationChallenge,
@@ -69,6 +70,35 @@ export async function registerRoutes(
   app.use(globalRateLimiter);
   app.use(anomalyDetection);
 
+  // Cookie configuration for refresh tokens (HttpOnly, Secure, SameSite)
+  const REFRESH_TOKEN_COOKIE_NAME = "xray_refresh_token";
+  const REFRESH_TOKEN_COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict" as const,
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  };
+
+  // Helper to set refresh token cookie and return access token
+  function setAuthCookieAndRespond(
+    res: any,
+    tokens: { accessToken: string; refreshToken: string; accessTokenExpiresIn: number; refreshTokenExpiresIn: number },
+    user?: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null }
+  ) {
+    res.cookie(REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
+    res.json({
+      accessToken: tokens.accessToken,
+      accessTokenExpiresIn: tokens.accessTokenExpiresIn,
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      } : undefined,
+    });
+  }
+
   // Token management endpoints
   app.post("/api/auth/token", authRateLimiter, sessionAuth, async (req, res) => {
     try {
@@ -87,15 +117,7 @@ export async function registerRoutes(
         req.clientInfo?.ip
       );
 
-      res.json({
-        ...tokens,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        }
-      });
+      setAuthCookieAndRespond(res, tokens, user);
     } catch (error) {
       console.error("Token generation failed:", error);
       res.status(500).json({ error: "TOKEN_GENERATION_FAILED", message: "Failed to generate tokens" });
@@ -104,10 +126,11 @@ export async function registerRoutes(
 
   app.post("/api/auth/refresh", authRateLimiter, async (req, res) => {
     try {
-      const { refreshToken } = req.body;
+      // Read refresh token from HttpOnly cookie (secure) or body (legacy fallback)
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME] || req.body?.refreshToken;
       
       if (!refreshToken) {
-        return res.status(400).json({ error: "MISSING_TOKEN", message: "Refresh token required" });
+        return res.status(401).json({ error: "NO_REFRESH_TOKEN", message: "Not authenticated" });
       }
 
       const tokens = await refreshAccessToken(
@@ -117,38 +140,103 @@ export async function registerRoutes(
       );
 
       if (!tokens) {
-        return res.status(401).json({ error: "INVALID_REFRESH_TOKEN", message: "Invalid or expired refresh token" });
+        // Clear invalid cookie
+        res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+        return res.status(401).json({ error: "INVALID_REFRESH_TOKEN", message: "Session expired, please login again" });
       }
 
-      res.json(tokens);
+      setAuthCookieAndRespond(res, tokens);
     } catch (error) {
       console.error("Token refresh failed:", error);
       res.status(500).json({ error: "TOKEN_REFRESH_FAILED", message: "Failed to refresh tokens" });
     }
   });
 
-  app.post("/api/auth/revoke", hybridAuth, async (req, res) => {
+  // Session check endpoint - called on app load to restore auth state
+  app.get("/api/auth/session", authRateLimiter, async (req, res) => {
     try {
-      const { refreshToken, revokeAll } = req.body;
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
       
-      if (revokeAll && req.tokenUser) {
-        await revokeAllUserTokens(req.tokenUser.sub);
-        return res.json({ success: true, message: "All tokens revoked" });
-      }
-
       if (!refreshToken) {
-        return res.status(400).json({ error: "MISSING_TOKEN", message: "Refresh token required" });
+        return res.status(401).json({ error: "NO_SESSION", message: "Not authenticated" });
       }
 
-      const success = await revokeToken(refreshToken);
-      if (!success) {
-        return res.status(400).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
+      const tokens = await refreshAccessToken(
+        refreshToken,
+        req.clientInfo?.userAgent,
+        req.clientInfo?.ip
+      );
+
+      if (!tokens) {
+        res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+        return res.status(401).json({ error: "SESSION_EXPIRED", message: "Session expired, please login again" });
       }
 
-      res.json({ success: true, message: "Token revoked" });
+      // Get user info for the response
+      const jwt = await import("jsonwebtoken");
+      const decoded = jwt.default.decode(tokens.accessToken) as any;
+      
+      setAuthCookieAndRespond(res, tokens, decoded ? {
+        id: decoded.sub,
+        email: decoded.email,
+        firstName: decoded.firstName,
+        lastName: decoded.lastName,
+      } : undefined);
+    } catch (error) {
+      console.error("Session check failed:", error);
+      res.status(500).json({ error: "SESSION_CHECK_FAILED", message: "Failed to check session" });
+    }
+  });
+
+  app.post("/api/auth/revoke", async (req, res) => {
+    try {
+      const { revokeAll } = req.body;
+      // Get refresh token from cookie (primary) or body (legacy fallback)
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME] || req.body?.refreshToken;
+      
+      // Always clear the cookie
+      res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+
+      // Check if user wants to revoke all tokens
+      const authHeader = req.headers.authorization;
+      if (revokeAll && authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const payload = await verifyAccessToken(token);
+        if (payload) {
+          await revokeAllUserTokens(payload.sub);
+          return res.json({ success: true, message: "All tokens revoked" });
+        }
+      }
+
+      // Revoke the specific refresh token if present
+      if (refreshToken) {
+        await revokeToken(refreshToken);
+      }
+
+      res.json({ success: true, message: "Logged out successfully" });
     } catch (error) {
       console.error("Token revocation failed:", error);
-      res.status(500).json({ error: "REVOKE_FAILED", message: "Failed to revoke token" });
+      // Still clear cookie even on error
+      res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+      res.json({ success: true, message: "Logged out" });
+    }
+  });
+
+  // Logout endpoint - alias for revoke with better semantics
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+      res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+      
+      if (refreshToken) {
+        await revokeToken(refreshToken);
+      }
+      
+      res.json({ success: true, message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Logout failed:", error);
+      res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
+      res.json({ success: true, message: "Logged out" });
     }
   });
 
@@ -203,11 +291,15 @@ export async function registerRoutes(
         req.clientInfo?.ip
       );
 
+      // Set refresh token as HttpOnly cookie
+      res.cookie(REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
+      
       res.json({
         success: true,
         message: "Passkey registered successfully",
         userId: result.userId,
-        ...tokens,
+        accessToken: tokens.accessToken,
+        accessTokenExpiresIn: tokens.accessTokenExpiresIn,
       });
     } catch (error) {
       console.error("Passkey registration failed:", error);
@@ -260,11 +352,15 @@ export async function registerRoutes(
         req.clientInfo?.ip
       );
 
+      // Set refresh token as HttpOnly cookie
+      res.cookie(REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
+      
       res.json({
         success: true,
         message: "Login successful",
         userId: result.userId,
-        ...tokens,
+        accessToken: tokens.accessToken,
+        accessTokenExpiresIn: tokens.accessTokenExpiresIn,
       });
     } catch (error) {
       console.error("Passkey login failed:", error);

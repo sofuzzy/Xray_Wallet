@@ -1,19 +1,11 @@
 import { useState, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
-
-interface PasskeyInfo {
-  rpId: string;
-  rpName: string;
-  supported: boolean;
-  nonCustodial: boolean;
-  message: string;
-}
+import { tokenManager } from "@/lib/tokenManager";
 
 interface AuthResult {
   success: boolean;
   userId?: string;
   accessToken?: string;
-  refreshToken?: string;
   accessTokenExpiresIn?: number;
   error?: string;
 }
@@ -73,9 +65,10 @@ export function usePasskey() {
       });
 
       if (result.success && result.accessToken) {
-        localStorage.setItem("accessToken", result.accessToken);
-        localStorage.setItem("refreshToken", result.refreshToken);
-        localStorage.setItem("passkeyUserId", result.userId);
+        tokenManager.setTokens({
+          accessToken: result.accessToken,
+          accessTokenExpiresIn: result.accessTokenExpiresIn || 900,
+        });
       }
 
       setIsLoading(false);
@@ -129,9 +122,10 @@ export function usePasskey() {
       });
 
       if (result.success && result.accessToken) {
-        localStorage.setItem("accessToken", result.accessToken);
-        localStorage.setItem("refreshToken", result.refreshToken);
-        localStorage.setItem("passkeyUserId", result.userId);
+        tokenManager.setTokens({
+          accessToken: result.accessToken,
+          accessTokenExpiresIn: result.accessTokenExpiresIn || 900,
+        });
       }
 
       setIsLoading(false);
@@ -144,14 +138,12 @@ export function usePasskey() {
     }
   }, [isSupported]);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("passkeyUserId");
+  const logout = useCallback(async () => {
+    await tokenManager.logout();
   }, []);
 
-  const getStoredUserId = useCallback((): string | null => {
-    return localStorage.getItem("passkeyUserId");
+  const isAuthenticated = useCallback((): boolean => {
+    return tokenManager.hasValidToken();
   }, []);
 
   return {
@@ -161,7 +153,7 @@ export function usePasskey() {
     isLoading,
     error,
     isSupported: isSupported(),
-    getStoredUserId,
+    isAuthenticated,
   };
 }
 

@@ -1,12 +1,6 @@
-const TOKEN_STORAGE_KEY = "xray_access_token";
-const REFRESH_TOKEN_KEY = "xray_refresh_token";
-const TOKEN_EXPIRY_KEY = "xray_token_expiry";
-
 interface TokenResponse {
   accessToken: string;
-  refreshToken: string;
   accessTokenExpiresIn: number;
-  refreshTokenExpiresIn: number;
   user?: {
     id: string;
     email: string;
@@ -15,57 +9,62 @@ interface TokenResponse {
   };
 }
 
+type TokenChangeListener = (hasToken: boolean) => void;
+
 class TokenManager {
+  private accessToken: string | null = null;
+  private tokenExpiry: number | null = null;
   private refreshPromise: Promise<boolean> | null = null;
+  private listeners: Set<TokenChangeListener> = new Set();
+
+  subscribe(listener: TokenChangeListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners() {
+    const hasToken = !!this.accessToken;
+    this.listeners.forEach(listener => listener(hasToken));
+  }
 
   getAccessToken(): string | null {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
-  }
-
-  getRefreshToken(): string | null {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  }
-
-  getTokenExpiry(): number | null {
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    return expiry ? parseInt(expiry) : null;
+    return this.accessToken;
   }
 
   isTokenExpired(): boolean {
-    const expiry = this.getTokenExpiry();
-    if (!expiry) return true;
-    return Date.now() > expiry - 60000;
+    if (!this.tokenExpiry) return true;
+    return Date.now() > this.tokenExpiry - 60000;
   }
 
   setTokens(response: TokenResponse): void {
-    localStorage.setItem(TOKEN_STORAGE_KEY, response.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
-    const expiryTime = Date.now() + response.accessTokenExpiresIn * 1000;
-    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
+    this.accessToken = response.accessToken;
+    this.tokenExpiry = Date.now() + response.accessTokenExpiresIn * 1000;
+    this.notifyListeners();
   }
 
   clearTokens(): void {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    this.accessToken = null;
+    this.tokenExpiry = null;
+    this.notifyListeners();
   }
 
-  async requestTokens(): Promise<boolean> {
+  async initSession(): Promise<boolean> {
     try {
-      const response = await fetch("/api/auth/token", {
-        method: "POST",
+      const response = await fetch("/api/auth/session", {
+        method: "GET",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
       });
 
       if (!response.ok) {
+        this.clearTokens();
         return false;
       }
 
-      const tokens: TokenResponse = await response.json();
-      this.setTokens(tokens);
+      const data: TokenResponse = await response.json();
+      this.setTokens(data);
       return true;
     } catch {
+      this.clearTokens();
       return false;
     }
   }
@@ -77,26 +76,22 @@ class TokenManager {
 
     this.refreshPromise = (async () => {
       try {
-        const refreshToken = this.getRefreshToken();
-        if (!refreshToken) {
-          return await this.requestTokens();
-        }
-
         const response = await fetch("/api/auth/refresh", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
         });
 
         if (!response.ok) {
           this.clearTokens();
-          return await this.requestTokens();
+          return false;
         }
 
-        const tokens: TokenResponse = await response.json();
-        this.setTokens(tokens);
+        const data: TokenResponse = await response.json();
+        this.setTokens(data);
         return true;
       } catch {
+        this.clearTokens();
         return false;
       } finally {
         this.refreshPromise = null;
@@ -107,31 +102,32 @@ class TokenManager {
   }
 
   async getValidAccessToken(): Promise<string | null> {
+    if (!this.accessToken) {
+      const success = await this.initSession();
+      return success ? this.accessToken : null;
+    }
+
     if (!this.isTokenExpired()) {
-      return this.getAccessToken();
+      return this.accessToken;
     }
 
     const success = await this.refreshTokens();
-    return success ? this.getAccessToken() : null;
+    return success ? this.accessToken : null;
   }
 
-  async revokeTokens(): Promise<void> {
-    const refreshToken = this.getRefreshToken();
-    
-    if (refreshToken) {
-      try {
-        await fetch("/api/auth/revoke", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.getAccessToken()}`,
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
-      } catch {}
-    }
+  async logout(): Promise<void> {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {}
     
     this.clearTokens();
+  }
+
+  hasValidToken(): boolean {
+    return !!this.accessToken && !this.isTokenExpired();
   }
 }
 

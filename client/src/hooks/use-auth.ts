@@ -17,32 +17,23 @@ async function fetchUser(): Promise<User | null> {
 
   const user = await response.json();
   
-  if (user && !tokenManager.getAccessToken()) {
-    await tokenManager.requestTokens();
+  if (user && !tokenManager.hasValidToken()) {
+    await tokenManager.initSession();
   }
   
   return user;
 }
 
 async function logout(): Promise<void> {
-  // Check if user is using passkey auth before clearing tokens
-  const isPasskeyUser = localStorage.getItem("passkeyUserId") !== null;
+  const hasToken = tokenManager.hasValidToken();
   
-  // Clear JWT tokens for passkey auth
-  await tokenManager.revokeTokens();
+  await tokenManager.logout();
   
-  // Clear passkey-specific localStorage items
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("passkeyUserId");
-  
-  // For passkey users, just reload the page
-  if (isPasskeyUser) {
+  if (hasToken) {
     window.location.reload();
     return;
   }
   
-  // For Replit OAuth users, redirect to OAuth logout
   window.location.href = "/api/logout";
 }
 
