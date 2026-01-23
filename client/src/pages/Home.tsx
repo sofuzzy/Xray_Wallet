@@ -70,7 +70,7 @@ export default function Home() {
     staleTime: 30000,
   });
   const { toast } = useToast();
-  const { register: registerPasskey, login: loginPasskey, isLoading: passkeyLoading, isSupported: passkeySupported, getStoredUserId } = usePasskey();
+  const { register: registerPasskey, login: loginPasskey, isLoading: passkeyLoading, isSupported: passkeySupported, isAuthenticated: isPasskeyAuthenticated } = usePasskey();
   const { registeredWallets, registerWallet } = useWalletRegistry(isAuthenticated);
   const [syncRetryTick, setSyncRetryTick] = useState(0);
   const inFlightAddresses = useRef<Set<string>>(new Set());
@@ -139,8 +139,7 @@ export default function Home() {
   const [showBetaModal, setShowBetaModal] = useState(() => !hasBetaAcknowledged());
   const [showLegalModal, setShowLegalModal] = useState(() => hasBetaAcknowledged() && !hasAcknowledgedLegal());
 
-  const passkeyUserId = getStoredUserId();
-  const isPasskeyAuth = !!passkeyUserId;
+  const isPasskeyAuth = isPasskeyAuthenticated();
 
   const handlePasskeyRegister = async () => {
     const result = await registerPasskey();
