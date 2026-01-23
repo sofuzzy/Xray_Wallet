@@ -1,5 +1,6 @@
 import { ArrowUpRight, ArrowDownLeft, Shuffle, Rocket } from "lucide-react";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 interface ActionButtonsProps {
   onSend: () => void;
@@ -10,33 +11,60 @@ interface ActionButtonsProps {
 
 export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionButtonsProps) {
   const buttons = [
-    { label: "Send", icon: ArrowUpRight, onClick: onSend, color: "bg-primary text-primary-foreground", testId: "button-send" },
-    { label: "Receive", icon: ArrowDownLeft, onClick: onReceive, color: "bg-muted text-foreground", testId: "button-receive" },
-    { label: "Swap", icon: Shuffle, onClick: onSwap, color: "bg-muted text-foreground", testId: "button-swap" },
-    { label: "Launch", icon: Rocket, onClick: onLaunch || (() => {}), color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white", testId: "button-launch" },
+    { 
+      label: "Send", 
+      icon: ArrowUpRight, 
+      onClick: onSend, 
+      variant: "default" as const,
+      testId: "button-send" 
+    },
+    { 
+      label: "Receive", 
+      icon: ArrowDownLeft, 
+      onClick: onReceive, 
+      variant: "secondary" as const,
+      testId: "button-receive" 
+    },
+    { 
+      label: "Swap", 
+      icon: Shuffle, 
+      onClick: onSwap, 
+      variant: "secondary" as const,
+      testId: "button-swap" 
+    },
+    { 
+      label: "Launch", 
+      icon: Rocket, 
+      onClick: onLaunch || (() => {}), 
+      variant: "secondary" as const,
+      className: "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500",
+      testId: "button-launch" 
+    },
   ];
 
   return (
-    <div className="flex gap-4 justify-center py-8">
+    <div className="flex gap-5 justify-center py-6">
       {buttons.map((btn, idx) => (
-        <motion.button
+        <motion.div
           key={btn.label}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={btn.onClick}
-          className="flex flex-col items-center gap-2 group"
-          data-testid={btn.testId}
+          transition={{ delay: idx * 0.08, type: "spring", stiffness: 200 }}
+          className="flex flex-col items-center gap-2.5"
         >
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all ${btn.color}`}>
-            <btn.icon className="w-6 h-6" strokeWidth={2.5} />
-          </div>
-          <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+          <Button
+            size="icon"
+            variant={btn.variant}
+            onClick={btn.onClick}
+            className={`w-14 h-14 rounded-2xl ${btn.className || ''}`}
+            data-testid={btn.testId}
+          >
+            <btn.icon className="w-5 h-5" strokeWidth={2} />
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">
             {btn.label}
           </span>
-        </motion.button>
+        </motion.div>
       ))}
     </div>
   );

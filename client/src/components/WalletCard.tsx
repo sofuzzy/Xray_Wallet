@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { shortenAddress, getTokenAccounts } from "@/lib/solana";
 import { useQuery } from "@tanstack/react-query";
@@ -75,54 +75,71 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
 
   return (
     <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
+      initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.5, type: "spring" }}
-      className="w-full max-w-md mx-auto aspect-[1.586/1] rounded-lg relative overflow-hidden shadow-2xl group cursor-pointer"
+      transition={{ duration: 0.4, type: "spring", stiffness: 100 }}
+      className="w-full max-w-md mx-auto aspect-[1.586/1] rounded-2xl relative overflow-hidden cursor-pointer group"
       onClick={handleCopy}
     >
-      {/* CRT Monitor Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-green-950 to-black" />
+      {/* Modern gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
       
-      {/* Scanline Effect */}
-      <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)'
+      {/* Subtle mesh gradient overlay */}
+      <div className="absolute inset-0 opacity-60" style={{
+        background: `
+          radial-gradient(ellipse at 20% 20%, hsl(165 85% 45% / 0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 80%, hsl(270 80% 65% / 0.1) 0%, transparent 50%)
+        `
       }} />
       
-      {/* CRT Glow */}
-      <div className="absolute inset-0 bg-gradient-to-t from-transparent via-emerald-500/5 to-emerald-400/10" />
-      
-      {/* Border Glow */}
-      <div className="absolute inset-0 rounded-lg border-2 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2),inset_0_0_30px_rgba(16,185,129,0.05)]" />
+      {/* Grid pattern */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+        backgroundSize: '30px 30px'
+      }} />
+
+      {/* Gradient border effect */}
+      <div className="absolute inset-0 rounded-2xl" style={{
+        padding: '1px',
+        background: 'linear-gradient(135deg, hsl(165 85% 45% / 0.4), hsl(270 80% 65% / 0.2), transparent)',
+        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude'
+      }} />
 
       {/* Content */}
-      <div className="relative h-full p-6 md:p-8 flex flex-col justify-between text-white z-10">
+      <div className="relative h-full p-6 md:p-8 flex flex-col justify-between z-10">
         <div className="flex justify-between items-start">
-          <div>
-            <span className="inline-block px-3 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs font-mono border border-emerald-500/30">
-              [SOLANA_MAINNET]
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-white/80" />
+            </div>
+            <span className="text-white/60 text-xs font-medium tracking-wide uppercase">
+              Solana
             </span>
           </div>
-          <div className="w-10 h-10 rounded bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-mono text-xs">
-            SOL
+          <div className="px-3 py-1.5 rounded-full bg-primary/20 backdrop-blur-sm border border-primary/30 text-primary text-xs font-medium">
+            Mainnet
           </div>
         </div>
 
         <div className="space-y-1">
-          <p className="text-sm text-emerald-400/70 font-mono tracking-wide uppercase">&gt; TOTAL_BALANCE</p>
+          <p className="text-white/60 text-sm font-medium tracking-wide uppercase">Total Balance</p>
           {isLoadingPrice ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-emerald-400/50" />
-              <span className="text-emerald-400/50 font-mono">LOADING...</span>
+              <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+              <span className="text-white/50 font-medium">Loading...</span>
             </div>
           ) : (
             <>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight font-mono text-emerald-400 glow-text" data-testid="text-total-usd-balance">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white" data-testid="text-total-usd-balance">
                 ${totalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h2>
-              <p className="text-sm text-emerald-500/60 font-mono mt-1" data-testid="text-sol-balance">
+              <p className="text-white/60 text-sm font-medium mt-1 font-mono" data-testid="text-sol-balance">
                 {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
-                {tokensUsdValue > 0 && ` + $${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} tokens`}
+                {tokensUsdValue > 0 && (
+                  <span className="text-emerald-300"> + ${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} tokens</span>
+                )}
               </p>
             </>
           )}
@@ -130,17 +147,18 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
 
         <div className="flex justify-between items-end gap-3">
           <div>
-            <p className="text-emerald-300 font-mono text-lg">{username || "Wallet"}</p>
-            <div className="flex items-center gap-2 text-emerald-500/60 text-sm font-mono mt-1 group-hover:text-emerald-400 transition-colors">
-              {address ? shortenAddress(address, 6) : "LOADING..."}
-              <Copy className="w-3 h-3" />
+            <p className="text-white font-semibold text-lg">{username || "Wallet"}</p>
+            <div className="flex items-center gap-2 text-white/60 text-sm font-mono mt-0.5">
+              {address ? shortenAddress(address, 6) : "Loading..."}
+              <Copy className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-emerald-600/50 text-xs font-mono border border-emerald-500/20 px-2 py-1 rounded">
+          <div className="text-white/30 text-xs font-medium px-2 py-1 rounded-md bg-white/10">
             v1.0.0
           </div>
         </div>
       </div>
+
     </motion.div>
   );
 }

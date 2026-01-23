@@ -10,6 +10,7 @@ import { type ActivityLog } from "@shared/schema";
 import { WalletCard } from "@/components/WalletCard";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { ActionButtons } from "@/components/ActionButtons";
+import { Button } from "@/components/ui/button";
 import { TransactionList } from "@/components/TransactionList";
 import { TokenBalances } from "@/components/TokenBalances";
 import { SendModal } from "@/components/SendModal";
@@ -173,39 +174,42 @@ export default function Home() {
 
   if (!isAuthenticated && !isPasskeyAuth) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden crt-overlay">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/3" />
+        
         <div className="absolute top-4 right-4 z-20">
           <ThemeToggle />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
         
-        <div className="relative z-10 text-center space-y-6 max-w-md w-full">
-          <div className="inline-flex items-center justify-center p-4 rounded border-2 border-primary/50 bg-primary/10 mb-4 glow-border">
-            <Sparkles className="w-8 h-8 text-primary" />
+        <div className="relative z-10 text-center space-y-8 max-w-md w-full">
+          {/* Logo */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-emerald-400 shadow-lg shadow-primary/25 mb-2">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
           
           <div className="space-y-3">
-            <h1 className="text-4xl md:text-5xl font-bold font-mono tracking-tight glow-text">
-              <span className="text-primary">&gt; XRAY_</span>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+              <span className="bg-gradient-to-r from-primary via-emerald-400 to-cyan-400 bg-clip-text text-transparent">XRAY</span>
             </h1>
-            <p className="text-muted-foreground font-mono text-sm">
-              // SOLANA WALLET TERMINAL v1.0.0
+            <p className="text-muted-foreground text-sm font-medium">
+              Next-gen Solana Wallet
             </p>
-            <p className="text-muted-foreground/70 font-mono text-xs">
+            <p className="text-muted-foreground/60 text-xs">
               Fast. Secure. Non-custodial.
             </p>
           </div>
 
           {isInIframe && passkeySupported && (
-            <div className="mb-4 p-3 rounded border border-amber-500/50 bg-amber-500/10">
-              <p className="text-xs text-amber-500 font-mono mb-2">
+            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+              <p className="text-xs text-amber-500 mb-2">
                 Passkeys require a full browser window
               </p>
               <a 
                 href={window.location.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-xs text-primary font-mono hover:underline"
+                className="inline-flex items-center gap-2 text-xs text-primary font-medium hover:underline"
                 data-testid="link-open-new-tab"
               >
                 <ExternalLink className="w-3 h-3" />
@@ -217,83 +221,90 @@ export default function Home() {
           {!showPasskeyOptions ? (
             <div className="space-y-4">
               {passkeySupported && !isInIframe && (
-                <button 
+                <Button 
                   onClick={() => setShowPasskeyOptions(true)}
                   disabled={passkeyLoading}
-                  className="w-full py-4 rounded border-2 border-primary bg-primary/20 text-primary font-mono font-bold text-lg hover:bg-primary/30 active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center gap-3 glow-border disabled:opacity-50"
+                  size="lg"
+                  className="w-full"
                   data-testid="button-passkey-auth"
                 >
                   {passkeyLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
                   ) : (
-                    <KeyRound className="w-5 h-5" />
+                    <KeyRound className="w-5 h-5 mr-2" />
                   )}
-                  [CONTINUE_WITH_PASSKEY]
-                </button>
+                  Continue with Passkey
+                </Button>
               )}
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground font-mono">OR</span>
+                <span className="text-xs text-muted-foreground">or</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
-              <button 
+              <Button 
+                variant="outline"
+                size="lg"
                 onClick={() => window.location.href = "/api/login"}
-                className="w-full py-3 rounded border border-border bg-muted/50 text-foreground font-mono hover:bg-muted transition-all flex items-center justify-center gap-3"
+                className="w-full"
                 data-testid="button-login-replit"
               >
-                <LogIn className="w-4 h-4" />
+                <LogIn className="w-4 h-4 mr-2" />
                 Continue with Replit
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              <button 
+              <Button 
                 onClick={handlePasskeyLogin}
                 disabled={passkeyLoading}
-                className="w-full py-4 rounded border-2 border-primary bg-primary/20 text-primary font-mono font-bold text-lg hover:bg-primary/30 active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center gap-3 glow-border disabled:opacity-50"
+                size="lg"
+                className="w-full"
                 data-testid="button-passkey-login"
               >
                 {passkeyLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 ) : (
-                  <Fingerprint className="w-5 h-5" />
+                  <Fingerprint className="w-5 h-5 mr-2" />
                 )}
-                [LOGIN_WITH_PASSKEY]
-              </button>
+                Login with Passkey
+              </Button>
 
-              <button 
+              <Button 
+                variant="outline"
                 onClick={handlePasskeyRegister}
                 disabled={passkeyLoading}
-                className="w-full py-3 rounded border border-border bg-muted/50 text-foreground font-mono hover:bg-muted transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                size="lg"
+                className="w-full"
                 data-testid="button-passkey-register"
               >
                 {passkeyLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
-                  <Shield className="w-4 h-4" />
+                  <Shield className="w-4 h-4 mr-2" />
                 )}
                 Create New Account
-              </button>
+              </Button>
 
-              <button 
+              <Button 
+                variant="ghost"
                 onClick={() => setShowPasskeyOptions(false)}
-                className="text-xs text-muted-foreground font-mono hover:text-foreground"
+                className="w-full"
                 data-testid="button-back"
               >
-                &lt; Back to options
-              </button>
+                Back to options
+              </Button>
             </div>
           )}
 
-          <div className="space-y-2 pt-4 border-t border-border">
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground font-mono">
-              <Shield className="w-3 h-3 text-primary" />
-              <span>NON_CUSTODIAL: Keys never leave your device</span>
+          <div className="space-y-3 pt-6">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Shield className="w-3.5 h-3.5 text-primary" />
+              <span>Non-custodial • Keys never leave your device</span>
             </div>
-            <p className="text-xs text-muted-foreground/70 font-mono">
-              &gt; network: SOLANA_DEVNET | storage: LOCAL_ONLY
+            <p className="text-xs text-muted-foreground/50">
+              Solana Mainnet • Encrypted Local Storage
             </p>
           </div>
         </div>
@@ -302,12 +313,13 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-10 relative overflow-hidden crt-overlay">
-      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
+    <div className="min-h-screen bg-background pb-10 relative overflow-hidden">
+      {/* Subtle gradient accent */}
+      <div className="fixed inset-0 pointer-events-none bg-gradient-to-br from-primary/3 via-transparent to-accent/2" />
 
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <h1 className="text-lg sm:text-xl font-mono font-bold text-primary glow-text whitespace-nowrap">&gt;_XRAY</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-primary whitespace-nowrap tracking-tight">XRAY</h1>
           <WalletSwitcher
             wallets={wallets}
             activeWallet={activeWallet}
@@ -318,7 +330,7 @@ export default function Home() {
             registeredWallets={registeredWallets}
             isAuthenticated={isAuthenticated}
           />
-          <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+          <span className="hidden sm:inline-block px-2 py-1 text-[10px] font-semibold tracking-wide rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">BETA</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
           <div className="text-right hidden md:block">
@@ -360,7 +372,7 @@ export default function Home() {
         <div className="px-6">
           <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
           <div className="flex justify-center mt-3 sm:hidden">
-            <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
+            <span className="px-2 py-1 text-[10px] font-semibold tracking-wide rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">BETA</span>
           </div>
         </div>
 
