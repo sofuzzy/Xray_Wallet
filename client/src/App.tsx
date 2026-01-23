@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
 import { VaultUnlockModal } from "@/components/VaultUnlockModal";
+import { CursorGlow } from "@/components/CursorGlow";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import TokenExplorer from "@/pages/TokenExplorer";
@@ -73,6 +74,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <CursorGlow />
         <VaultProvider>
           <VaultGate>
             <Toaster />
