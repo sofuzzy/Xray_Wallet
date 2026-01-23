@@ -512,7 +512,9 @@ export default function TokenExplorer() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-6 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-mono font-bold text-primary glow-text">&gt;_XRAY</h1>
+          <Link href="/" data-testid="link-logo-home">
+            <h1 className="text-xl font-mono font-bold text-primary glow-text cursor-pointer hover:opacity-80 transition-opacity">&gt;_XRAY</h1>
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
