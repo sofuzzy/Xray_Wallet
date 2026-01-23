@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Shield } from "lucide-react";
-import { SiX } from "react-icons/si";
+import { SiX, SiGithub } from "react-icons/si";
 
 export function Footer() {
   return (
@@ -11,7 +11,7 @@ export function Footer() {
           <span>NON_CUSTODIAL: Your keys never leave your device</span>
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
           <a
             href="https://x.com/xraythewallet"
             target="_blank"
@@ -21,6 +21,16 @@ export function Footer() {
           >
             <SiX className="w-4 h-4" />
             <span className="text-xs font-mono">@xraythewallet</span>
+          </a>
+          <a
+            href="https://github.com/sofuzzy/Xray_Wallet"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            data-testid="footer-link-github"
+          >
+            <SiGithub className="w-4 h-4" />
+            <span className="text-xs font-mono">GitHub</span>
           </a>
         </div>
         
