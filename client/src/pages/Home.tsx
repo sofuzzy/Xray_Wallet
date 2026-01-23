@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useWallet } from "@/hooks/use-wallet";
 import { usePasskey } from "@/hooks/use-passkey";
@@ -43,6 +43,7 @@ interface Token {
 }
 
 export default function Home() {
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { 
     balance, 
@@ -145,7 +146,7 @@ export default function Home() {
     const result = await registerPasskey();
     if (result.success) {
       toast({ title: "Success!", description: "Passkey registered. Welcome to Xray!" });
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } else {
       toast({ title: "Registration Failed", description: result.error || "Could not register passkey", variant: "destructive" });
     }
@@ -155,7 +156,7 @@ export default function Home() {
     const result = await loginPasskey();
     if (result.success) {
       toast({ title: "Welcome back!", description: "Logged in with passkey" });
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } else {
       toast({ title: "Login Failed", description: result.error || "Could not authenticate", variant: "destructive" });
     }

@@ -510,7 +510,7 @@ export async function verifyPasskeyLogin(
 }
 
 export function getRpId(): string {
-  return RP_ID;
+  return env.webauthnRpId;
 }
 
 setInterval(() => {
