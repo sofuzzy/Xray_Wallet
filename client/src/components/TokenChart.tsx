@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, RefreshCw, ArrowRightLeft, ExternalLink } from "lucide-react";
+import { tokenManager } from "@/lib/tokenManager";
 
 interface TokenChartProps {
   isOpen: boolean;
@@ -51,8 +52,13 @@ export function TokenChart({ isOpen, onClose, tokenMint, tokenSymbol, onSwap }: 
   const { data: tokenInfo, isLoading, refetch, isFetching } = useQuery<TokenInfo>({
     queryKey: ["/api/prices", tokenMint, "info"],
     queryFn: async () => {
+      const token = await tokenManager.getValidAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      
       const response = await fetch(`/api/prices/${tokenMint}?timeframe=24h`, {
         credentials: "include",
+        headers,
       });
       if (!response.ok) throw new Error("Failed to fetch token info");
       const data = await response.json();
