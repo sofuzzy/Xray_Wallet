@@ -172,9 +172,12 @@ The server follows a modular pattern:
 - **Passport.js**: Authentication middleware
 - **express-session**: Session management (backward compatibility)
 - **Zero-Trust Architecture**: JWT-based authentication with:
-  - Short-lived access tokens (15 min expiry)
-  - Refresh token rotation (7-day expiry, single-use)
-  - Per-request token validation
+  - Short-lived access tokens (15 min expiry) stored in memory only
+  - Refresh tokens stored in HttpOnly cookies (Secure, SameSite=Strict, 7-day expiry)
+  - No localStorage usage for auth tokens (security hardening)
+  - `/api/auth/session` endpoint restores auth state on app load from HttpOnly cookie
+  - `/api/auth/refresh` reads refresh token from cookie, returns new access token
+  - Per-request token validation with automatic refresh on 401
   - Hybrid auth supporting both sessions and tokens
   - Rate limiting (global/strict/auth tiers)
   - Basic anomaly detection for suspicious patterns
