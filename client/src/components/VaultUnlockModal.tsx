@@ -88,20 +88,21 @@ export function VaultUnlockModal({
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+          <h1 className="text-2xl font-bold text-primary mb-4 tracking-tight">XRAY</h1>
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
             {mode === "unlock" ? (
-              <Lock className="w-10 h-10 text-primary" />
+              <Lock className="w-8 h-8 text-primary" />
             ) : (
-              <Shield className="w-10 h-10 text-primary" />
+              <Shield className="w-8 h-8 text-primary" />
             )}
           </div>
-          <h1 className="text-2xl font-bold mb-2">
+          <h2 className="text-2xl font-bold mb-2">
             {mode === "unlock"
               ? "Unlock Your Wallet"
               : mode === "migrate"
               ? "Secure Your Wallet"
               : "Create a PIN"}
-          </h1>
+          </h2>
           <p className="text-muted-foreground">
             {mode === "unlock"
               ? "Enter your PIN to access your wallet"
