@@ -2,7 +2,15 @@
 
 ## Overview
 
-Xray is a Solana mainnet wallet application that allows users to manage SOL tokens with a retro-futuristic terminal-inspired interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and token launchpad. It supports both Passkey (WebAuthn) and Replit Auth for user authentication and stores wallet data in a PostgreSQL database. The wallet is completely non-custodial - private keys never touch the server.
+Xray is a Solana mainnet wallet application that allows users to manage SOL tokens with a clean, modern futuristic interface. The app provides core wallet functionality including sending/receiving SOL, token swaps, and token launchpad. It supports both Passkey (WebAuthn) and Replit Auth for user authentication and stores wallet data in a PostgreSQL database. The wallet is completely non-custodial - private keys never touch the server.
+
+### Design Philosophy
+The UI uses a clean, edgy futuristic aesthetic:
+- **Color Palette**: Deep slate backgrounds with teal/emerald primary (165 85% 45%) and purple accent (270 80% 65%)
+- **Typography**: Inter for body text, JetBrains Mono for monospace data
+- **Effects**: Subtle glassmorphism with backdrop-blur, modern gradients, minimal shadows
+- **Components**: shadcn/ui Button components with proper variants (no custom hover states)
+- **Cards**: Modern gradient backgrounds with subtle mesh overlays and gradient borders
 
 ## User Preferences
 
