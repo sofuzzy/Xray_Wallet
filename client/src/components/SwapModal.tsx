@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { tokenManager } from "@/lib/tokenManager";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
@@ -368,13 +369,19 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     return priorityFeeAmounts[priorityFee];
   };
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const token = await tokenManager.getValidAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const { data: tokens = [], isLoading: tokensLoading } = useQuery<Token[]>({
     queryKey: ["/api/swaps/tokens", searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set("search", searchQuery);
       params.set("limit", "100");
-      const response = await fetch(`/api/swaps/tokens?${params}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/swaps/tokens?${params}`, { credentials: "include", headers });
       if (!response.ok) throw new Error("Failed to fetch tokens");
       return response.json();
     },
@@ -385,7 +392,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   const { data: trendingTokens = [] } = useQuery<Token[]>({
     queryKey: ["/api/swaps/trending"],
     queryFn: async () => {
-      const response = await fetch("/api/swaps/trending", { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch("/api/swaps/trending", { credentials: "include", headers });
       if (!response.ok) return [];
       return response.json();
     },
@@ -401,7 +409,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
 
   const { mutate: lookupMint, isPending: isLookingUp } = useMutation({
     mutationFn: async (mint: string) => {
-      const response = await fetch(`/api/swaps/tokens/${mint}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/swaps/tokens/${mint}`, { credentials: "include", headers });
       if (!response.ok) throw new Error("Token not found");
       return response.json();
     },
@@ -435,7 +444,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
       setOutputMint(token.mint);
       if (token.mint !== "SOL" && !token.priceUsd) {
         try {
-          const response = await fetch(`/api/swaps/tokens/${token.mint}`, { credentials: "include" });
+          const headers = await getAuthHeaders();
+          const response = await fetch(`/api/swaps/tokens/${token.mint}`, { credentials: "include", headers });
           if (response.ok) {
             const enrichedToken = await response.json();
             setCustomTokens(prev => {
@@ -479,7 +489,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     queryKey: ["wallet-tokens-balances", address],
     queryFn: async () => {
       if (!address) return [];
-      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include", headers });
       if (!response.ok) return [];
       return response.json();
     },
@@ -527,7 +538,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         amount: debouncedInputAmount,
       });
       
-      const response = await fetch(`/api/swaps/validate-balance?${params}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/swaps/validate-balance?${params}`, { credentials: "include", headers });
       if (!response.ok) return null;
       return response.json();
     },
@@ -578,7 +590,11 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         }
       }
       
-      const response = await fetch(`/api/swaps/quote?${params}`, { credentials: "include" });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/swaps/quote?${params}`, { 
+        credentials: "include",
+        headers,
+      });
       if (!response.ok) {
         let errorData: any = {};
         try { errorData = await response.json(); } catch {}
