@@ -427,6 +427,28 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     },
   });
 
+  interface TokenBalance {
+    mint: string;
+    balance: number;
+    decimals?: number;
+    name?: string;
+    symbol?: string;
+    logoURI?: string;
+  }
+  
+  const { data: walletTokens = [] } = useQuery<TokenBalance[]>({
+    queryKey: ["wallet-tokens-balances", address],
+    queryFn: async () => {
+      if (!address) return [];
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include", headers });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: isOpen && !!address,
+    staleTime: 10000,
+  });
+
   const getTokenByMint = (mint: string): Token | undefined => {
     if (mint === "SOL") return { mint: "SOL", name: "Solana", symbol: "SOL", decimals: 9 };
     const fromTokens = tokens.find((t) => t.mint === mint);
@@ -490,29 +512,6 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     // Create stable key from settings.checks object directly
     return JSON.stringify(riskShieldSettings.checks);
   }, [riskShieldSettings.enabled, riskShieldSettings.checks]);
-
-  // Fetch wallet token balances for Max button
-  interface TokenBalance {
-    mint: string;
-    balance: number;
-    decimals: number;
-    name?: string;
-    symbol?: string;
-    logoURI?: string;
-  }
-  
-  const { data: walletTokens = [] } = useQuery<TokenBalance[]>({
-    queryKey: ["wallet-tokens-balances", address],
-    queryFn: async () => {
-      if (!address) return [];
-      const headers = await getAuthHeaders();
-      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include", headers });
-      if (!response.ok) return [];
-      return response.json();
-    },
-    enabled: isOpen && !!address,
-    staleTime: 10000,
-  });
 
   // Get the balance for the selected input token
   const inputTokenBalance = useMemo(() => {
