@@ -110,9 +110,70 @@ export async function fetchPopularTokens(): Promise<Token[]> {
   }
 }
 
+// Check if a string looks like a Solana address (base58, 32-44 chars)
+function isSolanaAddress(query: string): boolean {
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  return base58Regex.test(query);
+}
+
+// Direct token lookup by address using DexScreener
+async function lookupTokenByAddress(address: string): Promise<Token | null> {
+  try {
+    const response = await fetch(`${DEXSCREENER_API}/tokens/${address}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    
+    if (!response.ok) {
+      console.error("DexScreener token lookup failed:", response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (!data.pairs || !Array.isArray(data.pairs) || data.pairs.length === 0) {
+      return null;
+    }
+    
+    // Find the Solana pair with highest liquidity
+    const solanaPairs = data.pairs.filter((p: any) => p.chainId === "solana");
+    if (solanaPairs.length === 0) return null;
+    
+    // Sort by liquidity to get the best pair
+    solanaPairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+    const bestPair = solanaPairs[0];
+    
+    const baseToken = bestPair.baseToken;
+    if (!baseToken?.address) return null;
+    
+    return {
+      mint: baseToken.address,
+      name: baseToken.name || "Unknown",
+      symbol: baseToken.symbol || "???",
+      decimals: 9,
+      logoURI: bestPair.info?.imageUrl,
+      volume24h: bestPair.volume?.h24 || 0,
+      liquidity: bestPair.liquidity?.usd || 0,
+      priceChange24h: bestPair.priceChange?.h24 || 0,
+      priceUsd: parseFloat(bestPair.priceUsd) || undefined,
+      marketCap: bestPair.marketCap || bestPair.fdv || undefined,
+    };
+  } catch (error) {
+    console.error("DexScreener token lookup error:", error);
+    return null;
+  }
+}
+
 // Search tokens by name/symbol using DexScreener API
 export async function searchTokens(query: string, limit: number = 20): Promise<Token[]> {
   try {
+    // If query looks like a Solana address, try direct lookup first
+    if (isSolanaAddress(query)) {
+      const token = await lookupTokenByAddress(query);
+      if (token) {
+        return [token];
+      }
+      // If direct lookup fails, fall through to search
+    }
+    
     const response = await fetch(`${DEXSCREENER_API}/search?q=${encodeURIComponent(query)}`);
     if (!response.ok) {
       console.error("DexScreener search failed:", response.status);
