@@ -214,8 +214,6 @@ export function RiskShieldModal(props: {
             <p className="flex flex-wrap gap-x-3 gap-y-1">
               <a 
                 href="/risk-checks" 
-                target="_blank" 
-                rel="noopener noreferrer"
                 className="text-primary hover:underline"
                 data-testid="link-risk-checks-info"
               >
