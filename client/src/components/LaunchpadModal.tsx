@@ -183,7 +183,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         } catch (err: any) {
           lastError = err;
           console.error(`Token creation attempt ${attempt + 1} failed:`, err.message);
-          if (err.message?.includes("403") || err.message?.includes("forbidden") || err.message?.includes("rate")) {
+          if (err.message?.includes("403") || err.message?.includes("401") || err.message?.includes("forbidden") || err.message?.includes("rate") || err.message?.includes("token")) {
             switchToNextRpc();
             await new Promise(r => setTimeout(r, 1000)); // Wait before retry
           } else {
