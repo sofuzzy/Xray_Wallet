@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp, TrendingDown, Loader2, Plus, X, Flame } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, Loader2, Plus, X, Flame, Wallet } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@/hooks/use-wallet";
 import { PublicKey } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -49,12 +50,48 @@ function isValidSolanaAddress(address: string): boolean {
   }
 }
 
+interface WalletToken {
+  mint: string;
+  balance: number;
+  symbol?: string;
+  name?: string;
+  logoURI?: string;
+  decimals?: number;
+  priceUsd?: number;
+}
+
 export function TokenSearch({ onSelectToken }: TokenSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [customTokens, setCustomTokens] = useState<Token[]>([]);
   const autoLookupRef = useRef<string | null>(null);
   const { toast } = useToast();
+  const { address } = useWallet();
+
+  const { data: walletTokens = [] } = useQuery<WalletToken[]>({
+    queryKey: ["wallet-tokens", address],
+    queryFn: async () => {
+      if (!address) return [];
+      const response = await fetch(`/api/wallet/tokens/${address}`, { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!address,
+    staleTime: 30000,
+  });
+
+  const heldTokens: Token[] = useMemo(() => {
+    return walletTokens
+      .filter(wt => wt.balance > 0 && wt.symbol)
+      .map(wt => ({
+        mint: wt.mint,
+        name: wt.name || wt.symbol || "Unknown",
+        symbol: wt.symbol || "???",
+        decimals: wt.decimals || 9,
+        logoURI: wt.logoURI,
+        priceUsd: wt.priceUsd,
+      }));
+  }, [walletTokens]);
 
   const { data: trendingTokens = [], isLoading: trendingLoading } = useQuery<Token[]>({
     queryKey: ["/api/swaps/trending"],
@@ -130,7 +167,7 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
   };
 
   const displayTokens = searchQuery.trim() ? searchResults : trendingTokens.slice(0, 10);
-  const showDropdown = isFocused && (displayTokens.length > 0 || isSearchingMintAddress || searchLoading || trendingLoading);
+  const showDropdown = isFocused && (displayTokens.length > 0 || heldTokens.length > 0 || isSearchingMintAddress || searchLoading || trendingLoading);
 
   return (
     <div className="relative">
@@ -164,13 +201,6 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
             exit={{ opacity: 0, y: -10 }}
             className="absolute top-full left-0 right-0 mt-2 bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-xl z-50 overflow-hidden"
           >
-            {!searchQuery.trim() && trendingTokens.length > 0 && (
-              <div className="px-3 py-2 border-b border-border flex items-center gap-2">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <span className="text-sm font-medium">Trending Tokens</span>
-              </div>
-            )}
-
             {(searchLoading || trendingLoading) && (
               <div className="p-4 flex items-center justify-center">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -178,7 +208,52 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
             )}
 
             {!searchLoading && !trendingLoading && (
-              <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[350px] overflow-y-auto">
+                {/* Your Tokens Section */}
+                {!searchQuery.trim() && heldTokens.filter(t => t.mint).length > 0 && (
+                  <>
+                    <div className="px-3 py-2 border-b border-border flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+                      <Wallet className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Your Tokens</span>
+                    </div>
+                    <div className="p-2 space-y-1">
+                      {heldTokens.map((token) => (
+                        <button
+                          key={`held-${token.mint}`}
+                          onClick={() => handleSelectToken(token)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors text-left"
+                          data-testid={`held-token-${token.symbol}`}
+                        >
+                          {token.logoURI ? (
+                            <img src={token.logoURI} alt={token.symbol} className="w-8 h-8 rounded-full" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center text-xs font-bold">
+                              {token.symbol?.charAt(0) || "?"}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{token.name}</div>
+                            <div className="text-xs text-muted-foreground">{token.symbol}</div>
+                          </div>
+                          {token.priceUsd && (
+                            <div className="text-right">
+                              <div className="text-sm font-medium">{formatPrice(token.priceUsd)}</div>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Trending Section */}
+                {!searchQuery.trim() && trendingTokens.length > 0 && (
+                  <div className="px-3 py-2 border-b border-border flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+                    <Flame className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm font-medium">Trending</span>
+                  </div>
+                )}
+
                 <div className="p-2 space-y-1">
                   {displayTokens.map((token) => (
                     <button

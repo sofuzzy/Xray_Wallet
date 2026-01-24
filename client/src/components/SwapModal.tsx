@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { tokenManager } from "@/lib/tokenManager";
@@ -483,6 +483,9 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     mint: string;
     balance: number;
     decimals: number;
+    name?: string;
+    symbol?: string;
+    logoURI?: string;
   }
   
   const { data: walletTokens = [] } = useQuery<TokenBalance[]>({
@@ -891,6 +894,45 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                     <div className="text-sm text-muted-foreground">SOL</div>
                   </div>
                 </button>
+
+                {!searchQuery && walletTokens.filter(t => t.balance > 0).length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                      <Wallet className="w-4 h-4 text-primary" />
+                      Your Tokens
+                    </div>
+                    {walletTokens.filter(t => t.balance > 0).slice(0, 10).map((token) => (
+                      <button
+                        key={`held-${token.mint}`}
+                        className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted/70 transition-colors text-left"
+                        onClick={() => handleSelectToken({ 
+                          mint: token.mint, 
+                          name: token.name || token.symbol || "Unknown", 
+                          symbol: token.symbol || "???", 
+                          decimals: token.decimals || 9,
+                          logoURI: token.logoURI 
+                        })}
+                        data-testid={`token-held-${token.mint.slice(0, 8)}`}
+                      >
+                        {token.logoURI ? (
+                          <img src={token.logoURI} alt={token.symbol} className="w-8 h-8 rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center text-xs font-bold">
+                            {token.symbol?.slice(0, 2) || "?"}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{token.name || token.symbol || "Unknown"}</div>
+                          <div className="text-sm text-muted-foreground">{token.symbol}</div>
+                        </div>
+                        <div className="text-right text-sm text-muted-foreground">
+                          {token.balance?.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        </div>
+                      </button>
+                    ))}
+                    <div className="border-t border-border my-2" />
+                  </>
+                )}
 
                 {!searchQuery && trendingTokens.length > 0 && (
                   <>
