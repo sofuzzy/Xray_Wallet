@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
 import { Link } from "wouter";
 import { SiX, SiGithub } from "react-icons/si";
+import xrayEyeImage from "@/assets/xray-eye.jpg";
 
 interface VaultUnlockModalProps {
   mode: "unlock" | "setup" | "migrate";
@@ -91,12 +92,12 @@ export function VaultUnlockModal({
       >
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-primary mb-4 tracking-tight">XRAY</h1>
-          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
-            {mode === "unlock" ? (
-              <Lock className="w-8 h-8 text-primary" />
-            ) : (
-              <Shield className="w-8 h-8 text-primary" />
-            )}
+          <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <img 
+              src={xrayEyeImage} 
+              alt="XRAY Eye" 
+              className="w-full h-full object-contain dark:invert"
+            />
           </div>
           <h2 className="text-2xl font-bold mb-2">
             {mode === "unlock"
