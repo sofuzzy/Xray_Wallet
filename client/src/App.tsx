@@ -13,6 +13,7 @@ import Transactions from "@/pages/Transactions";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import Disclaimer from "@/pages/Disclaimer";
+import RiskChecks from "@/pages/RiskChecks";
 import BetaExit from "@/pages/BetaExit";
 import { Loader2 } from "lucide-react";
 
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/disclaimer" component={Disclaimer} />
+      <Route path="/risk-checks" component={RiskChecks} />
       <Route path="/beta-exit" component={BetaExit} />
       <Route component={NotFound} />
     </Switch>

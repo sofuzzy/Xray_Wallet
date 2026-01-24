@@ -211,15 +211,24 @@ export function RiskShieldModal(props: {
 
           <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
             <p>Risk Shield provides automated safety checks but cannot guarantee token safety. Always do your own research and only invest what you can afford to lose.</p>
-            <p>
+            <p className="flex flex-wrap gap-x-3 gap-y-1">
               <a 
-                href="/disclaimer#risk-shield" 
+                href="/risk-checks" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+                data-testid="link-risk-checks-info"
+              >
+                What do we check?
+              </a>
+              <a 
+                href="/disclaimer" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
                 data-testid="link-risk-disclaimer"
               >
-                Read full Risk Shield disclaimer
+                Full disclaimer
               </a>
             </p>
           </div>
