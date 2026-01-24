@@ -30,6 +30,7 @@ import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { tokenManager } from "@/lib/tokenManager";
 
 interface Token {
   mint: string;
@@ -160,7 +161,15 @@ export default function Home() {
       toast({ title: "Welcome back!", description: "Logged in with passkey" });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } else {
-      toast({ title: "Login Failed", description: result.error || "Could not authenticate", variant: "destructive" });
+      // Check if user has an existing valid session before showing error
+      // This prevents confusing "Login Failed" when user was already logged in
+      const hasExistingSession = await tokenManager.initSession();
+      if (hasExistingSession) {
+        // User was already authenticated - silently proceed
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else {
+        toast({ title: "Login Failed", description: result.error || "Could not authenticate", variant: "destructive" });
+      }
     }
   };
 
