@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
-import { splTokenConnection, getLocalKeypair } from "@/lib/solana";
+import { splTokenConnection } from "@/lib/solana";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -32,7 +32,7 @@ interface TokenFormData {
 }
 
 export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
-  const { address, balance } = useWallet();
+  const { address, balance, keypair } = useWallet();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,14 +99,8 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   };
 
   const createToken = async () => {
-    if (!address) {
-      toast({ title: "Error", description: "Wallet not connected", variant: "destructive" });
-      return;
-    }
-
-    const keypair = await getLocalKeypair();
-    if (!keypair) {
-      toast({ title: "Error", description: "No keypair found", variant: "destructive" });
+    if (!address || !keypair) {
+      toast({ title: "Error", description: "Wallet not connected or locked", variant: "destructive" });
       return;
     }
 
