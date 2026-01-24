@@ -36,7 +36,13 @@ export async function buildCreateMintTransaction(
   request: BuildMintTxRequest
 ): Promise<BuildMintTxResponse> {
   const rpc = getRpcService();
-  const connection = (rpc as any).connection as Connection;
+  if (!rpc) {
+    throw new Error("RPC_NOT_CONFIGURED: No Solana RPC configured; set SOLANA_RPCS or HELIUS_RPC_URL");
+  }
+  const connection = rpc.getConnection();
+  if (!connection) {
+    throw new Error("RPC_NOT_CONFIGURED: No Solana RPC configured; set SOLANA_RPCS or HELIUS_RPC_URL");
+  }
   
   const walletPubkey = new PublicKey(request.walletAddress);
   const mintKeypair = Keypair.generate();
