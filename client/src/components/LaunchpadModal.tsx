@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
-import { splTokenConnection } from "@/lib/solana";
+import { splTokenConnection, sendTransactionViaServer, switchToNextRpc } from "@/lib/solana";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -166,14 +166,32 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     try {
       const mintKeypair = Keypair.generate();
       
-      const mint = await createMint(
-        splTokenConnection,
-        keypair,
-        keypair.publicKey,
-        keypair.publicKey,
-        formData.decimals,
-        mintKeypair
-      );
+      // Retry logic with RPC fallback
+      let mint;
+      let lastError;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          mint = await createMint(
+            splTokenConnection,
+            keypair,
+            keypair.publicKey,
+            keypair.publicKey,
+            formData.decimals,
+            mintKeypair
+          );
+          break; // Success
+        } catch (err: any) {
+          lastError = err;
+          console.error(`Token creation attempt ${attempt + 1} failed:`, err.message);
+          if (err.message?.includes("403") || err.message?.includes("forbidden") || err.message?.includes("rate")) {
+            switchToNextRpc();
+            await new Promise(r => setTimeout(r, 1000)); // Wait before retry
+          } else {
+            throw err; // Non-RPC error, don't retry
+          }
+        }
+      }
+      if (!mint) throw lastError || new Error("Failed to create token after retries");
 
       const tokenAccount = await getOrCreateAssociatedTokenAccount(
         splTokenConnection,
@@ -250,11 +268,10 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
             
             setPoolStatus("confirming");
             
-            const signature = await splTokenConnection.sendRawTransaction(
-              transaction.serialize(),
-              { skipPreflight: false, maxRetries: 3 }
-            );
+            // Send through server endpoint (uses Helius RPC for reliability)
+            const signature = await sendTransactionViaServer(transaction.serialize());
             
+            // Wait for confirmation
             await splTokenConnection.confirmTransaction(signature, "confirmed");
             
             tokenInfo.poolId = poolResult.poolId || signature;

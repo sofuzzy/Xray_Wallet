@@ -14,11 +14,47 @@ export const SOLANA_NETWORK = "mainnet-beta";
 // because the @solana/spl-token library functions need it internally.
 // This connection is ONLY used for SPL token write operations where the user
 // signs locally (non-custodial). All other reads should use server endpoints.
-const SPL_TOKEN_RPC_URL = "https://api.mainnet-beta.solana.com";
-export const splTokenConnection = new Connection(SPL_TOKEN_RPC_URL, {
+// Use multiple fallback RPCs for reliability
+const SPL_TOKEN_RPC_URLS = [
+  "https://solana-mainnet.rpc.extrnode.com",
+  "https://rpc.ankr.com/solana",
+  "https://api.mainnet-beta.solana.com",
+];
+
+// Try each RPC until one works
+let splTokenConnectionIndex = 0;
+export let splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
   commitment: "confirmed",
   confirmTransactionInitialTimeout: 60000,
 });
+
+// Function to switch to next RPC on failure
+export function switchToNextRpc(): boolean {
+  splTokenConnectionIndex = (splTokenConnectionIndex + 1) % SPL_TOKEN_RPC_URLS.length;
+  splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
+    commitment: "confirmed",
+    confirmTransactionInitialTimeout: 60000,
+  });
+  console.log(`Switched to RPC: ${SPL_TOKEN_RPC_URLS[splTokenConnectionIndex]}`);
+  return true;
+}
+
+// Send transaction through server (uses Helius RPC)
+export async function sendTransactionViaServer(serializedTx: Uint8Array): Promise<string> {
+  const base64Tx = btoa(String.fromCharCode.apply(null, Array.from(serializedTx)));
+  const response = await fetch("/api/solana/send-transaction", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ serializedTransaction: base64Tx }),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to send transaction");
+  }
+  const result = await response.json();
+  return result.signature;
+}
 
 // NOTE: For general RPC operations, use server endpoints (/api/solana/*)
 // The splTokenConnection above is ONLY for SPL token operations that need
