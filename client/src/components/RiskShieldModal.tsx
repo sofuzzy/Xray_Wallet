@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, ShieldAlert, ShieldCheck, Info } from "lucide-react";
+import { RiskChecksModal } from "./RiskChecksModal";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
 
@@ -80,6 +82,7 @@ export function RiskShieldModal(props: {
   decision: RiskShieldDecision | null;
   onAcknowledge: () => void;
 }) {
+  const [showRiskChecks, setShowRiskChecks] = useState(false);
   const decision = props.decision;
   const assessment = decision?.assessment;
 
@@ -212,13 +215,13 @@ export function RiskShieldModal(props: {
           <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
             <p>Risk Shield provides automated safety checks but cannot guarantee token safety. Always do your own research and only invest what you can afford to lose.</p>
             <p className="flex flex-wrap gap-x-3 gap-y-1">
-              <a 
-                href="/risk-checks" 
+              <button 
+                onClick={() => setShowRiskChecks(true)}
                 className="text-primary hover:underline"
-                data-testid="link-risk-checks-info"
+                data-testid="button-risk-checks-info"
               >
                 What do we check?
-              </a>
+              </button>
               <a 
                 href="/disclaimer" 
                 target="_blank" 
@@ -231,6 +234,8 @@ export function RiskShieldModal(props: {
             </p>
           </div>
         </div>
+
+        <RiskChecksModal open={showRiskChecks} onOpenChange={setShowRiskChecks} />
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>
