@@ -33,12 +33,13 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
       testId: "button-swap" 
     },
     { 
-      label: "Launch", 
+      label: "Coming Soon", 
       icon: Rocket, 
-      onClick: onLaunch || (() => {}), 
+      onClick: () => {}, 
       variant: "secondary" as const,
-      className: "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500",
-      testId: "button-launch" 
+      className: "opacity-50 cursor-not-allowed",
+      testId: "button-launch",
+      disabled: true
     },
   ];
 
@@ -56,6 +57,7 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
             size="icon"
             variant={btn.variant}
             onClick={btn.onClick}
+            disabled={'disabled' in btn && btn.disabled}
             className={`w-14 h-14 rounded-2xl ${btn.className || ''}`}
             data-testid={btn.testId}
           >
