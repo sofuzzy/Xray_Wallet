@@ -354,6 +354,20 @@ class RpcService {
       "getParsedTransaction"
     );
   }
+
+  async getBlockHeight(commitment?: Commitment): Promise<number> {
+    return this.execute(
+      (conn) => conn.getBlockHeight(commitment || this.options.commitment),
+      "getBlockHeight"
+    );
+  }
+
+  async getSignatureStatuses(signatures: string[], config?: { searchTransactionHistory: boolean }) {
+    return this.execute(
+      (conn) => conn.getSignatureStatuses(signatures, config),
+      "getSignatureStatuses"
+    );
+  }
 }
 
 let rpcServiceInstance: RpcService | null = null;

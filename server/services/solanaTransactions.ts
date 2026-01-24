@@ -141,14 +141,31 @@ export async function sendRawTransaction(
     
     console.log(`[tx] Broadcast via standard RPC: ${signature}`);
     
-    const latestBlockhash = await rpc.getLatestBlockhash();
-    await rpc.confirmTransaction(
-      signature,
-      latestBlockhash.blockhash,
-      latestBlockhash.lastValidBlockHeight
-    );
+    // Use getSignatureStatuses polling instead of confirmTransaction with new blockhash
+    const maxAttempts = 60;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const statuses = await rpc.getSignatureStatuses([signature], { searchTransactionHistory: true });
+        const status = statuses?.value?.[0];
+        
+        if (status) {
+          if (status.err) {
+            throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+          }
+          if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+            console.log(`[tx] Transaction confirmed (${status.confirmationStatus}): ${signature}`);
+            return signature;
+          }
+        }
+      } catch (err: any) {
+        if (err.message?.includes("Transaction failed")) {
+          throw err;
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
     
-    return signature;
+    throw new Error("Transaction confirmation timeout");
   } catch (error: any) {
     console.error("Error sending transaction:", error);
     const parsed = parseTransactionError(error);

@@ -1614,6 +1614,49 @@ export async function registerRoutes(
     }
   });
 
+  // ========== Launchpad Server-Assisted Token Creation ==========
+  // Build unsigned mint transaction on server, client signs locally (non-custodial)
+  app.post("/api/launchpad/build-create-mint-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const { buildCreateMintTransaction } = await import("./services/launchpadService");
+      
+      const inputSchema = z.object({
+        walletAddress: z.string().min(32).max(64),
+        decimals: z.number().int().min(0).max(18),
+        totalSupply: z.string().regex(/^\d+$/),
+      });
+      
+      const parsed = inputSchema.parse(req.body);
+      const result = await buildCreateMintTransaction(parsed);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[launchpad] Build mint tx error:", error);
+      res.status(500).json({ error: error.message || "Failed to build transaction" });
+    }
+  });
+
+  // Send signed transaction with Helius Sender + resend loop + proper confirmation
+  app.post("/api/launchpad/send-signed-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const { sendAndConfirmLaunchpadTx } = await import("./services/launchpadService");
+      
+      const inputSchema = z.object({
+        signedTransaction: z.string().min(100),
+        blockhash: z.string().min(32).max(64),
+        lastValidBlockHeight: z.number().int().positive(),
+      });
+      
+      const parsed = inputSchema.parse(req.body);
+      const result = await sendAndConfirmLaunchpadTx(parsed);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[launchpad] Send tx error:", error);
+      res.status(500).json({ error: error.message || "Failed to send transaction" });
+    }
+  });
+
   // Liquidity pool creation routes (Raydium CPMM)
   app.get("/api/liquidity-pool/cost", async (_req, res) => {
     try {

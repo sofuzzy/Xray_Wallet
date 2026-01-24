@@ -54,19 +54,27 @@ The server follows a modular pattern with distinct routes, abstracted database o
 - Supports native Solana staking using `StakeProgram` from web3.js, including delegation, activation, deactivation, and withdrawal.
 
 ### Token Launchpad Implementation
-- **SPL Token Creation**: Users can create custom SPL tokens with configurable parameters
-  - Uses `@solana/spl-token` for on-chain creation (client-side signing, non-custodial)
+- **Server-Assisted SPL Token Creation**: Users can create custom SPL tokens with configurable parameters
+  - Server builds unsigned transaction with mint creation, ATA, and mintTo instructions (`/api/launchpad/build-create-mint-tx`)
+  - Server signs with generated mint keypair, returns transaction to client
+  - Client signs with wallet keypair locally (non-custodial)
+  - Client submits signed transaction to server (`/api/launchpad/send-signed-tx`)
+  - Server broadcasts via Helius Sender with resend loop and getSignatureStatuses confirmation
   - Configurable name, symbol, decimals (0-18), and total supply
   - Optional token image upload to object storage
+  - Key file: `server/services/launchpadService.ts`
 - **Raydium CPMM Liquidity Pool Creation**: Optional pool creation after token launch
   - Server-side transaction building via Raydium API v3 (`/api/liquidity-pool/build`)
-  - Client-side transaction signing and submission (same RPC exception as SPL token creation)
+  - Client-side transaction signing and server-side broadcast/confirmation
   - Configurable SOL amount (min 0.1) and token supply percentage (1-100%)
   - Pool creation fee: ~0.3 SOL (fetched dynamically from `/api/liquidity-pool/cost`)
   - Robust base64 decoding with URL-safe character handling
   - Key files: `server/services/raydiumPool.ts`, `client/src/components/LaunchpadModal.tsx`
 - **Token Launch Tracking**: Launched tokens saved to database (`tokenLaunches` table)
   - Displayed in "My Tokens" section with quick swap access
+- **Transaction Confirmation**: Uses getSignatureStatuses polling with resend loop instead of blockhash-based confirmation
+  - Avoids "block height exceeded" errors from confirming with mismatched blockhashes
+  - Key files: `server/services/heliusSender.ts`, `server/services/solanaTransactions.ts`
 
 ### Token Swap Implementation (Jupiter)
 - **Jupiter API Integration**: Leverages Jupiter's API for server-side quote and swap transaction generation.

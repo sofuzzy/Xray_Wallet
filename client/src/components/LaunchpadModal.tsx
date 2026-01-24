@@ -7,16 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
-import { splTokenConnection, sendTransactionViaServer, switchToNextRpc, confirmTransactionViaServer } from "@/lib/solana";
+import { sendTransactionViaServer, confirmTransactionViaServer } from "@/lib/solana";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import {
-  createMint,
-  getOrCreateAssociatedTokenAccount,
-  mintTo,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, VersionedTransaction } from "@solana/web3.js";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
+import { LAMPORTS_PER_SOL, VersionedTransaction, Transaction } from "@solana/web3.js";
 import { useUpload } from "@/hooks/use-upload";
 
 interface LaunchpadModalProps {
@@ -164,62 +158,61 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     setStep("creating");
 
     try {
-      const mintKeypair = Keypair.generate();
+      const authHeaders = await getAuthHeaders();
       
-      // Retry logic with RPC fallback
-      let mint;
-      let lastError;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          mint = await createMint(
-            splTokenConnection,
-            keypair,
-            keypair.publicKey,
-            keypair.publicKey,
-            formData.decimals,
-            mintKeypair
-          );
-          break; // Success
-        } catch (err: any) {
-          lastError = err;
-          console.error(`Token creation attempt ${attempt + 1} failed:`, err.message);
-          if (err.message?.includes("403") || err.message?.includes("401") || err.message?.includes("forbidden") || err.message?.includes("rate") || err.message?.includes("token")) {
-            switchToNextRpc();
-            await new Promise(r => setTimeout(r, 1000)); // Wait before retry
-          } else {
-            throw err; // Non-RPC error, don't retry
-          }
-        }
-      }
-      if (!mint) throw lastError || new Error("Failed to create token after retries");
-
-      const tokenAccount = await getOrCreateAssociatedTokenAccount(
-        splTokenConnection,
-        keypair,
-        mint,
-        keypair.publicKey
-      );
-
-      const supplyBigInt = BigInt(formData.totalSupply);
-      let multiplier = BigInt(1);
-      for (let i = 0; i < formData.decimals; i++) {
-        multiplier = multiplier * BigInt(10);
-      }
-      const supplyWithDecimals = supplyBigInt * multiplier;
+      // Step 1: Build unsigned transaction on server
+      const buildResponse = await fetch("/api/launchpad/build-create-mint-tx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        credentials: "include",
+        body: JSON.stringify({
+          walletAddress: address,
+          decimals: formData.decimals,
+          totalSupply: formData.totalSupply,
+        }),
+      });
       
-      await mintTo(
-        splTokenConnection,
-        keypair,
-        mint,
-        tokenAccount.address,
-        keypair,
-        supplyWithDecimals
-      );
+      if (!buildResponse.ok) {
+        const err = await buildResponse.json();
+        throw new Error(err.error || "Failed to build transaction");
+      }
+      
+      const buildResult = await buildResponse.json();
+      const { transaction: unsignedTxBase64, mintAddress, blockhash, lastValidBlockHeight } = buildResult;
+      
+      // Step 2: Deserialize and sign locally (non-custodial)
+      const txBuffer = Buffer.from(unsignedTxBase64, "base64");
+      const transaction = Transaction.from(txBuffer);
+      transaction.partialSign(keypair);
+      
+      // Step 3: Send signed transaction to server for broadcast + confirmation
+      const signedTxBase64 = transaction.serialize().toString("base64");
+      
+      const sendResponse = await fetch("/api/launchpad/send-signed-tx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        credentials: "include",
+        body: JSON.stringify({
+          signedTransaction: signedTxBase64,
+          blockhash,
+          lastValidBlockHeight,
+        }),
+      });
+      
+      if (!sendResponse.ok) {
+        const err = await sendResponse.json();
+        throw new Error(err.error || "Failed to send transaction");
+      }
+      
+      const sendResult = await sendResponse.json();
+      if (!sendResult.confirmed) {
+        throw new Error("Transaction was not confirmed");
+      }
 
       await saveLaunchMutation.mutateAsync({
         name: formData.name,
         symbol: formData.symbol.toUpperCase(),
-        mintAddress: mint.toBase58(),
+        mintAddress: mintAddress,
         decimals: formData.decimals,
         totalSupply: formData.totalSupply,
         creatorAddress: address,
@@ -227,7 +220,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       });
 
       const tokenInfo = {
-        mintAddress: mint.toBase58(),
+        mintAddress: mintAddress,
         name: formData.name,
         symbol: formData.symbol.toUpperCase(),
         imageUrl: formData.imageUrl || undefined,
@@ -242,7 +235,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
           const tokenAmountForPool = Math.floor(Number(formData.totalSupply) * (Number(formData.liquidityPercent) / 100));
           
           const poolResult = await apiRequest("POST", "/api/liquidity-pool/build", {
-            tokenMint: mint.toBase58(),
+            tokenMint: mintAddress,
             tokenDecimals: formData.decimals,
             tokenAmount: tokenAmountForPool.toString(),
             solAmount: formData.liquiditySol,

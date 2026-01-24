@@ -108,16 +108,33 @@ export async function broadcastAndConfirmTransaction(
   
   const { signature, usedSender } = await broadcastTransaction(signedTxBase64, userRpc);
   
-  const latestBlockhash = await rpc.getLatestBlockhash();
-  await rpc.confirmTransaction(
-    signature,
-    latestBlockhash.blockhash,
-    latestBlockhash.lastValidBlockHeight
-  );
+  // Use getSignatureStatuses polling instead of confirmTransaction with new blockhash
+  // This avoids the bug where we confirm with a blockhash different from the tx's own
+  const maxAttempts = 60;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const statuses = await rpc.getSignatureStatuses([signature], { searchTransactionHistory: true });
+      const status = statuses?.value?.[0];
+      
+      if (status) {
+        if (status.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+        }
+        if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+          console.log(`[broadcast] Transaction confirmed (${status.confirmationStatus}): ${signature}`);
+          return { signature, usedSender };
+        }
+      }
+    } catch (err: any) {
+      if (err.message?.includes("Transaction failed")) {
+        throw err;
+      }
+      console.warn(`[broadcast] Status check error:`, err.message);
+    }
+    await new Promise(r => setTimeout(r, 1000));
+  }
   
-  console.log(`[broadcast] Transaction confirmed: ${signature}`);
-  
-  return { signature, usedSender };
+  throw new Error("Transaction confirmation timeout");
 }
 
 export function isHeliusSenderEnabled(): boolean {
