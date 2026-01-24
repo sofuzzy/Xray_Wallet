@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
-import { splTokenConnection, sendTransactionViaServer, switchToNextRpc } from "@/lib/solana";
+import { splTokenConnection, sendTransactionViaServer, switchToNextRpc, confirmTransactionViaServer } from "@/lib/solana";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -271,8 +271,8 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
             // Send through server endpoint (uses Helius RPC for reliability)
             const signature = await sendTransactionViaServer(transaction.serialize());
             
-            // Wait for confirmation
-            await splTokenConnection.confirmTransaction(signature, "confirmed");
+            // Wait for confirmation via server (uses Helius for reliable polling)
+            await confirmTransactionViaServer(signature);
             
             tokenInfo.poolId = poolResult.poolId || signature;
             setPoolStatus("success");

@@ -25,7 +25,7 @@ const SPL_TOKEN_RPC_URLS = [
 let splTokenConnectionIndex = 0;
 export let splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
   commitment: "confirmed",
-  confirmTransactionInitialTimeout: 60000,
+  confirmTransactionInitialTimeout: 120000, // 2 minutes for slow confirmations
 });
 
 // Function to switch to next RPC on failure
@@ -33,10 +33,42 @@ export function switchToNextRpc(): boolean {
   splTokenConnectionIndex = (splTokenConnectionIndex + 1) % SPL_TOKEN_RPC_URLS.length;
   splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
     commitment: "confirmed",
-    confirmTransactionInitialTimeout: 60000,
+    confirmTransactionInitialTimeout: 120000, // 2 minutes for slow confirmations
   });
   console.log(`Switched to RPC: ${SPL_TOKEN_RPC_URLS[splTokenConnectionIndex]}`);
   return true;
+}
+
+// Confirm transaction via server (polls Helius RPC)
+export async function confirmTransactionViaServer(signature: string, maxAttempts = 60): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch("/api/solana/rpc-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getSignatureStatuses",
+          params: [[signature], { searchTransactionHistory: true }]
+        }),
+      });
+      const result = await response.json();
+      const status = result?.result?.value?.[0];
+      if (status) {
+        if (status.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+        }
+        if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn("Confirmation check error:", err);
+    }
+    await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds between checks
+  }
+  throw new Error("Transaction confirmation timeout");
 }
 
 // Send transaction through server (uses Helius RPC)
