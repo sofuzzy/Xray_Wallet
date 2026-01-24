@@ -154,7 +154,7 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
             </div>
           </div>
           <div className="text-white/30 text-xs font-medium px-2 py-1 rounded-md bg-white/10">
-            v1.0.0
+            v0.9.9
           </div>
         </div>
       </div>
