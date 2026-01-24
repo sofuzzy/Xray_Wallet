@@ -29,6 +29,7 @@ import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerpri
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
+import { SiX, SiGithub } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { tokenManager } from "@/lib/tokenManager";
 
@@ -315,6 +316,60 @@ export default function Home() {
             </div>
             <p className="text-xs text-muted-foreground/50">
               Solana Mainnet • Encrypted Local Storage
+            </p>
+          </div>
+
+          {/* Footer links */}
+          <div className="space-y-4 pt-4 border-t border-border/30">
+            <div className="flex items-center justify-center gap-4">
+              <a
+                href="https://x.com/xraythewallet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="login-link-x"
+              >
+                <SiX className="w-4 h-4" />
+              </a>
+              <a
+                href="https://github.com/sofuzzy/Xray_Wallet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="login-link-github"
+              >
+                <SiGithub className="w-4 h-4" />
+              </a>
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
+              <Link 
+                href="/terms" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+                data-testid="login-link-terms"
+              >
+                Terms
+              </Link>
+              <span className="text-border">•</span>
+              <Link 
+                href="/privacy" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+                data-testid="login-link-privacy"
+              >
+                Privacy
+              </Link>
+              <span className="text-border">•</span>
+              <Link 
+                href="/disclaimer" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+                data-testid="login-link-disclaimer"
+              >
+                Risk Disclaimer
+              </Link>
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground/50">
+              XRAY Wallet v0.9.9
             </p>
           </div>
         </div>

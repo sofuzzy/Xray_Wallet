@@ -4,6 +4,8 @@ import { Lock, Eye, EyeOff, Loader2, Shield, KeyRound, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
+import { Link } from "wouter";
+import { SiX, SiGithub } from "react-icons/si";
 
 interface VaultUnlockModalProps {
   mode: "unlock" | "setup" | "migrate";
@@ -237,6 +239,60 @@ export function VaultUnlockModal({
         <p className="text-xs text-muted-foreground text-center mt-6">
           Your wallet is encrypted locally. Your PIN never leaves this device.
         </p>
+
+        {/* Footer links */}
+        <div className="space-y-4 pt-6 mt-6 border-t border-border/30">
+          <div className="flex items-center justify-center gap-4">
+            <a
+              href="https://x.com/xraythewallet"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="vault-link-x"
+            >
+              <SiX className="w-4 h-4" />
+            </a>
+            <a
+              href="https://github.com/sofuzzy/Xray_Wallet"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="vault-link-github"
+            >
+              <SiGithub className="w-4 h-4" />
+            </a>
+          </div>
+          
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
+            <Link 
+              href="/terms" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              data-testid="vault-link-terms"
+            >
+              Terms
+            </Link>
+            <span className="text-border">•</span>
+            <Link 
+              href="/privacy" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              data-testid="vault-link-privacy"
+            >
+              Privacy
+            </Link>
+            <span className="text-border">•</span>
+            <Link 
+              href="/disclaimer" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              data-testid="vault-link-disclaimer"
+            >
+              Risk Disclaimer
+            </Link>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground/50">
+            XRAY Wallet v0.9.9
+          </p>
+        </div>
       </motion.div>
     </div>
   );
