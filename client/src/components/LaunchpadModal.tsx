@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon, Info } from "lucide-react";
+import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon, Info, Droplets, ExternalLink } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { splTokenConnection } from "@/lib/solana";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   createMint,
@@ -16,7 +16,7 @@ import {
   mintTo,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, VersionedTransaction } from "@solana/web3.js";
 import { useUpload } from "@/hooks/use-upload";
 
 interface LaunchpadModalProps {
@@ -42,6 +42,8 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading } = useUpload();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [poolStatus, setPoolStatus] = useState<"idle" | "building" | "signing" | "confirming" | "success" | "error">("idle");
+  const [poolError, setPoolError] = useState("");
   
   const [formData, setFormData] = useState<TokenFormData>({
     name: "",
@@ -50,12 +52,22 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     totalSupply: "1000000",
     imageUrl: "",
     addLiquidity: false,
-    liquiditySol: "0.5",
+    liquiditySol: "1",
     liquidityPercent: "50",
   });
-  const [step, setStep] = useState<"form" | "creating" | "success" | "error">("form");
-  const [createdToken, setCreatedToken] = useState<{ mintAddress: string; name: string; symbol: string; imageUrl?: string } | null>(null);
+  const [step, setStep] = useState<"form" | "creating" | "addingLiquidity" | "success" | "error">("form");
+  const [createdToken, setCreatedToken] = useState<{ mintAddress: string; name: string; symbol: string; imageUrl?: string; poolId?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  
+  const { data: poolCost } = useQuery({
+    queryKey: ["/api/liquidity-pool/cost"],
+    queryFn: async () => {
+      const res = await fetch("/api/liquidity-pool/cost");
+      if (!res.ok) return { solCost: 0.35, breakdown: "~0.35 SOL for pool creation" };
+      return res.json();
+    },
+    staleTime: 60000,
+  });
 
   const saveLaunchMutation = useMutation({
     mutationFn: async (data: {
@@ -111,11 +123,15 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       return;
     }
 
-    const requiredLamports = Math.floor(0.05 * LAMPORTS_PER_SOL);
+    const liquidityCost = formData.addLiquidity 
+      ? (poolCost?.solCost || 0.35) + parseFloat(formData.liquiditySol || "0")
+      : 0;
+    const requiredLamports = Math.floor((0.05 + liquidityCost) * LAMPORTS_PER_SOL);
+    
     if (balance < requiredLamports) {
       toast({ 
         title: "Insufficient Balance", 
-        description: `You need at least 0.05 SOL to create a token. Current balance: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL.`, 
+        description: `You need at least ${((requiredLamports / LAMPORTS_PER_SOL)).toFixed(2)} SOL. Current: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL.`, 
         variant: "destructive" 
       });
       return;
@@ -129,6 +145,19 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     if (!formData.totalSupply || !/^\d+$/.test(formData.totalSupply) || BigInt(formData.totalSupply) <= 0) {
       toast({ title: "Error", description: "Please enter a valid total supply", variant: "destructive" });
       return;
+    }
+
+    if (formData.addLiquidity) {
+      const solAmount = parseFloat(formData.liquiditySol || "0");
+      const percentAmount = parseInt(formData.liquidityPercent || "0");
+      if (solAmount < 0.1) {
+        toast({ title: "Error", description: "Minimum 0.1 SOL required for liquidity", variant: "destructive" });
+        return;
+      }
+      if (percentAmount < 1 || percentAmount > 100) {
+        toast({ title: "Error", description: "Supply percentage must be between 1-100%", variant: "destructive" });
+        return;
+      }
     }
 
     setStep("creating");
@@ -178,15 +207,82 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         imageUrl: formData.imageUrl || undefined,
       });
 
-      setCreatedToken({
+      const tokenInfo = {
         mintAddress: mint.toBase58(),
         name: formData.name,
         symbol: formData.symbol.toUpperCase(),
         imageUrl: formData.imageUrl || undefined,
-      });
+        poolId: undefined as string | undefined,
+      };
+
+      if (formData.addLiquidity) {
+        setStep("addingLiquidity");
+        setPoolStatus("building");
+        
+        try {
+          const tokenAmountForPool = Math.floor(Number(formData.totalSupply) * (Number(formData.liquidityPercent) / 100));
+          
+          const poolResult = await apiRequest("POST", "/api/liquidity-pool/build", {
+            tokenMint: mint.toBase58(),
+            tokenDecimals: formData.decimals,
+            tokenAmount: tokenAmountForPool.toString(),
+            solAmount: formData.liquiditySol,
+            creatorAddress: address,
+          });
+
+          if (poolResult.success && poolResult.transaction) {
+            setPoolStatus("signing");
+            
+            let transaction: VersionedTransaction;
+            try {
+              const base64Tx = poolResult.transaction as string;
+              const normalizedB64 = base64Tx.replace(/-/g, "+").replace(/_/g, "/");
+              const paddedB64 = normalizedB64.padEnd(normalizedB64.length + (4 - normalizedB64.length % 4) % 4, "=");
+              const txBytes = Uint8Array.from(atob(paddedB64), c => c.charCodeAt(0));
+              transaction = VersionedTransaction.deserialize(txBytes);
+            } catch (decodeError: any) {
+              console.error("Failed to decode pool transaction:", decodeError);
+              throw new Error("Invalid transaction data from Raydium API");
+            }
+            
+            transaction.sign([keypair]);
+            
+            setPoolStatus("confirming");
+            
+            const signature = await splTokenConnection.sendRawTransaction(
+              transaction.serialize(),
+              { skipPreflight: false, maxRetries: 3 }
+            );
+            
+            await splTokenConnection.confirmTransaction(signature, "confirmed");
+            
+            tokenInfo.poolId = poolResult.poolId || signature;
+            setPoolStatus("success");
+            toast({ title: "Success", description: "Liquidity pool created on Raydium!" });
+          } else {
+            setPoolStatus("error");
+            setPoolError(poolResult.message || "Pool creation is currently unavailable");
+            toast({ 
+              title: "Pool Creation Note", 
+              description: poolResult.message || "Token created! Create pool manually on raydium.io",
+            });
+          }
+        } catch (poolError: any) {
+          console.error("Pool creation failed:", poolError);
+          setPoolStatus("error");
+          setPoolError(poolError.message || "Pool creation failed");
+          toast({ 
+            title: "Token Created", 
+            description: "Token launched successfully! You can add liquidity later on raydium.io",
+          });
+        }
+      }
+
+      setCreatedToken(tokenInfo);
       setStep("success");
       
       queryClient.invalidateQueries({ queryKey: ["/api/token-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] });
       
     } catch (error: unknown) {
       console.error("Token creation failed:", error);
@@ -197,10 +293,12 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
   const handleClose = () => {
     setStep("form");
-    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "", addLiquidity: false, liquiditySol: "0.5", liquidityPercent: "50" });
+    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "", addLiquidity: false, liquiditySol: "1", liquidityPercent: "50" });
     setCreatedToken(null);
     setErrorMessage("");
     setImagePreview(null);
+    setPoolStatus("idle");
+    setPoolError("");
     onClose();
   };
 
@@ -336,28 +434,71 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
               <div className="border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-muted-foreground" />
+                    <Droplets className="w-4 h-4 text-muted-foreground" />
                     <span className="font-medium text-foreground">Add Initial Liquidity</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">SOON</span>
                   </div>
                   <Switch
                     checked={formData.addLiquidity}
                     onCheckedChange={(checked) => handleInputChange("addLiquidity", checked)}
-                    disabled
                     data-testid="toggle-add-liquidity"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  Create a liquidity pool so others can trade your token - coming soon
-                </p>
+                
+                {formData.addLiquidity ? (
+                  <div className="space-y-3 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      Create a Raydium CPMM pool so others can trade your token
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">SOL Amount</Label>
+                        <Input
+                          type="text"
+                          value={formData.liquiditySol}
+                          onChange={(e) => handleInputChange("liquiditySol", e.target.value.replace(/[^0-9.]/g, ""))}
+                          className="bg-background border-border text-foreground"
+                          placeholder="1"
+                          data-testid="input-liquidity-sol"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">% of Supply</Label>
+                        <Input
+                          type="text"
+                          value={formData.liquidityPercent}
+                          onChange={(e) => handleInputChange("liquidityPercent", e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+                          className="bg-background border-border text-foreground"
+                          placeholder="50"
+                          data-testid="input-liquidity-percent"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                      <p>Pool will be created on Raydium with:</p>
+                      <p className="font-mono mt-1">
+                        {Math.floor(Number(formData.totalSupply) * (Number(formData.liquidityPercent) / 100)).toLocaleString()} {formData.symbol || "tokens"} + {formData.liquiditySol || "0"} SOL
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Enable to create a Raydium trading pool after token creation
+                  </p>
+                )}
               </div>
 
               <div className="bg-muted rounded-xl p-4 space-y-2">
                 <p className="text-xs text-muted-foreground">Estimated Cost</p>
-                <p className="text-lg font-bold text-foreground">~0.05 SOL</p>
+                <p className="text-lg font-bold text-foreground">
+                  ~{formData.addLiquidity 
+                    ? (0.05 + (poolCost?.solCost || 0.35) + parseFloat(formData.liquiditySol || "0")).toFixed(2) 
+                    : "0.05"} SOL
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Covers account rent and transaction fees
+                  {formData.addLiquidity 
+                    ? `Token creation (0.05) + Pool fee (~${(poolCost?.solCost || 0.35).toFixed(2)}) + Liquidity (${formData.liquiditySol || "0"})`
+                    : "Covers account rent and transaction fees"}
                 </p>
               </div>
 
@@ -378,6 +519,20 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
               <div>
                 <p className="text-lg font-medium text-foreground">Creating your token...</p>
                 <p className="text-sm text-muted-foreground">This may take a moment</p>
+              </div>
+            </div>
+          )}
+
+          {step === "addingLiquidity" && (
+            <div className="py-12 text-center space-y-4">
+              <Droplets className="w-12 h-12 text-blue-400 mx-auto animate-pulse" />
+              <div>
+                <p className="text-lg font-medium text-foreground">Adding Liquidity Pool...</p>
+                <p className="text-sm text-muted-foreground">
+                  {poolStatus === "building" && "Building pool transaction..."}
+                  {poolStatus === "signing" && "Please sign the transaction..."}
+                  {poolStatus === "confirming" && "Confirming on Solana..."}
+                </p>
               </div>
             </div>
           )}
@@ -408,6 +563,22 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 <p className="text-xs text-muted-foreground mb-1">Mint Address (tap to copy)</p>
                 <p className="text-sm font-mono text-foreground break-all">{createdToken.mintAddress}</p>
               </div>
+
+              {poolStatus === "error" && poolError && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <p className="text-xs text-amber-500">
+                    Pool creation unavailable: {poolError}
+                  </p>
+                  <a 
+                    href="https://raydium.io/liquidity/create-pool/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary flex items-center justify-center gap-1 mt-2"
+                  >
+                    Create pool manually on Raydium <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted rounded-lg p-3">
                 <Coins className="w-4 h-4" />

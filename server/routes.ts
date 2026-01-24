@@ -23,6 +23,7 @@ import {
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
 import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
 import { decideTokenAction, getRiskShieldPolicy } from "./services/riskShield";
+import { buildCreatePoolTransaction, getEstimatedPoolCost } from "./services/raydiumPool";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
   extractClientInfo, 
@@ -1581,6 +1582,51 @@ export async function registerRoutes(
       res.json(launches);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch token launches" });
+    }
+  });
+
+  // Liquidity pool creation routes (Raydium CPMM)
+  app.get("/api/liquidity-pool/cost", async (_req, res) => {
+    try {
+      const cost = await getEstimatedPoolCost();
+      res.json(cost);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get pool cost estimate" });
+    }
+  });
+
+  app.post("/api/liquidity-pool/build", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const poolInput = z.object({
+        tokenMint: z.string().min(32).max(64),
+        tokenDecimals: z.number().int().min(0).max(18),
+        tokenAmount: z.string().regex(/^[\d.]+$/),
+        solAmount: z.string().regex(/^[\d.]+$/),
+        creatorAddress: z.string().min(32).max(64),
+      });
+      
+      const parsed = poolInput.parse(req.body);
+      
+      const result = await buildCreatePoolTransaction({
+        tokenMint: parsed.tokenMint,
+        tokenDecimals: parsed.tokenDecimals,
+        tokenAmount: parsed.tokenAmount,
+        solAmount: parsed.solAmount,
+        creatorAddress: parsed.creatorAddress,
+      });
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ message: result.error, details: result.message });
+      }
+    } catch (error: any) {
+      console.error("Pool build error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Failed to build pool transaction" });
+      }
     }
   });
 
