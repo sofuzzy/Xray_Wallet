@@ -21,6 +21,7 @@ import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
 import { TradingViewModal } from "@/components/TradingViewModal";
 import { Watchlist } from "@/components/Watchlist";
+import { MyTokens } from "@/components/MyTokens";
 import { Footer } from "@/components/Footer";
 import { LegalAcknowledgmentModal, hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
 import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDisclaimerModal";
@@ -465,6 +466,10 @@ export default function Home() {
               setIsSwapOpen(true);
             }}
           />
+        </div>
+
+        <div className="px-6">
+          <MyTokens />
         </div>
 
         <div className="px-6">

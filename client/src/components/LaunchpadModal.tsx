@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon } from "lucide-react";
+import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon, Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,9 @@ interface TokenFormData {
   decimals: number;
   totalSupply: string;
   imageUrl: string;
+  addLiquidity: boolean;
+  liquiditySol: string;
+  liquidityPercent: string;
 }
 
 export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
@@ -45,6 +49,9 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     decimals: 9,
     totalSupply: "1000000",
     imageUrl: "",
+    addLiquidity: false,
+    liquiditySol: "0.5",
+    liquidityPercent: "50",
   });
   const [step, setStep] = useState<"form" | "creating" | "success" | "error">("form");
   const [createdToken, setCreatedToken] = useState<{ mintAddress: string; name: string; symbol: string; imageUrl?: string } | null>(null);
@@ -67,7 +74,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     },
   });
 
-  const handleInputChange = (field: keyof TokenFormData, value: string | number) => {
+  const handleInputChange = (field: keyof TokenFormData, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -190,7 +197,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
   const handleClose = () => {
     setStep("form");
-    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "" });
+    setFormData({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "", addLiquidity: false, liquiditySol: "0.5", liquidityPercent: "50" });
     setCreatedToken(null);
     setErrorMessage("");
     setImagePreview(null);
@@ -324,6 +331,26 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     data-testid="input-token-supply"
                   />
                 </div>
+              </div>
+
+              <div className="border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-foreground">Add Initial Liquidity</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">SOON</span>
+                  </div>
+                  <Switch
+                    checked={formData.addLiquidity}
+                    onCheckedChange={(checked) => handleInputChange("addLiquidity", checked)}
+                    disabled
+                    data-testid="toggle-add-liquidity"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  Create a liquidity pool so others can trade your token - coming soon
+                </p>
               </div>
 
               <div className="bg-muted rounded-xl p-4 space-y-2">
