@@ -30,7 +30,8 @@ import {
   globalRateLimiter, 
   strictRateLimiter,
   authRateLimiter,
-  anomalyDetection 
+  anomalyDetection,
+  optionalAuth
 } from "./middleware/zeroTrust";
 import { 
   generateTokenPair, 
@@ -852,8 +853,8 @@ export async function registerRoutes(
     }
   });
 
-  // Swap routes - Token Discovery
-  app.get(api.swaps.tokens.path, hybridAuth, async (req, res) => {
+  // Swap routes - Token Discovery (public endpoint)
+  app.get(api.swaps.tokens.path, optionalAuth, async (req, res) => {
     try {
       const { search, limit, trending } = req.query;
       const tokens = await getTokens({
@@ -867,8 +868,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get token by mint address (for paste-to-add)
-  app.get("/api/swaps/tokens/:mint", hybridAuth, async (req, res) => {
+  // Get token by mint address (for paste-to-add, public endpoint)
+  app.get("/api/swaps/tokens/:mint", optionalAuth, async (req, res) => {
     try {
       const { mint } = req.params;
       const token = await getTokenByMint(mint);
@@ -881,8 +882,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get trending tokens
-  app.get("/api/swaps/trending", hybridAuth, async (req, res) => {
+  // Get trending tokens (public endpoint)
+  app.get("/api/swaps/trending", optionalAuth, async (req, res) => {
     try {
       const tokens = await getTokens({ trending: true, limit: 20 });
       res.json(tokens);

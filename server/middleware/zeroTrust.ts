@@ -110,6 +110,32 @@ export const hybridAuth: RequestHandler = async (req, res, next) => {
   });
 };
 
+export const optionalAuth: RequestHandler = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    const payload = await verifyAccessToken(token);
+    
+    if (payload) {
+      req.tokenUser = payload;
+    }
+  } else if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+    const sessionUser = req.user as any;
+    if (sessionUser.claims?.sub) {
+      req.tokenUser = {
+        sub: sessionUser.claims.sub,
+        email: sessionUser.claims.email,
+        firstName: sessionUser.claims.first_name,
+        lastName: sessionUser.claims.last_name,
+        type: "access",
+      };
+    }
+  }
+  
+  return next();
+};
+
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
