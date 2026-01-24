@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,6 +16,8 @@ import Disclaimer from "@/pages/Disclaimer";
 import RiskChecks from "@/pages/RiskChecks";
 import BetaExit from "@/pages/BetaExit";
 import { Loader2 } from "lucide-react";
+
+const PUBLIC_ROUTES = ["/terms", "/privacy", "/disclaimer", "/risk-checks", "/beta-exit"];
 
 function Router() {
   return (
@@ -35,6 +37,12 @@ function Router() {
 
 function VaultGate({ children }: { children: React.ReactNode }) {
   const vault = useVaultContext();
+  const [location] = useLocation();
+
+  // Skip vault gate for public routes
+  if (PUBLIC_ROUTES.includes(location)) {
+    return <>{children}</>;
+  }
 
   if (vault.status === "loading") {
     return (
