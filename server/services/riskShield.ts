@@ -1,4 +1,4 @@
-import { assessTokenRisk, type TokenRiskAssessment, type RiskLevel } from "./tokenRiskEngine";
+import { assessTokenRisk, isNativeSol, type TokenRiskAssessment, type RiskLevel } from "./tokenRiskEngine";
 
 export interface RiskShieldPolicy {
   blockLevel: RiskLevel;            // tokens at or above this level are blocked
@@ -78,6 +78,32 @@ export async function decideTokenAction(opts: {
       requiresAcknowledgement: false,
       policy,
       reason: "Missing mint",
+    };
+  }
+
+  // Short-circuit for native SOL - always allowed, no risk checks needed
+  if (isNativeSol(mint)) {
+    const nativeSolAssessment: TokenRiskAssessment = {
+      mint,
+      score: 0,
+      level: "low",
+      flags: [],
+      inputs: {
+        isNativeSol: true,
+        label: "Native SOL",
+        note: "Native SOL is not subject to token-specific risk checks.",
+      },
+      updatedAt: Date.now(),
+    };
+    return {
+      mint,
+      action: opts.action,
+      allowed: true,
+      blocked: false,
+      requiresAcknowledgement: false,
+      policy,
+      assessment: opts.includeAssessment ? nativeSolAssessment : undefined,
+      reason: "Native SOL",
     };
   }
 

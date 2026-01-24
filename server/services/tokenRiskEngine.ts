@@ -5,6 +5,17 @@ import { getRpcService } from "./rpcService";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 
+// Native SOL wrapped mint address - this should never be evaluated with SPL token risk checks
+export const NATIVE_SOL_MINT = "So11111111111111111111111111111111111111112";
+
+/**
+ * Check if a mint address is native SOL (wrapped SOL).
+ */
+export function isNativeSol(mint: string): boolean {
+  const normalized = (mint || "").trim();
+  return normalized === NATIVE_SOL_MINT;
+}
+
 /**
  * Risk engine heuristics:
  * - Uses public DexScreener token/pair data + (optional) on-chain reads to produce a conservative risk score.
@@ -182,6 +193,24 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
 
   // Basic mint sanity check
   if (!isProbablyMint(key)) return null;
+
+  // Short-circuit for native SOL - it's a native asset and should not be evaluated
+  // with SPL token risk heuristics (liquidity locks, holder concentration, etc.)
+  if (isNativeSol(key)) {
+    const nativeSolAssessment: TokenRiskAssessment = {
+      mint: key,
+      score: 0,
+      level: "low",
+      flags: [],
+      inputs: {
+        isNativeSol: true,
+        label: "Native SOL",
+        note: "Native SOL is not subject to token-specific risk checks.",
+      },
+      updatedAt: nowMs(),
+    };
+    return nativeSolAssessment;
+  }
 
   const cacheKey = `${hashKey(key)}:v2`;
   const cached = cache.get(cacheKey);

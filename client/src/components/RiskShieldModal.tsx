@@ -76,6 +76,11 @@ function formatLiquidityUsd(value?: number): string {
   return `$${value.toFixed(0)}`;
 }
 
+// Check if the assessment is for native SOL
+function isNativeSolAssessment(assessment?: TokenRiskAssessment): boolean {
+  return assessment?.inputs?.isNativeSol === true;
+}
+
 export function RiskShieldModal(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,19 +90,26 @@ export function RiskShieldModal(props: {
   const [showRiskChecks, setShowRiskChecks] = useState(false);
   const decision = props.decision;
   const assessment = decision?.assessment;
+  const isNativeSol = isNativeSolAssessment(assessment);
 
   const level = (assessment?.level || (decision?.blocked ? "critical" : "high")) as RiskLevel;
   const score = assessment?.score;
 
-  const title = decision?.blocked
-    ? "This token is blocked"
-    : decision?.requiresAcknowledgement
-      ? "Review before swapping"
-      : "Token Safety Check";
+  // Native SOL should never trigger this modal since it's always allowed,
+  // but handle it gracefully if it does
+  const title = isNativeSol
+    ? "Native SOL"
+    : decision?.blocked
+      ? "This token is blocked"
+      : decision?.requiresAcknowledgement
+        ? "Review before swapping"
+        : "Token Safety Check";
 
-  const description = decision?.blocked
-    ? "Risk Shield has blocked this swap to protect your funds."
-    : "We found some potential concerns with this token. Please review before proceeding.";
+  const description = isNativeSol
+    ? "Native SOL is not subject to token-specific risk checks."
+    : decision?.blocked
+      ? "Risk Shield has blocked this swap to protect your funds."
+      : "We found some potential concerns with this token. Please review before proceeding.";
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
