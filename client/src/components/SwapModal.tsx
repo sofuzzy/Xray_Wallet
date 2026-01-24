@@ -431,7 +431,20 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     if (mint === "SOL") return { mint: "SOL", name: "Solana", symbol: "SOL", decimals: 9 };
     const fromTokens = tokens.find((t) => t.mint === mint);
     if (fromTokens) return fromTokens;
-    return customTokens.find((t) => t.mint === mint);
+    const fromCustom = customTokens.find((t) => t.mint === mint);
+    if (fromCustom) return fromCustom;
+    // Also check wallet tokens (held tokens)
+    const fromWallet = walletTokens.find((t) => t.mint === mint);
+    if (fromWallet) {
+      return {
+        mint: fromWallet.mint,
+        name: fromWallet.name || fromWallet.symbol || "Unknown",
+        symbol: fromWallet.symbol || "???",
+        decimals: fromWallet.decimals || 9,
+        logoURI: fromWallet.logoURI,
+      };
+    }
+    return undefined;
   };
 
   const inputToken = getTokenByMint(inputMint);
@@ -823,7 +836,13 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   };
 
   const outputDecimals = quote?.outputDecimals ?? outputToken?.decimals ?? 9;
-  const outputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, outputDecimals)).toFixed(6) : "0";
+  // Format output amount with appropriate decimal places based on value
+  const rawOutputAmount = quote ? parseInt(quote.outAmount) / Math.pow(10, outputDecimals) : 0;
+  const outputAmount = quote ? (
+    rawOutputAmount >= 1000 ? rawOutputAmount.toFixed(2) :
+    rawOutputAmount >= 1 ? rawOutputAmount.toFixed(4) :
+    rawOutputAmount.toFixed(6)
+  ) : "0";
 
   if (selectingFor) {
     return (
