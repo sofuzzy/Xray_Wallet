@@ -1,25 +1,28 @@
 import { 
-  Connection, 
+  Connection,
   Keypair, 
   PublicKey, 
-  clusterApiUrl, 
   LAMPORTS_PER_SOL,
-  StakeProgram,
-  Authorized,
-  Transaction,
-  Lockup
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 
-// Use Mainnet for production with reliable RPC
+// Use Mainnet for production - RPC calls should go through server when possible
 export const SOLANA_NETWORK = "mainnet-beta";
-// Use environment variable RPC or fallback to Ankr's free endpoint (more reliable than public RPC)
-export const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL || "https://rpc.ankr.com/solana";
-export const connection = new Connection(SOLANA_RPC_URL, {
+
+// EXCEPTION: SPL Token operations (createMint, mintTo, etc.) require a Connection object
+// because the @solana/spl-token library functions need it internally.
+// This connection is ONLY used for SPL token write operations where the user
+// signs locally (non-custodial). All other reads should use server endpoints.
+const SPL_TOKEN_RPC_URL = "https://api.mainnet-beta.solana.com";
+export const splTokenConnection = new Connection(SPL_TOKEN_RPC_URL, {
   commitment: "confirmed",
   confirmTransactionInitialTimeout: 60000,
 });
+
+// NOTE: For general RPC operations, use server endpoints (/api/solana/*)
+// The splTokenConnection above is ONLY for SPL token operations that need
+// direct Connection access for non-custodial signing.
 
 // Constants
 export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
@@ -268,136 +271,88 @@ export const formatSol = (lamports: number) => {
 };
 
 export interface StakeAccountInfo {
-  pubkey: PublicKey;
+  pubkey: string;
   lamports: number;
   state: 'inactive' | 'activating' | 'active' | 'deactivating';
   validator?: string;
 }
 
-export async function getStakeAccounts(walletPubkey: PublicKey): Promise<StakeAccountInfo[]> {
-  const stakeAccounts = await connection.getParsedProgramAccounts(
-    StakeProgram.programId,
-    {
-      filters: [
-        { dataSize: 200 },
-        {
-          memcmp: {
-            offset: 12,
-            bytes: walletPubkey.toBase58(),
-          },
-        },
-      ],
-    }
-  );
-
-  return stakeAccounts.map((account) => {
-    const parsed = (account.account.data as any).parsed;
-    const info = parsed?.info;
-    const meta = info?.meta;
-    const stake = info?.stake;
-    
-    let state: StakeAccountInfo['state'] = 'inactive';
-    if (stake?.delegation) {
-      const activationEpoch = stake.delegation.activationEpoch;
-      const deactivationEpoch = stake.delegation.deactivationEpoch;
-      
-      if (deactivationEpoch !== '18446744073709551615') {
-        state = 'deactivating';
-      } else if (activationEpoch !== '18446744073709551615') {
-        state = 'active';
-      }
-    }
-
-    return {
-      pubkey: account.pubkey,
-      lamports: account.account.lamports,
-      state,
-      validator: stake?.delegation?.voter,
-    };
-  });
+// Fetch stake accounts via server endpoint (uses Helius RPC)
+export async function getStakeAccounts(walletAddress: string): Promise<StakeAccountInfo[]> {
+  try {
+    const response = await fetch(`/api/solana/stake-accounts/${walletAddress}`);
+    if (!response.ok) throw new Error("Failed to fetch stake accounts");
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to fetch stake accounts:", e);
+    return [];
+  }
 }
 
+// Fetch validators via server endpoint (uses Helius RPC)
 export async function getValidators(): Promise<{ votePubkey: string; activatedStake: number; commission: number }[]> {
-  const { current } = await connection.getVoteAccounts();
-  return current
-    .filter((v) => v.commission <= 10) // Only show validators with reasonable commission (max 10%)
-    .sort((a, b) => b.activatedStake - a.activatedStake)
-    .slice(0, 20)
-    .map((v) => ({
-      votePubkey: v.votePubkey,
-      activatedStake: v.activatedStake,
-      commission: v.commission,
-    }));
+  try {
+    const response = await fetch("/api/solana/validators");
+    if (!response.ok) throw new Error("Failed to fetch validators");
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to fetch validators:", e);
+    return [];
+  }
 }
 
-export async function createStakeAccount(
-  wallet: Keypair,
-  amountSol: number,
-  validatorVotePubkey: string
-): Promise<string> {
-  const stakeAccount = Keypair.generate();
-  
-  const minimumRent = await connection.getMinimumBalanceForRentExemption(StakeProgram.space);
-  const amountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
-  const totalLamports = minimumRent + amountLamports;
-
-  const createStakeAccountIx = StakeProgram.createAccount({
-    fromPubkey: wallet.publicKey,
-    stakePubkey: stakeAccount.publicKey,
-    authorized: new Authorized(wallet.publicKey, wallet.publicKey),
-    lamports: totalLamports,
-    lockup: new Lockup(0, 0, wallet.publicKey),
-  });
-
-  const delegateIx = StakeProgram.delegate({
-    stakePubkey: stakeAccount.publicKey,
-    authorizedPubkey: wallet.publicKey,
-    votePubkey: new PublicKey(validatorVotePubkey),
-  });
-
-  const transaction = new Transaction().add(createStakeAccountIx, delegateIx);
-  
-  const signature = await connection.sendTransaction(transaction, [wallet, stakeAccount]);
-  await connection.confirmTransaction(signature, "confirmed");
-
-  return signature;
+// Fetch rent exemption via server endpoint (uses Helius RPC)
+export async function getRentExemption(dataLength: number = 200): Promise<number> {
+  try {
+    const response = await fetch(`/api/solana/rent-exemption?dataLength=${dataLength}`);
+    if (!response.ok) throw new Error("Failed to fetch rent exemption");
+    const data = await response.json();
+    return data.lamports;
+  } catch (e) {
+    console.error("Failed to fetch rent exemption:", e);
+    throw e;
+  }
 }
 
-export async function deactivateStake(
-  wallet: Keypair,
-  stakeAccountPubkey: PublicKey
-): Promise<string> {
-  const deactivateIx = StakeProgram.deactivate({
-    stakePubkey: stakeAccountPubkey,
-    authorizedPubkey: wallet.publicKey,
-  });
-
-  const transaction = new Transaction().add(deactivateIx);
-  
-  const signature = await connection.sendTransaction(transaction, [wallet]);
-  await connection.confirmTransaction(signature, "confirmed");
-
-  return signature;
+// Fetch latest blockhash via server endpoint (uses Helius RPC)
+export async function getLatestBlockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+  try {
+    const response = await fetch("/api/solana/blockhash");
+    if (!response.ok) throw new Error("Failed to fetch blockhash");
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to fetch blockhash:", e);
+    throw e;
+  }
 }
 
-export async function withdrawStake(
-  wallet: Keypair,
-  stakeAccountPubkey: PublicKey,
-  lamports: number
-): Promise<string> {
-  const withdrawIx = StakeProgram.withdraw({
-    stakePubkey: stakeAccountPubkey,
-    authorizedPubkey: wallet.publicKey,
-    toPubkey: wallet.publicKey,
-    lamports,
+// Send serialized transaction via server endpoint (uses Helius RPC)
+export async function sendTransaction(serializedTransaction: string): Promise<string> {
+  const response = await fetch("/api/solana/send-transaction", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serializedTransaction }),
   });
-
-  const transaction = new Transaction().add(withdrawIx);
   
-  const signature = await connection.sendTransaction(transaction, [wallet]);
-  await connection.confirmTransaction(signature, "confirmed");
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to send transaction");
+  }
+  
+  const data = await response.json();
+  return data.signature;
+}
 
-  return signature;
+// Get transaction status via server endpoint
+export async function getTransactionStatus(signature: string): Promise<{ status: string; confirmations: number | null; err: any | null }> {
+  try {
+    const response = await fetch(`/api/solana/tx-status/${signature}`);
+    if (!response.ok) throw new Error("Failed to fetch transaction status");
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to fetch transaction status:", e);
+    throw e;
+  }
 }
 
 // Token account interface

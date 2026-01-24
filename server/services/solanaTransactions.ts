@@ -1,5 +1,5 @@
-import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getRpcService, createUserRpcService } from "./rpcService";
+import { PublicKey, LAMPORTS_PER_SOL, StakeProgram } from "@solana/web3.js";
+import { getRpcService, createUserRpcService, RpcService } from "./rpcService";
 import { broadcastAndConfirmTransaction, isHeliusSenderEnabled } from "./heliusSender";
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -179,6 +179,157 @@ export interface OnChainTransaction {
   inputToken: string | null;
   outputToken: string | null;
   outputAmount: string | null;
+}
+
+// ========== Staking Functions ==========
+
+export interface StakeAccountInfo {
+  pubkey: string;
+  lamports: number;
+  state: 'inactive' | 'activating' | 'active' | 'deactivating';
+  validator?: string;
+}
+
+export async function getStakeAccounts(
+  walletAddress: string,
+  userRpc?: string
+): Promise<StakeAccountInfo[]> {
+  try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
+    const publicKey = new PublicKey(walletAddress);
+    
+    const stakeAccounts = await rpc.execute(
+      (connection) => connection.getParsedProgramAccounts(
+        StakeProgram.programId,
+        {
+          filters: [
+            { dataSize: 200 },
+            {
+              memcmp: {
+                offset: 12,
+                bytes: publicKey.toBase58(),
+              },
+            },
+          ],
+        }
+      ),
+      "getStakeAccounts"
+    );
+
+    return stakeAccounts.map((account) => {
+      const parsed = (account.account.data as any).parsed;
+      const info = parsed?.info;
+      const stake = info?.stake;
+      
+      let state: StakeAccountInfo['state'] = 'inactive';
+      if (stake?.delegation) {
+        const activationEpoch = stake.delegation.activationEpoch;
+        const deactivationEpoch = stake.delegation.deactivationEpoch;
+        
+        if (deactivationEpoch !== '18446744073709551615') {
+          state = 'deactivating';
+        } else if (activationEpoch !== '18446744073709551615') {
+          state = 'active';
+        }
+      }
+
+      return {
+        pubkey: account.pubkey.toString(),
+        lamports: account.account.lamports,
+        state,
+        validator: stake?.delegation?.voter,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching stake accounts:", error);
+    return [];
+  }
+}
+
+export interface ValidatorInfo {
+  votePubkey: string;
+  activatedStake: number;
+  commission: number;
+}
+
+export async function getValidators(userRpc?: string): Promise<ValidatorInfo[]> {
+  try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
+    
+    const voteAccounts = await rpc.execute(
+      (connection) => connection.getVoteAccounts(),
+      "getVoteAccounts"
+    );
+    
+    return voteAccounts.current
+      .filter((v) => v.commission <= 10) // Only validators with max 10% commission
+      .sort((a, b) => b.activatedStake - a.activatedStake)
+      .slice(0, 20)
+      .map((v) => ({
+        votePubkey: v.votePubkey,
+        activatedStake: v.activatedStake,
+        commission: v.commission,
+      }));
+  } catch (error) {
+    console.error("Error fetching validators:", error);
+    return [];
+  }
+}
+
+export async function getMinimumBalanceForRentExemption(
+  dataLength: number = StakeProgram.space,
+  userRpc?: string
+): Promise<number> {
+  try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
+    
+    return await rpc.execute(
+      (connection) => connection.getMinimumBalanceForRentExemption(dataLength),
+      "getMinimumBalanceForRentExemption"
+    );
+  } catch (error) {
+    console.error("Error fetching rent exemption:", error);
+    throw error;
+  }
+}
+
+export async function getTransactionStatus(
+  signature: string,
+  userRpc?: string
+): Promise<{ status: string; confirmations: number | null; err: any | null }> {
+  try {
+    const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
+    
+    const status = await rpc.execute(
+      (connection) => connection.getSignatureStatus(signature),
+      "getSignatureStatus"
+    );
+    
+    if (!status.value) {
+      return { status: 'not_found', confirmations: null, err: null };
+    }
+    
+    const confirmationStatus = status.value.confirmationStatus;
+    return {
+      status: confirmationStatus || 'unknown',
+      confirmations: status.value.confirmations,
+      err: status.value.err,
+    };
+  } catch (error) {
+    console.error("Error fetching transaction status:", error);
+    throw error;
+  }
+}
+
+// Get RPC health info for dev headers
+export function getRpcHealthInfo(): { host: string; tier: string } {
+  const rpc = getRpcService();
+  const health = rpc.getHealthStatus();
+  const bestEndpoint = health.endpoints.find(ep => ep.healthy) || health.endpoints[0];
+  return {
+    host: bestEndpoint?.name || 'unknown',
+    tier: bestEndpoint?.healthy ? 'healthy' : 'degraded',
+  };
 }
 
 export async function getOnChainTransactions(

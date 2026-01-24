@@ -52,7 +52,18 @@ import {
   verifyPasskeyLogin,
   getRpId
 } from "./services/webauthnService";
-import { getOnChainTransactions, getWalletBalance, getTokenAccounts, sendRawTransaction, getLatestBlockhash } from "./services/solanaTransactions";
+import { 
+  getOnChainTransactions, 
+  getWalletBalance, 
+  getTokenAccounts, 
+  sendRawTransaction, 
+  getLatestBlockhash,
+  getStakeAccounts,
+  getValidators,
+  getMinimumBalanceForRentExemption,
+  getTransactionStatus,
+  getRpcHealthInfo
+} from "./services/solanaTransactions";
 import { getRpcService } from "./services/rpcService";
 import { balanceCache } from "./services/balanceCache";
 
@@ -674,10 +685,120 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing serializedTransaction" });
       }
       const signature = await sendRawTransaction(serializedTransaction);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
       res.json({ signature });
     } catch (error: any) {
       console.error("Error sending transaction:", error);
       res.status(500).json({ error: error.message || "Failed to send transaction" });
+    }
+  });
+
+  // ========== Server-only RPC Endpoints ==========
+  // These endpoints replace client-side Solana Connection usage
+  
+  // Get stake accounts for a wallet
+  app.get("/api/solana/stake-accounts/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+      const pubkeySchema = z.string().min(32).max(44);
+      const parsed = pubkeySchema.safeParse(address);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid wallet address" });
+      }
+      
+      const stakeAccounts = await getStakeAccounts(address);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
+      res.json(stakeAccounts);
+    } catch (error) {
+      console.error("Error fetching stake accounts:", error);
+      res.status(500).json({ error: "Failed to fetch stake accounts" });
+    }
+  });
+
+  // Get top validators list
+  app.get("/api/solana/validators", async (req, res) => {
+    try {
+      const validators = await getValidators();
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
+      res.json(validators);
+    } catch (error) {
+      console.error("Error fetching validators:", error);
+      res.status(500).json({ error: "Failed to fetch validators" });
+    }
+  });
+
+  // Get minimum balance for rent exemption (for staking)
+  app.get("/api/solana/rent-exemption", async (req, res) => {
+    try {
+      const dataLength = parseInt(req.query.dataLength as string) || 200; // Default stake account size
+      const rentExemption = await getMinimumBalanceForRentExemption(dataLength);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
+      res.json({ rentExemption, lamports: rentExemption });
+    } catch (error) {
+      console.error("Error fetching rent exemption:", error);
+      res.status(500).json({ error: "Failed to fetch rent exemption" });
+    }
+  });
+
+  // Get transaction status
+  app.get("/api/solana/tx-status/:signature", async (req, res) => {
+    try {
+      const { signature } = req.params;
+      const sigSchema = z.string().min(80).max(100);
+      const parsed = sigSchema.safeParse(signature);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid signature" });
+      }
+      
+      const status = await getTransactionStatus(signature);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching transaction status:", error);
+      res.status(500).json({ error: "Failed to fetch transaction status" });
+    }
+  });
+
+  // RPC health status endpoint (for debugging)
+  app.get("/api/solana/rpc-health", async (req, res) => {
+    try {
+      const rpc = getRpcService();
+      const health = rpc.getHealthStatus();
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
+      res.json(health);
+    } catch (error) {
+      console.error("Error fetching RPC health:", error);
+      res.status(500).json({ error: "Failed to fetch RPC health" });
     }
   });
 

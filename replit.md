@@ -150,6 +150,14 @@ The server follows a modular pattern:
   - Non-custodial: API keys never exposed to frontend
   - Logs which broadcast path was used (Helius Sender vs standard RPC)
   - Key files: `server/services/heliusSender.ts`, `server/services/solanaTransactions.ts`
+- **Server-Only RPC Architecture**: All Solana RPC calls routed through server
+  - Client-side Connection objects removed (prevents Helius API key exposure)
+  - All balance, token, stake, and transaction queries use server endpoints
+  - Wallet endpoints: `/api/wallet/balance/:address`, `/api/wallet/tokens/:address`
+  - Solana endpoints: `/api/solana/blockhash`, `/api/solana/account-info`, `/api/solana/send-transaction`, `/api/solana/stake-accounts/:address`, `/api/solana/validators`, `/api/solana/rent-exemption`, `/api/solana/tx-status/:signature`, `/api/solana/rpc-health`
+  - Development headers: `X-RPC-HOST` and `X-RPC-TIER` added to responses for debugging
+  - Key files: `server/services/rpcService.ts`, `server/routes.ts`
+  - **Exception**: `splTokenConnection` in `client/src/lib/solana.ts` uses public RPC for SPL token operations (`createMint`, `mintTo`) where @solana/spl-token library requires a Connection object and signing stays client-side (non-custodial)
 
 ## External Dependencies
 
@@ -158,7 +166,7 @@ The server follows a modular pattern:
 - **@solana/spl-token**: SPL token creation and management
 - **bs58**: Base58 encoding for key serialization
 - **Buffer polyfill**: CDN-loaded buffer for browser SPL token compatibility
-- **Network**: Solana Devnet (clusterApiUrl)
+- **Network**: Solana Mainnet (mainnet-beta)
 
 ### Authentication & Security
 - **Passkey Authentication (Primary)**: WebAuthn-based passwordless authentication

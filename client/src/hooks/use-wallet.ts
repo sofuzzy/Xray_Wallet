@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { connection } from "@/lib/solana";
 import { useVaultContext, type StoredWallet } from "@/contexts/VaultContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import bs58 from "bs58";
+
+// NOTE: All Solana RPC calls are now routed through server endpoints
+// No direct client-side Connection usage on mainnet
 
 export function useWallet() {
   const vault = useVaultContext();
@@ -29,21 +30,6 @@ export function useWallet() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     staleTime: 5000,
   });
-
-  const requestAirdrop = useCallback(async () => {
-    if (!vault.keypair) return;
-    try {
-      const signature = await connection.requestAirdrop(
-        vault.keypair.publicKey,
-        1 * LAMPORTS_PER_SOL
-      );
-      await connection.confirmTransaction(signature);
-      refreshBalance();
-    } catch (error) {
-      console.error("Airdrop failed:", error);
-      throw error;
-    }
-  }, [vault.keypair, refreshBalance]);
 
   const getSeedPhrase = useCallback((): string | null => {
     if (!vault.activeWallet) return null;
@@ -116,7 +102,6 @@ export function useWallet() {
     balance: balance || 0,
     isLoading: vault.status === "loading",
     refreshBalance,
-    requestAirdrop,
     getSeedPhrase,
     getPrivateKey,
     isPrivateKeyWallet,

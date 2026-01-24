@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
-import { connection, getLocalKeypair } from "@/lib/solana";
+import { splTokenConnection, getLocalKeypair } from "@/lib/solana";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -104,7 +104,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       return;
     }
 
-    const keypair = getLocalKeypair();
+    const keypair = await getLocalKeypair();
     if (!keypair) {
       toast({ title: "Error", description: "No keypair found", variant: "destructive" });
       return;
@@ -136,7 +136,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       const mintKeypair = Keypair.generate();
       
       const mint = await createMint(
-        connection,
+        splTokenConnection,
         keypair,
         keypair.publicKey,
         keypair.publicKey,
@@ -145,7 +145,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       );
 
       const tokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
+        splTokenConnection,
         keypair,
         mint,
         keypair.publicKey
@@ -159,7 +159,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       const supplyWithDecimals = supplyBigInt * multiplier;
       
       await mintTo(
-        connection,
+        splTokenConnection,
         keypair,
         mint,
         tokenAccount.address,
