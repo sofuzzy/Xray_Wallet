@@ -126,12 +126,13 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     const liquidityCost = formData.addLiquidity 
       ? (poolCost?.solCost || 0.35) + parseFloat(formData.liquiditySol || "0")
       : 0;
-    const requiredLamports = Math.floor((0.05 + liquidityCost) * LAMPORTS_PER_SOL);
+    const requiredSol = 0.05 + liquidityCost;
     
-    if (balance < requiredLamports) {
+    // balance from useWallet is already in SOL, not lamports
+    if (balance < requiredSol) {
       toast({ 
         title: "Insufficient Balance", 
-        description: `You need at least ${((requiredLamports / LAMPORTS_PER_SOL)).toFixed(2)} SOL. Current: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL.`, 
+        description: `You need at least ${requiredSol.toFixed(2)} SOL. Current: ${balance.toFixed(4)} SOL.`, 
         variant: "destructive" 
       });
       return;
