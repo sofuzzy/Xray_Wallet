@@ -14,10 +14,10 @@ export const SOLANA_NETWORK = "mainnet-beta";
 // because the @solana/spl-token library functions need it internally.
 // This connection is ONLY used for SPL token write operations where the user
 // signs locally (non-custodial). All other reads should use server endpoints.
-// Use multiple fallback RPCs for reliability (free public endpoints)
+// Use server RPC proxy as primary (uses Helius), with public fallbacks
 const SPL_TOKEN_RPC_URLS = [
+  `${window.location.origin}/api/solana/rpc-proxy`, // Server proxy (uses Helius)
   "https://rpc.ankr.com/solana",
-  "https://solana-rpc.publicnode.com",
   "https://api.mainnet-beta.solana.com",
 ];
 

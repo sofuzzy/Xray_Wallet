@@ -700,6 +700,35 @@ export async function registerRoutes(
     }
   });
 
+  // RPC Proxy endpoint - forwards JSON-RPC requests to Helius
+  // This allows client-side SPL token operations to use the reliable Helius RPC
+  app.post("/api/solana/rpc-proxy", async (req, res) => {
+    try {
+      const rpc = getRpcService();
+      const rpcUrl = (rpc as any).connection?._rpcEndpoint || process.env.HELIUS_RPC_URL;
+      
+      if (!rpcUrl) {
+        return res.status(500).json({ error: "RPC not configured" });
+      }
+      
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("RPC proxy error:", error);
+      res.status(500).json({ 
+        jsonrpc: "2.0", 
+        error: { code: -32603, message: error.message || "Internal error" },
+        id: req.body?.id 
+      });
+    }
+  });
+
   // ========== Server-only RPC Endpoints ==========
   // These endpoints replace client-side Solana Connection usage
   
