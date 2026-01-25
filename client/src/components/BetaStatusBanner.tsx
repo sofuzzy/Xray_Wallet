@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/hooks/use-wallet";
-import { Lock, Unlock, Loader2 } from "lucide-react";
+import { Lock, Unlock, Loader2, Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 interface BetaStatus {
   unlocked: boolean;
@@ -80,6 +83,23 @@ export function BetaStatusBanner() {
       <span className="text-muted-foreground">
         XRAY Balance: {status.balanceUi.toLocaleString()} / {status.requiredUi.toLocaleString()}
       </span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 text-amber-500 hover:text-amber-600"
+            data-testid="button-beta-info"
+          >
+            <Info className="w-4 h-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 text-sm" data-testid="popover-beta-info">
+          <p>
+            To access beta functionality of the wallet, buy or transfer 5,000 XRAY tokens to the wallet you are transacting from in XRAY.
+          </p>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
