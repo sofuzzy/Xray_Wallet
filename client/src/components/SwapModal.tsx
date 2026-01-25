@@ -214,11 +214,16 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   const { toast } = useToast();
   const { settings: riskShieldSettings, getEnabledCheckCodes } = useRiskShieldSettings();
   const { data: betaStatus } = useBetaStatus();
-  const isBetaLocked = betaStatus && !betaStatus.unlocked;
   const [inputAmount, setInputAmount] = useState("");
   const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
   const [inputMint, setInputMint] = useState(initialInputToken?.mint || "SOL");
   const [outputMint, setOutputMint] = useState(initialInputToken ? "SOL" : (initialOutputToken?.mint || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
+  
+  // Allow buying the XRAY token even when beta is locked
+  const unlockTokenMint = betaStatus?.unlockTokenMint;
+  const normalizedOutputForBeta = outputMint === "SOL" ? "So11111111111111111111111111111111111111112" : outputMint;
+  const isBuyingUnlockToken = unlockTokenMint && normalizedOutputForBeta === unlockTokenMint;
+  const isBetaLocked = betaStatus && !betaStatus.unlocked && !isBuyingUnlockToken;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectingFor, setSelectingFor] = useState<"input" | "output" | null>(null);
   const [priorityFee, setPriorityFee] = useState<"low" | "medium" | "high" | "custom">(() => {
@@ -703,6 +708,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         signedTransaction: signedTx,
         skipPreflight: true,
         lastValidBlockHeight: txResponse.lastValidBlockHeight,
+        outputMint: normalizedOutputMint,
       });
 
       setTxStep("confirming");

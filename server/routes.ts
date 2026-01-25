@@ -34,7 +34,7 @@ import {
   anomalyDetection,
   optionalAuth
 } from "./middleware/zeroTrust";
-import { requireBetaUnlock, checkBetaUnlock } from "./middleware/requireBetaUnlock";
+import { requireBetaUnlock, requireBetaUnlockOrBuyingToken, checkBetaUnlock, getBetaUnlockToken } from "./middleware/requireBetaUnlock";
 import { 
   generateTokenPair, 
   refreshAccessToken, 
@@ -716,7 +716,10 @@ export async function registerRoutes(
       }
       
       const result = await checkBetaUnlock(owner);
-      res.json(result);
+      res.json({
+        ...result,
+        unlockTokenMint: getBetaUnlockToken() || null,
+      });
     } catch (error) {
       console.error("Error checking beta status:", error);
       res.status(500).json({ error: "Failed to check beta status" });
@@ -1532,7 +1535,7 @@ export async function registerRoutes(
   });
 
   // Get swap transaction from Jupiter (beta-gated)
-  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
+  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const { quote, userPublicKey, priorityFee, riskShieldDisabled, enabledCheckCodes } = req.body;
 
@@ -1604,7 +1607,7 @@ export async function registerRoutes(
   });
 
   // Send signed transaction (beta-gated)
-  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
+  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const { signedTransaction, skipPreflight, lastValidBlockHeight } = req.body;
       
@@ -1643,7 +1646,7 @@ export async function registerRoutes(
   });
 
   // Legacy execute endpoint (backward compatibility, beta-gated)
-  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
+  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const input = api.swaps.execute.input.parse(req.body);
       

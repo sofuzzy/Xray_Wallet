@@ -7,6 +7,7 @@ interface BetaStatus {
   balanceRaw: string;
   balanceUi: number;
   requiredUi: number;
+  unlockTokenMint?: string | null;
 }
 
 export function useBetaStatus() {

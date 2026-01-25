@@ -167,6 +167,19 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
   }
 }
 
+function isSwapToUnlockToken(req: Request): boolean {
+  if (!BETA_UNLOCK_TOKEN) return false;
+  const body = req.body;
+  if (!body) return false;
+  
+  // Check if outputMint matches the unlock token
+  const outputMint = body.outputMint || body.destinationMint || body.toMint;
+  if (typeof outputMint === "string" && outputMint === BETA_UNLOCK_TOKEN) {
+    return true;
+  }
+  return false;
+}
+
 export function requireBetaUnlock(req: Request, res: Response, next: NextFunction) {
   if (!BETA_UNLOCK_TOKEN) {
     return next();
@@ -202,6 +215,25 @@ export function requireBetaUnlock(req: Request, res: Response, next: NextFunctio
         requiredUi: REQUIRED_UI_BALANCE,
       });
     });
+}
+
+// Variant that allows swaps purchasing the unlock token
+export function requireBetaUnlockOrBuyingToken(req: Request, res: Response, next: NextFunction) {
+  if (!BETA_UNLOCK_TOKEN) {
+    return next();
+  }
+
+  // Always allow swaps that are purchasing the unlock token
+  if (isSwapToUnlockToken(req)) {
+    return next();
+  }
+
+  // Otherwise, require full beta unlock
+  return requireBetaUnlock(req, res, next);
+}
+
+export function getBetaUnlockToken(): string | undefined {
+  return BETA_UNLOCK_TOKEN;
 }
 
 export function clearBetaCache(wallet?: string) {
