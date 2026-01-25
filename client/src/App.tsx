@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
 import { VaultUnlockModal } from "@/components/VaultUnlockModal";
 import { CursorGlow } from "@/components/CursorGlow";
+import { BetaStatusBanner } from "@/components/BetaStatusBanner";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import TokenExplorer from "@/pages/TokenExplorer";
@@ -77,7 +78,12 @@ function VaultGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <BetaStatusBanner />
+      {children}
+    </>
+  );
 }
 
 function App() {

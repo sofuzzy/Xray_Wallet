@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon, Info, Droplets, ExternalLink } from "lucide-react";
+import { X, Rocket, Loader2, CheckCircle, AlertCircle, Coins, ImageIcon, Info, Droplets, ExternalLink, Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
+import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { sendTransactionViaServer, confirmTransactionViaServer } from "@/lib/solana";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
@@ -35,6 +36,8 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading } = useUpload();
+  const { data: betaStatus } = useBetaStatus();
+  const isBetaLocked = betaStatus && !betaStatus.unlocked;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [poolStatus, setPoolStatus] = useState<"idle" | "building" | "signing" | "confirming" | "success" | "error">("idle");
   const [poolError, setPoolError] = useState("");
@@ -515,11 +518,21 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
 
               <Button
                 onClick={createToken}
+                disabled={isBetaLocked}
                 className="w-full py-6 text-lg font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                 data-testid="button-launch-token"
               >
-                <Rocket className="w-5 h-5 mr-2" />
-                Launch Token
+                {isBetaLocked ? (
+                  <>
+                    <Lock className="w-5 h-5 mr-2" />
+                    Beta Locked
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="w-5 h-5 mr-2" />
+                    Launch Token
+                  </>
+                )}
               </Button>
             </div>
           )}

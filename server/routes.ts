@@ -34,6 +34,7 @@ import {
   anomalyDetection,
   optionalAuth
 } from "./middleware/zeroTrust";
+import { requireBetaUnlock, checkBetaUnlock } from "./middleware/requireBetaUnlock";
 import { 
   generateTokenPair, 
   refreshAccessToken, 
@@ -706,8 +707,24 @@ export async function registerRoutes(
     }
   });
 
-  // Send signed transaction
-  app.post("/api/solana/send-transaction", async (req, res) => {
+  // Beta unlock status endpoint
+  app.get("/api/beta/status", async (req, res) => {
+    try {
+      const owner = req.query.owner as string;
+      if (!owner || owner.length < 32 || owner.length > 44) {
+        return res.status(400).json({ error: "Invalid owner address" });
+      }
+      
+      const result = await checkBetaUnlock(owner);
+      res.json(result);
+    } catch (error) {
+      console.error("Error checking beta status:", error);
+      res.status(500).json({ error: "Failed to check beta status" });
+    }
+  });
+
+  // Send signed transaction (beta-gated)
+  app.post("/api/solana/send-transaction", requireBetaUnlock, async (req, res) => {
     try {
       const { serializedTransaction } = req.body;
       if (!serializedTransaction) {
@@ -1514,8 +1531,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get swap transaction from Jupiter
-  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, async (req, res) => {
+  // Get swap transaction from Jupiter (beta-gated)
+  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const { quote, userPublicKey, priorityFee, riskShieldDisabled, enabledCheckCodes } = req.body;
 
@@ -1586,8 +1603,8 @@ export async function registerRoutes(
     }
   });
 
-  // Send signed transaction
-  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, async (req, res) => {
+  // Send signed transaction (beta-gated)
+  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const { signedTransaction, skipPreflight, lastValidBlockHeight } = req.body;
       
@@ -1625,8 +1642,8 @@ export async function registerRoutes(
     }
   });
 
-  // Legacy execute endpoint (backward compatibility)
-  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, async (req, res) => {
+  // Legacy execute endpoint (backward compatibility, beta-gated)
+  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const input = api.swaps.execute.input.parse(req.body);
       
@@ -1722,8 +1739,8 @@ export async function registerRoutes(
   });
 
   // ========== Launchpad Server-Assisted Token Creation ==========
-  // Build unsigned mint transaction on server, client signs locally (non-custodial)
-  app.post("/api/launchpad/build-create-mint-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+  // Build unsigned mint transaction on server, client signs locally (non-custodial, beta-gated)
+  app.post("/api/launchpad/build-create-mint-tx", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const { buildCreateMintTransaction } = await import("./services/launchpadService");
       
@@ -1743,8 +1760,8 @@ export async function registerRoutes(
     }
   });
 
-  // Send signed transaction with Helius Sender + resend loop + proper confirmation
-  app.post("/api/launchpad/send-signed-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+  // Send signed transaction with Helius Sender + resend loop + proper confirmation (beta-gated)
+  app.post("/api/launchpad/send-signed-tx", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const { sendAndConfirmLaunchpadTx } = await import("./services/launchpadService");
       
@@ -1774,7 +1791,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/liquidity-pool/build", hybridAuth, strictRateLimiter, async (req, res) => {
+  app.post("/api/liquidity-pool/build", hybridAuth, strictRateLimiter, requireBetaUnlock, async (req, res) => {
     try {
       const poolInput = z.object({
         tokenMint: z.string().min(32).max(64),

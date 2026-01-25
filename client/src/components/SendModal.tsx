@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X, Send, User, Loader2, Check, Coins } from "lucide-react";
+import { X, Send, User, Loader2, Check, Coins, Lock } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useCreateTransaction } from "@/hooks/use-transactions";
 import { useLookupUser } from "@/hooks/use-users";
+import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,8 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
   const { mutateAsync: recordTx } = useCreateTransaction();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: betaStatus } = useBetaStatus();
+  const isBetaLocked = betaStatus && !betaStatus.unlocked;
 
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -387,12 +390,16 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
               </div>
 
               <button
-                disabled={isProcessing || !recipient || !amount}
+                disabled={isProcessing || !recipient || !amount || isBetaLocked}
                 onClick={handleSend}
                 className="w-full py-4 rounded-xl bg-white text-black font-bold text-lg hover:bg-white/90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 data-testid="button-send-confirm"
               >
-                {isProcessing ? (
+                {isBetaLocked ? (
+                  <>
+                    <Lock className="w-5 h-5" /> Beta Locked
+                  </>
+                ) : isProcessing ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" /> Processing...
                   </>

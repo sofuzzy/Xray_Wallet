@@ -2,13 +2,14 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet, Lock } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { tokenManager } from "@/lib/tokenManager";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
+import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
@@ -212,6 +213,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const { settings: riskShieldSettings, getEnabledCheckCodes } = useRiskShieldSettings();
+  const { data: betaStatus } = useBetaStatus();
+  const isBetaLocked = betaStatus && !betaStatus.unlocked;
   const [inputAmount, setInputAmount] = useState("");
   const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
   const [inputMint, setInputMint] = useState(initialInputToken?.mint || "SOL");
@@ -1428,11 +1431,16 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
 
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient || isBetaLocked}
             className="w-full"
             data-testid="button-execute-swap"
           >
-            {isSwapping ? (
+            {isBetaLocked ? (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                Beta Locked
+              </>
+            ) : isSwapping ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Swapping...
