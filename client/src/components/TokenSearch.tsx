@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, TrendingUp, TrendingDown, Loader2, Plus, X, Flame, Wallet } from "lucide-react";
@@ -7,6 +7,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { PublicKey } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Custom debounce hook to reduce RPC calls
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  
+  return debouncedValue;
+}
 
 interface Token {
   mint: string;
@@ -67,6 +79,9 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
   const autoLookupRef = useRef<string | null>(null);
   const { toast } = useToast();
   const { address } = useWallet();
+  
+  // Debounce search query to reduce API calls (300ms delay)
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const { data: walletTokens = [] } = useQuery<WalletToken[]>({
     queryKey: ["wallet-tokens", address],
@@ -100,14 +115,14 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
       if (!response.ok) return [];
       return response.json();
     },
-    staleTime: 30000,
+    staleTime: 120000, // 2 minutes - trending tokens update infrequently
     refetchOnWindowFocus: false,
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
-    queryKey: ["/api/tokens/search", searchQuery],
+    queryKey: ["/api/tokens/search", debouncedSearchQuery],
     queryFn: async () => {
-      const query = searchQuery.trim();
+      const query = debouncedSearchQuery.trim();
       if (!query || query.length < 2) return [];
       // Skip search for valid Solana addresses (handled by lookupMint)
       if (isValidSolanaAddress(query)) return [];
@@ -115,8 +130,9 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: searchQuery.trim().length >= 2 && !isValidSolanaAddress(searchQuery.trim()),
-    staleTime: 30000,
+    enabled: debouncedSearchQuery.trim().length >= 2 && !isValidSolanaAddress(debouncedSearchQuery.trim()),
+    staleTime: 60000, // 60 seconds - search results don't change frequently
+    refetchOnWindowFocus: false,
   });
 
   const isSearchingMintAddress = useMemo(() => {
