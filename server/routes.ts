@@ -606,6 +606,12 @@ export async function registerRoutes(
     try {
       const { address } = req.params;
       const result = await getWalletBalance(address);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
       res.json(result);
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
@@ -638,8 +644,18 @@ export async function registerRoutes(
           };
         });
         
+        // Add dev headers
+        const rpcInfo = getRpcHealthInfo();
+        res.setHeader("X-RPC-HOST", rpcInfo.host);
+        res.setHeader("X-RPC-TIER", rpcInfo.tier);
+        
         res.json(enhancedTokens);
       } else {
+        // Add dev headers
+        const rpcInfo = getRpcHealthInfo();
+        res.setHeader("X-RPC-HOST", rpcInfo.host);
+        res.setHeader("X-RPC-TIER", rpcInfo.tier);
+        
         res.json(tokens);
       }
     } catch (error) {
@@ -652,6 +668,12 @@ export async function registerRoutes(
   app.get("/api/solana/blockhash", async (req, res) => {
     try {
       const result = await getLatestBlockhash();
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
       res.json(result);
     } catch (error) {
       console.error("Error fetching blockhash:", error);
@@ -671,6 +693,11 @@ export async function registerRoutes(
       const rpc = getRpcService();
       const pubkey = new PublicKey(address);
       const accountInfo = await rpc.getAccountInfo(pubkey);
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
       
       res.json({ exists: accountInfo !== null });
     } catch (error) {
@@ -701,9 +728,83 @@ export async function registerRoutes(
   });
 
   // RPC Proxy endpoint - forwards JSON-RPC requests to Helius
-  // This allows client-side SPL token operations to use the reliable Helius RPC
+  // Security: rate limiting, max body size, method allowlist
+  const RPC_ALLOWED_METHODS = new Set([
+    "getAccountInfo",
+    "getBalance",
+    "getTokenAccountsByOwner",
+    "getMultipleAccounts",
+    "getRecentBlockhash",
+    "getLatestBlockhash",
+    "getSignatureStatuses",
+    "getTransaction",
+    "getMinimumBalanceForRentExemption",
+    "getProgramAccounts",
+    "getSlot",
+    "getHealth",
+  ]);
+  const RPC_MAX_BODY_SIZE = 10 * 1024; // 10KB max body size
+  const rpcProxyRateLimit: Map<string, { count: number; resetTime: number }> = new Map();
+  const RPC_RATE_LIMIT = 30; // requests per window
+  const RPC_RATE_WINDOW = 60 * 1000; // 60 seconds
+
   app.post("/api/solana/rpc-proxy", async (req, res) => {
     try {
+      // Validate body exists and check size
+      if (!req.body || typeof req.body !== "object") {
+        return res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Invalid request body" },
+          id: null,
+        });
+      }
+      
+      let bodySize: number;
+      try {
+        bodySize = JSON.stringify(req.body).length;
+      } catch {
+        return res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Invalid JSON body" },
+          id: req.body?.id,
+        });
+      }
+      
+      if (bodySize > RPC_MAX_BODY_SIZE) {
+        return res.status(413).json({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Request body too large" },
+          id: req.body?.id,
+        });
+      }
+
+      // Rate limiting by IP
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+      const now = Date.now();
+      let rateState = rpcProxyRateLimit.get(clientIp);
+      if (!rateState || now > rateState.resetTime) {
+        rateState = { count: 0, resetTime: now + RPC_RATE_WINDOW };
+        rpcProxyRateLimit.set(clientIp, rateState);
+      }
+      rateState.count++;
+      if (rateState.count > RPC_RATE_LIMIT) {
+        return res.status(429).json({
+          jsonrpc: "2.0",
+          error: { code: -32005, message: "Rate limit exceeded" },
+          id: req.body?.id,
+        });
+      }
+
+      // Method allowlist check
+      const method = req.body?.method;
+      if (!method || !RPC_ALLOWED_METHODS.has(method)) {
+        return res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32601, message: `Method not allowed: ${method}` },
+          id: req.body?.id,
+        });
+      }
+
       const rpc = getRpcService();
       const rpcUrl = (rpc as any).connection?._rpcEndpoint || process.env.HELIUS_RPC_URL;
       
@@ -718,6 +819,12 @@ export async function registerRoutes(
       });
       
       const data = await response.json();
+      
+      // Add dev headers
+      const rpcInfo = getRpcHealthInfo();
+      res.setHeader("X-RPC-HOST", rpcInfo.host);
+      res.setHeader("X-RPC-TIER", rpcInfo.tier);
+      
       res.json(data);
     } catch (error: any) {
       console.error("RPC proxy error:", error);

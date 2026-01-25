@@ -2,7 +2,9 @@ import { encryptWalletData, decryptWalletData, type EncryptedVaultData } from ".
 
 const LOCAL_VAULT_KEY = "xray_encrypted_vault";
 const ACTIVE_WALLET_KEY = "xray_active_wallet_id";
-const SESSION_UNLOCK_KEY = "xray_session_unlock";
+
+// In-memory unlock token (not persisted) - cleared on page refresh
+let memoryUnlockToken: string | null = null;
 
 export interface LocalVaultState {
   isLocked: boolean;
@@ -47,7 +49,10 @@ export async function unlockVault(pin: string): Promise<string> {
   
   try {
     const decrypted = await decryptWalletData(vault, pin);
-    sessionStorage.setItem(SESSION_UNLOCK_KEY, decrypted);
+    // Set short-lived unlock token (memory only, not persisted)
+    memoryUnlockToken = crypto.randomUUID();
+    // Decrypted wallet data is returned to caller (VaultContext)
+    // and kept only in React state - never written to storage
     return decrypted;
   } catch (error: any) {
     if (error.message === "DECRYPTION_FAILED") {
@@ -58,16 +63,22 @@ export async function unlockVault(pin: string): Promise<string> {
 }
 
 export function lockVault(): void {
-  sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+  // Clear memory token (decrypted data is in React state, will be cleared by VaultContext)
+  memoryUnlockToken = null;
   sessionStorage.removeItem(ACTIVE_WALLET_KEY);
 }
 
 export function isVaultUnlocked(): boolean {
-  return sessionStorage.getItem(SESSION_UNLOCK_KEY) !== null;
+  // Check memory token instead of sessionStorage
+  return memoryUnlockToken !== null;
 }
 
-export function getSessionUnlock(): string | null {
-  return sessionStorage.getItem(SESSION_UNLOCK_KEY);
+export function getUnlockToken(): string | null {
+  return memoryUnlockToken;
+}
+
+export function setUnlockToken(token: string | null): void {
+  memoryUnlockToken = token;
 }
 
 export async function updateVaultData(walletData: string, pin: string): Promise<void> {

@@ -7,8 +7,6 @@ import {
   createLocalVault,
   unlockVault,
   lockVault as lockVaultStorage,
-  isVaultUnlocked,
-  getSessionUnlock,
   updateVaultData,
   deleteLocalVault,
 } from "@/lib/localVault";
@@ -43,21 +41,8 @@ export function useLocalVault(): UseLocalVaultReturn {
 
   useEffect(() => {
     const initVault = () => {
-      if (isVaultUnlocked()) {
-        const data = getSessionUnlock();
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            setWallets(Array.isArray(parsed) ? parsed : []);
-            setStatus("unlocked");
-            return;
-          } catch {
-            setStatus("locked");
-            return;
-          }
-        }
-      }
-
+      // Memory-only unlock token - on page refresh, vault is always locked
+      // User must re-enter PIN to unlock (decrypted data never persisted)
       if (hasLocalVault()) {
         setStatus("locked");
         return;
