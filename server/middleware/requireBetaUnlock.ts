@@ -1,18 +1,20 @@
 import { Request, Response, NextFunction } from "express";
 import { PublicKey, VersionedTransaction, Transaction } from "@solana/web3.js";
 import { getRpcService } from "../services/rpcService";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getMint } from "@solana/spl-token";
 
 const BETA_UNLOCK_TOKEN = process.env.BETA_UNLOCK_TOKEN;
-const REQUIRED_BALANCE = BigInt(5000) * BigInt(10 ** 9);
+const REQUIRED_UI_BALANCE = 5000;
 
 interface CacheEntry {
   unlocked: boolean;
   balanceRaw: string;
+  decimals: number;
   timestamp: number;
 }
 
 const balanceCache = new Map<string, CacheEntry>();
+let tokenDecimalsCache: number | null = null;
 const CACHE_TTL_MS = 90_000;
 
 function extractSignerFromTransaction(serialized: string): string | null {
@@ -69,6 +71,29 @@ function extractWalletFromRequest(req: Request): string | null {
   return null;
 }
 
+async function getTokenDecimals(): Promise<number> {
+  if (tokenDecimalsCache !== null) {
+    return tokenDecimalsCache;
+  }
+  
+  if (!BETA_UNLOCK_TOKEN) {
+    return 9;
+  }
+  
+  try {
+    const rpcService = getRpcService();
+    const connection = rpcService.getConnection();
+    const mintPubkey = new PublicKey(BETA_UNLOCK_TOKEN);
+    const mintInfo = await getMint(connection, mintPubkey);
+    tokenDecimalsCache = mintInfo.decimals;
+    console.log(`[beta] Token decimals fetched: ${tokenDecimalsCache}`);
+    return tokenDecimalsCache;
+  } catch (error) {
+    console.error("[beta] Failed to fetch token decimals, defaulting to 6:", error);
+    return 6;
+  }
+}
+
 export async function checkBetaUnlock(walletAddress: string): Promise<{
   unlocked: boolean;
   balanceRaw: string;
@@ -76,17 +101,21 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
   requiredUi: number;
 }> {
   if (!BETA_UNLOCK_TOKEN) {
-    return { unlocked: true, balanceRaw: "0", balanceUi: 0, requiredUi: 5000 };
+    return { unlocked: true, balanceRaw: "0", balanceUi: 0, requiredUi: REQUIRED_UI_BALANCE };
   }
 
+  const decimals = await getTokenDecimals();
+  const divisor = BigInt(10 ** decimals);
+  const requiredRaw = BigInt(REQUIRED_UI_BALANCE) * divisor;
+
   const cached = balanceCache.get(walletAddress);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    const balanceUi = Number(BigInt(cached.balanceRaw) / BigInt(10 ** 9));
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && cached.decimals === decimals) {
+    const balanceUi = Number(BigInt(cached.balanceRaw)) / Number(divisor);
     return {
       unlocked: cached.unlocked,
       balanceRaw: cached.balanceRaw,
       balanceUi,
-      requiredUi: 5000,
+      requiredUi: REQUIRED_UI_BALANCE,
     };
   }
 
@@ -111,20 +140,21 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
       }
     }
 
-    const unlocked = totalRaw >= REQUIRED_BALANCE;
+    const unlocked = totalRaw >= requiredRaw;
     const balanceRaw = totalRaw.toString();
 
     balanceCache.set(walletAddress, {
       unlocked,
       balanceRaw,
+      decimals,
       timestamp: Date.now(),
     });
 
     return {
       unlocked,
       balanceRaw,
-      balanceUi: Number(totalRaw / BigInt(10 ** 9)),
-      requiredUi: 5000,
+      balanceUi: Number(totalRaw) / Number(divisor),
+      requiredUi: REQUIRED_UI_BALANCE,
     };
   } catch (error) {
     console.error("[beta-unlock] Error checking token balance:", error);
@@ -132,7 +162,7 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
       unlocked: false,
       balanceRaw: "0",
       balanceUi: 0,
-      requiredUi: 5000,
+      requiredUi: REQUIRED_UI_BALANCE,
     };
   }
 }
@@ -158,7 +188,7 @@ export function requireBetaUnlock(req: Request, res: Response, next: NextFunctio
 
       return res.status(403).json({
         error: "BETA_LOCKED",
-        message: "Beta is locked. Hold >= 5,000 XRAY to enable transactions.",
+        message: `Beta is locked. Hold >= ${REQUIRED_UI_BALANCE.toLocaleString()} XRAY to enable transactions.`,
         balanceUi: result.balanceUi,
         requiredUi: result.requiredUi,
       });
@@ -167,9 +197,9 @@ export function requireBetaUnlock(req: Request, res: Response, next: NextFunctio
       console.error("[beta-unlock] Middleware error:", error);
       return res.status(403).json({
         error: "BETA_LOCKED",
-        message: "Beta is locked. Hold >= 5,000 XRAY to enable transactions.",
+        message: `Beta is locked. Hold >= ${REQUIRED_UI_BALANCE.toLocaleString()} XRAY to enable transactions.`,
         balanceUi: 0,
-        requiredUi: 5000,
+        requiredUi: REQUIRED_UI_BALANCE,
       });
     });
 }
