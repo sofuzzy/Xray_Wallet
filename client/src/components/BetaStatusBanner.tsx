@@ -34,7 +34,11 @@ export function useBetaStatus() {
   });
 }
 
-export function BetaStatusBanner() {
+interface BetaStatusBannerProps {
+  onBuyXray?: () => void;
+}
+
+export function BetaStatusBanner({ onBuyXray }: BetaStatusBannerProps = {}) {
   const { data: status, isLoading } = useBetaStatus();
   const { address } = useWallet();
   
@@ -95,9 +99,19 @@ export function BetaStatusBanner() {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-80 text-sm" data-testid="popover-beta-info">
-          <p>
+          <p className="mb-3">
             To access beta functionality of the wallet, buy or transfer 5,000 XRAY tokens to the wallet you are transacting from in XRAY.
           </p>
+          {onBuyXray && (
+            <Button 
+              size="sm" 
+              className="w-full"
+              onClick={onBuyXray}
+              data-testid="button-buy-xray"
+            >
+              Buy XRAY
+            </Button>
+          )}
         </PopoverContent>
       </Popover>
     </div>

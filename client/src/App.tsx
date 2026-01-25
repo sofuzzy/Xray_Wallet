@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
 import { VaultUnlockModal } from "@/components/VaultUnlockModal";
 import { CursorGlow } from "@/components/CursorGlow";
-import { BetaStatusBanner } from "@/components/BetaStatusBanner";
+import { BetaStatusBanner, useBetaStatus } from "@/components/BetaStatusBanner";
+import { SwapModal } from "@/components/SwapModal";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import TokenExplorer from "@/pages/TokenExplorer";
@@ -39,6 +41,11 @@ function Router() {
 function VaultGate({ children }: { children: React.ReactNode }) {
   const vault = useVaultContext();
   const [location] = useLocation();
+  const [isBuyXrayOpen, setIsBuyXrayOpen] = useState(false);
+  const { data: betaStatus } = useBetaStatus();
+  
+  // Get the XRAY token mint for the swap modal
+  const xrayTokenMint = betaStatus?.unlockTokenMint;
 
   // Skip vault gate for public routes
   if (PUBLIC_ROUTES.includes(location)) {
@@ -80,8 +87,15 @@ function VaultGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <BetaStatusBanner />
+      <BetaStatusBanner onBuyXray={() => setIsBuyXrayOpen(true)} />
       {children}
+      {isBuyXrayOpen && xrayTokenMint && (
+        <SwapModal 
+          isOpen={isBuyXrayOpen} 
+          onClose={() => setIsBuyXrayOpen(false)}
+          initialOutputToken={{ mint: xrayTokenMint, symbol: "XRAY", name: "XRAY", decimals: 6 }}
+        />
+      )}
     </>
   );
 }
