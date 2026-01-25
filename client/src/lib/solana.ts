@@ -1,5 +1,4 @@
 import { 
-  Connection,
   Keypair, 
   PublicKey, 
   LAMPORTS_PER_SOL,
@@ -7,37 +6,8 @@ import {
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 
-// Use Mainnet for production - RPC calls should go through server when possible
+// Use Mainnet for production - ALL RPC calls go through server endpoints
 export const SOLANA_NETWORK = "mainnet-beta";
-
-// EXCEPTION: SPL Token operations (createMint, mintTo, etc.) require a Connection object
-// because the @solana/spl-token library functions need it internally.
-// This connection is ONLY used for SPL token write operations where the user
-// signs locally (non-custodial). All other reads should use server endpoints.
-// Use server RPC proxy as primary (uses Helius), with public fallbacks
-const SPL_TOKEN_RPC_URLS = [
-  `${window.location.origin}/api/solana/rpc-proxy`, // Server proxy (uses Helius)
-  "https://rpc.ankr.com/solana",
-  "https://api.mainnet-beta.solana.com",
-];
-
-// Try each RPC until one works
-let splTokenConnectionIndex = 0;
-export let splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
-  commitment: "confirmed",
-  confirmTransactionInitialTimeout: 120000, // 2 minutes for slow confirmations
-});
-
-// Function to switch to next RPC on failure
-export function switchToNextRpc(): boolean {
-  splTokenConnectionIndex = (splTokenConnectionIndex + 1) % SPL_TOKEN_RPC_URLS.length;
-  splTokenConnection = new Connection(SPL_TOKEN_RPC_URLS[splTokenConnectionIndex], {
-    commitment: "confirmed",
-    confirmTransactionInitialTimeout: 120000, // 2 minutes for slow confirmations
-  });
-  console.log(`Switched to RPC: ${SPL_TOKEN_RPC_URLS[splTokenConnectionIndex]}`);
-  return true;
-}
 
 // Confirm transaction via server (polls Helius RPC)
 export async function confirmTransactionViaServer(signature: string, maxAttempts = 60): Promise<boolean> {
@@ -88,18 +58,12 @@ export async function sendTransactionViaServer(serializedTx: Uint8Array): Promis
   return result.signature;
 }
 
-// NOTE: For general RPC operations, use server endpoints (/api/solana/*)
-// The splTokenConnection above is ONLY for SPL token operations that need
-// direct Connection access for non-custodial signing.
+// NOTE: ALL RPC operations go through server endpoints (/api/solana/*)
+// No client-side RPC connections are used for mainnet security.
 
-// Constants
-export const LOCAL_STORAGE_KEY = "solana_wallet_secret_key";
-export const LOCAL_STORAGE_MNEMONIC_KEY = "solana_wallet_mnemonic";
-export const LOCAL_STORAGE_WALLETS_KEY = "solana_wallets";
-export const LOCAL_STORAGE_ACTIVE_WALLET_KEY = "solana_active_wallet";
 export { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-// Wallet interface for multi-wallet support
+// Wallet interface for multi-wallet support (used by encrypted vault system)
 export interface StoredWallet {
   id: string;
   name: string;
@@ -107,97 +71,6 @@ export interface StoredWallet {
   publicKey: string;
   createdAt: number;
 }
-
-export const getStoredWallets = (): StoredWallet[] => {
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_WALLETS_KEY);
-    if (!stored) return [];
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-};
-
-export const saveWallets = (wallets: StoredWallet[]): void => {
-  localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(wallets));
-};
-
-export const getActiveWalletId = (): string | null => {
-  return localStorage.getItem(LOCAL_STORAGE_ACTIVE_WALLET_KEY);
-};
-
-export const setActiveWalletId = (id: string): void => {
-  localStorage.setItem(LOCAL_STORAGE_ACTIVE_WALLET_KEY, id);
-};
-
-export const createWallet = async (name: string): Promise<StoredWallet> => {
-  const mnemonic = generateMnemonic();
-  const keypair = await keypairFromMnemonic(mnemonic);
-  const wallet: StoredWallet = {
-    id: crypto.randomUUID(),
-    name,
-    mnemonic,
-    publicKey: keypair.publicKey.toString(),
-    createdAt: Date.now(),
-  };
-  const wallets = getStoredWallets();
-  wallets.push(wallet);
-  saveWallets(wallets);
-  return wallet;
-};
-
-export const importWalletWithName = async (mnemonic: string, name: string): Promise<StoredWallet | null> => {
-  if (!validateMnemonic(mnemonic)) return null;
-  const normalizedMnemonic = mnemonic.trim().toLowerCase();
-  const keypair = await keypairFromMnemonic(normalizedMnemonic);
-  const publicKeyStr = keypair.publicKey.toString();
-  const wallets = getStoredWallets();
-  const existing = wallets.find(w => w.publicKey === publicKeyStr);
-  if (existing) {
-    return existing;
-  }
-  const wallet: StoredWallet = {
-    id: crypto.randomUUID(),
-    name,
-    mnemonic: normalizedMnemonic,
-    publicKey: publicKeyStr,
-    createdAt: Date.now(),
-  };
-  wallets.push(wallet);
-  saveWallets(wallets);
-  return wallet;
-};
-
-export const deleteWallet = (id: string): boolean => {
-  const wallets = getStoredWallets();
-  const filtered = wallets.filter(w => w.id !== id);
-  if (filtered.length === wallets.length) return false;
-  saveWallets(filtered);
-  if (getActiveWalletId() === id && filtered.length > 0) {
-    setActiveWalletId(filtered[0].id);
-  }
-  return true;
-};
-
-export const renameWallet = (id: string, newName: string): boolean => {
-  const wallets = getStoredWallets();
-  const wallet = wallets.find(w => w.id === id);
-  if (!wallet) return false;
-  wallet.name = newName;
-  saveWallets(wallets);
-  return true;
-};
-
-export const getActiveWallet = (): StoredWallet | null => {
-  const wallets = getStoredWallets();
-  if (wallets.length === 0) return null;
-  const activeId = getActiveWalletId();
-  if (activeId) {
-    const active = wallets.find(w => w.id === activeId);
-    if (active) return active;
-  }
-  return wallets[0];
-};
 
 export const getKeypairForWallet = async (wallet: StoredWallet): Promise<Keypair> => {
   if (wallet.mnemonic.startsWith('pk:')) {
@@ -213,27 +86,20 @@ export const getPrivateKeyForWallet = async (wallet: StoredWallet): Promise<stri
   return bs58.encode(keypair.secretKey);
 };
 
-export const importWalletFromPrivateKey = async (privateKey: string, name: string): Promise<StoredWallet | null> => {
+// Create a StoredWallet from private key (in-memory only, does not persist to storage)
+export const createWalletFromPrivateKey = (privateKey: string, name: string): StoredWallet | null => {
   try {
     const secretKey = bs58.decode(privateKey.trim());
     if (secretKey.length !== 64) return null;
     const keypair = Keypair.fromSecretKey(secretKey);
     const publicKeyStr = keypair.publicKey.toString();
-    const wallets = getStoredWallets();
-    const existing = wallets.find(w => w.publicKey === publicKeyStr);
-    if (existing) {
-      return existing;
-    }
-    const wallet: StoredWallet = {
+    return {
       id: crypto.randomUUID(),
       name,
       mnemonic: `pk:${privateKey.trim()}`,
       publicKey: publicKeyStr,
       createdAt: Date.now(),
     };
-    wallets.push(wallet);
-    saveWallets(wallets);
-    return wallet;
   } catch {
     return null;
   }
@@ -248,25 +114,7 @@ export const keypairFromStoredWallet = async (wallet: StoredWallet): Promise<Key
   return keypairFromMnemonic(wallet.mnemonic);
 };
 
-// Migrate from legacy single wallet to multi-wallet system
-export const migrateLegacyWallet = async (): Promise<void> => {
-  const wallets = getStoredWallets();
-  if (wallets.length > 0) return; // Already migrated
-  
-  const legacyMnemonic = localStorage.getItem(LOCAL_STORAGE_MNEMONIC_KEY);
-  if (legacyMnemonic && validateMnemonic(legacyMnemonic)) {
-    const keypair = await keypairFromMnemonic(legacyMnemonic);
-    const wallet: StoredWallet = {
-      id: crypto.randomUUID(),
-      name: "Main Wallet",
-      mnemonic: legacyMnemonic,
-      publicKey: keypair.publicKey.toString(),
-      createdAt: Date.now(),
-    };
-    saveWallets([wallet]);
-    setActiveWalletId(wallet.id);
-  }
-};
+// Pure crypto functions - no localStorage access
 
 export const generateMnemonic = (): string => {
   return bip39.generateMnemonic(128); // 12 words
@@ -282,49 +130,31 @@ export const keypairFromMnemonic = async (mnemonic: string): Promise<Keypair> =>
   return Keypair.fromSeed(seed.slice(0, 32));
 };
 
-export const getStoredMnemonic = (): string | null => {
-  return localStorage.getItem(LOCAL_STORAGE_MNEMONIC_KEY);
-};
-
-export const getLocalKeypair = async (): Promise<Keypair | null> => {
-  try {
-    // First try to get from mnemonic
-    const mnemonic = getStoredMnemonic();
-    if (mnemonic && validateMnemonic(mnemonic)) {
-      return await keypairFromMnemonic(mnemonic);
-    }
-    // Fallback to legacy secret key storage
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!stored) return null;
-    const secretKey = bs58.decode(stored);
-    return Keypair.fromSecretKey(secretKey);
-  } catch (e) {
-    console.error("Failed to load keypair", e);
-    return null;
-  }
-};
-
-export const createNewKeypair = async (): Promise<Keypair> => {
+// Create a new wallet in-memory (does not persist - use vault for storage)
+export const createWalletInMemory = async (name: string): Promise<StoredWallet> => {
   const mnemonic = generateMnemonic();
   const keypair = await keypairFromMnemonic(mnemonic);
-  localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic);
-  localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
-  return keypair;
+  return {
+    id: crypto.randomUUID(),
+    name,
+    mnemonic,
+    publicKey: keypair.publicKey.toString(),
+    createdAt: Date.now(),
+  };
 };
 
-export const importFromMnemonic = async (mnemonic: string): Promise<Keypair | null> => {
-  if (!validateMnemonic(mnemonic)) {
-    return null;
-  }
-  const keypair = await keypairFromMnemonic(mnemonic);
-  localStorage.setItem(LOCAL_STORAGE_MNEMONIC_KEY, mnemonic.trim().toLowerCase());
-  localStorage.setItem(LOCAL_STORAGE_KEY, bs58.encode(keypair.secretKey));
-  return keypair;
-};
-
-export const clearWallet = (): void => {
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
-  localStorage.removeItem(LOCAL_STORAGE_MNEMONIC_KEY);
+// Import wallet from mnemonic in-memory (does not persist - use vault for storage)
+export const importWalletInMemory = async (mnemonic: string, name: string): Promise<StoredWallet | null> => {
+  if (!validateMnemonic(mnemonic)) return null;
+  const normalizedMnemonic = mnemonic.trim().toLowerCase();
+  const keypair = await keypairFromMnemonic(normalizedMnemonic);
+  return {
+    id: crypto.randomUUID(),
+    name,
+    mnemonic: normalizedMnemonic,
+    publicKey: keypair.publicKey.toString(),
+    createdAt: Date.now(),
+  };
 };
 
 export const shortenAddress = (address: string, chars = 4) => {

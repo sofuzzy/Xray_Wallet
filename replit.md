@@ -46,9 +46,12 @@ The server follows a modular pattern with distinct routes, abstracted database o
 ### Wallet Implementation
 - **Non-Custodial Security**: Keypairs generated client-side; private keys never leave the user's device.
 - **Encrypted Local Vault**: All wallet data is encrypted at rest in `localStorage` using AES-256-GCM with PBKDF2 key derivation. Data is decrypted into memory only when the user provides a PIN.
+- **No Plaintext Secrets**: Mnemonic phrases and private keys are NEVER stored in plaintext localStorage. All sensitive wallet data goes through the encrypted vault system only.
+- **Session-Based Unlock**: Decrypted wallet data lives only in `sessionStorage` while unlocked, automatically cleared on tab close.
 - **Multi-Wallet Support**: Users can create, manage, and switch between multiple wallets, stored encrypted within the local vault.
 - **Multi-Device Wallet Sync**: Public wallet addresses (never private keys) are synced to a cloud registry (`userWallets` table) for cross-device visibility.
 - **Seed Phrase Management**: Supports BIP39 12-word mnemonic for backup, restore, and generation of new wallets.
+- **Key Files**: `client/src/lib/localVault.ts`, `client/src/lib/vaultCrypto.ts`, `client/src/contexts/VaultContext.tsx`
 
 ### Staking Implementation
 - Supports native Solana staking using `StakeProgram` from web3.js, including delegation, activation, deactivation, and withdrawal.
@@ -84,7 +87,7 @@ The server follows a modular pattern with distinct routes, abstracted database o
 - **RPC Manager**: Implements automatic RPC fallback across multiple endpoints with health tracking and latency-based routing.
 - **Helius Integrations**: Supports Helius Post-Trade Rebates and Helius Sender for ultra-low latency transaction broadcasting (optional, feature-flagged).
 - **Transaction Integrity Verification**: Client-side SHA256 message hash checks to prevent post-signing transaction mutations.
-- **Server-Only RPC Architecture**: All Solana RPC calls (except specific SPL token operations) are routed through the server to prevent exposure of API keys and provide centralized control.
+- **Server-Only RPC Architecture**: ALL Solana RPC calls are routed through server endpoints (`/api/solana/*`). No client-side RPC connections to mainnet. This prevents exposure of API keys and provides centralized RPC control via Helius.
 
 ## External Dependencies
 

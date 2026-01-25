@@ -2,6 +2,7 @@ import { encryptWalletData, decryptWalletData, type EncryptedVaultData } from ".
 
 const LOCAL_VAULT_KEY = "xray_encrypted_vault";
 const ACTIVE_WALLET_KEY = "xray_active_wallet_id";
+const SESSION_UNLOCK_KEY = "xray_session_unlock";
 
 export interface LocalVaultState {
   isLocked: boolean;
@@ -46,6 +47,7 @@ export async function unlockVault(pin: string): Promise<string> {
   
   try {
     const decrypted = await decryptWalletData(vault, pin);
+    sessionStorage.setItem(SESSION_UNLOCK_KEY, decrypted);
     return decrypted;
   } catch (error: any) {
     if (error.message === "DECRYPTION_FAILED") {
@@ -53,6 +55,19 @@ export async function unlockVault(pin: string): Promise<string> {
     }
     throw error;
   }
+}
+
+export function lockVault(): void {
+  sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+  sessionStorage.removeItem(ACTIVE_WALLET_KEY);
+}
+
+export function isVaultUnlocked(): boolean {
+  return sessionStorage.getItem(SESSION_UNLOCK_KEY) !== null;
+}
+
+export function getSessionUnlock(): string | null {
+  return sessionStorage.getItem(SESSION_UNLOCK_KEY);
 }
 
 export async function updateVaultData(walletData: string, pin: string): Promise<void> {
