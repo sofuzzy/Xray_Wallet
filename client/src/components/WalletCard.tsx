@@ -18,6 +18,15 @@ interface TokenWithPrice {
   priceUsd?: number;
 }
 
+interface WalletToken {
+  mint: string;
+  balance: number;
+  symbol?: string;
+  name?: string;
+  decimals?: number;
+  logoURI?: string;
+}
+
 export function WalletCard({ balance, address, username, onRefresh }: WalletCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -33,7 +42,7 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
         onRefresh?.(),
         queryClient.invalidateQueries({ queryKey: ["sol-price"] }),
         queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/swaps/tokens"] }),
+        queryClient.invalidateQueries({ queryKey: ["token-prices"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/beta/status"] }),
       ]);
       toast({
@@ -67,27 +76,43 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
     refetchInterval: 60000,
   });
 
-  // Fetch wallet token accounts
-  const { data: walletTokens = [] } = useQuery({
+  // Fetch wallet token accounts with USD values
+  const { data: walletTokens = [] } = useQuery<WalletToken[]>({
     queryKey: ["wallet-tokens", address],
     queryFn: () => address ? getTokenAccounts(address) : Promise.resolve([]),
     enabled: !!address,
     staleTime: 30000,
   });
 
-  // Fetch token prices from our backend
-  const { data: tokenPrices = [] } = useQuery<TokenWithPrice[]>({
-    queryKey: ["/api/swaps/tokens"],
-    staleTime: 30000,
+  // Fetch USD values for all tokens in wallet
+  const tokenMints = walletTokens.map(t => t.mint).filter(Boolean);
+  const { data: tokenPriceMap = {} } = useQuery<Record<string, number>>({
+    queryKey: ["token-prices", tokenMints.join(",")],
+    queryFn: async () => {
+      if (tokenMints.length === 0) return {};
+      try {
+        const response = await fetch("/api/tokens/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mints: tokenMints }),
+        });
+        if (!response.ok) return {};
+        return response.json();
+      } catch {
+        return {};
+      }
+    },
+    enabled: tokenMints.length > 0,
+    staleTime: 60000,
   });
 
   // Calculate total USD balance
   const solUsdValue = balance * (solPrice || 0);
   
-  const tokensUsdValue = walletTokens.reduce((total, wt: { mint: string; balance: number }) => {
-    const tokenInfo = tokenPrices.find((t: TokenWithPrice) => t.mint === wt.mint);
-    if (tokenInfo?.priceUsd && wt.balance) {
-      return total + (wt.balance * tokenInfo.priceUsd);
+  const tokensUsdValue = walletTokens.reduce((total, wt) => {
+    const priceUsd = tokenPriceMap[wt.mint];
+    if (priceUsd && wt.balance) {
+      return total + (wt.balance * priceUsd);
     }
     return total;
   }, 0);

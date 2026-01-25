@@ -2084,5 +2084,44 @@ export async function registerRoutes(
     }
   });
 
+  // Batch fetch token prices from DexScreener
+  app.post("/api/tokens/prices", async (req, res) => {
+    try {
+      const { mints } = req.body;
+      if (!Array.isArray(mints) || mints.length === 0) {
+        return res.status(400).json({ message: "Mints array required" });
+      }
+      if (mints.length > 30) {
+        return res.status(400).json({ message: "Maximum 30 tokens per batch" });
+      }
+
+      const priceMap: Record<string, number> = {};
+      const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
+      
+      // DexScreener supports comma-separated mints (max 30)
+      const response = await fetch(`${DEXSCREENER_API}/tokens/${mints.join(",")}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.pairs && Array.isArray(data.pairs)) {
+          for (const pair of data.pairs) {
+            const mint = pair.baseToken?.address;
+            const priceUsd = parseFloat(pair.priceUsd);
+            if (mint && !isNaN(priceUsd) && !priceMap[mint]) {
+              priceMap[mint] = priceUsd;
+            }
+          }
+        }
+      }
+
+      res.json(priceMap);
+    } catch (error) {
+      console.error("Token prices error:", error);
+      res.status(500).json({ message: "Failed to fetch token prices" });
+    }
+  });
+
   return httpServer;
 }
