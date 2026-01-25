@@ -47,7 +47,7 @@ The server follows a modular pattern with distinct routes, abstracted database o
 - **Non-Custodial Security**: Keypairs generated client-side; private keys never leave the user's device.
 - **Encrypted Local Vault**: All wallet data is encrypted at rest in `localStorage` using AES-256-GCM with PBKDF2 key derivation. Data is decrypted into memory only when the user provides a PIN.
 - **No Plaintext Secrets**: Mnemonic phrases and private keys are NEVER stored in plaintext localStorage. All sensitive wallet data goes through the encrypted vault system only.
-- **Session-Based Unlock**: Decrypted wallet data lives only in `sessionStorage` while unlocked, automatically cleared on tab close.
+- **Memory-Only Unlock**: Decrypted wallet data lives only in React state (memory) while unlocked. A short-lived memory token tracks unlock status. On page refresh, vault returns to locked state - no secrets persisted to sessionStorage.
 - **Multi-Wallet Support**: Users can create, manage, and switch between multiple wallets, stored encrypted within the local vault.
 - **Multi-Device Wallet Sync**: Public wallet addresses (never private keys) are synced to a cloud registry (`userWallets` table) for cross-device visibility.
 - **Seed Phrase Management**: Supports BIP39 12-word mnemonic for backup, restore, and generation of new wallets.
