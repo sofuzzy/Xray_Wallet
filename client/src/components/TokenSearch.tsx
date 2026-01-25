@@ -101,7 +101,7 @@ export function TokenSearch({ onSelectToken }: TokenSearchProps) {
       return response.json();
     },
     staleTime: 30000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<Token[]>({
