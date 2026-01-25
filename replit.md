@@ -79,6 +79,16 @@ The server follows a modular pattern with distinct routes, abstracted database o
   - Avoids "block height exceeded" errors from confirming with mismatched blockhashes
   - Key files: `server/services/heliusSender.ts`, `server/services/solanaTransactions.ts`
 
+### Beta Unlock Gating
+- **Token-Based Access Control**: Transaction features gated by holding ≥5,000 XRAY tokens
+- **Server Enforcement**: `requireBetaUnlock` middleware on all transaction routes extracts signer from request body or deserializes signed transactions
+- **Signer Extraction**: Handles both VersionedTransaction and legacy Transaction formats to prevent bypass
+- **Balance Caching**: 90-second TTL cache per wallet address to reduce RPC load
+- **Client Status**: `BetaStatusBanner` component shows unlock status with token balance
+- **Disabled UI**: Transaction buttons (swap, send, launch) disabled when beta is locked
+- **Gated Routes**: `/api/solana/send-transaction`, `/api/swaps/*`, `/api/launchpad/*`, `/api/liquidity-pool/build`
+- **Key File**: `server/middleware/requireBetaUnlock.ts`
+
 ### Token Swap Implementation (Jupiter)
 - **Jupiter API Integration**: Leverages Jupiter's API for server-side quote and swap transaction generation.
 - **Token Discovery**: Uses DexScreener API for comprehensive token data, prices, and trending information.
