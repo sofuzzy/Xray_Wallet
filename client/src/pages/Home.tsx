@@ -59,7 +59,8 @@ export default function Home() {
     addWallet,
     removeWallet,
     editWalletName,
-    lockVault
+    lockVault,
+    refreshBalance
   } = useWallet();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
@@ -446,7 +447,8 @@ export default function Home() {
           <WalletCard 
             balance={balance} 
             address={address} 
-            username={activeWallet?.name || "Wallet"} 
+            username={activeWallet?.name || "Wallet"}
+            onRefresh={refreshBalance}
           />
         </div>
 

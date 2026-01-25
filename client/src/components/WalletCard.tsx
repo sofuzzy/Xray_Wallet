@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Loader2, Wallet } from "lucide-react";
+import { Copy, Loader2, Wallet, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { shortenAddress, getTokenAccounts } from "@/lib/solana";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface WalletCardProps {
   balance: number;
   address?: string;
   username?: string | null;
+  onRefresh?: () => Promise<unknown>;
 }
 
 interface TokenWithPrice {
@@ -16,8 +18,38 @@ interface TokenWithPrice {
   priceUsd?: number;
 }
 
-export function WalletCard({ balance, address, username }: WalletCardProps) {
+export function WalletCard({ balance, address, username, onRefresh }: WalletCardProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        onRefresh?.(),
+        queryClient.invalidateQueries({ queryKey: ["sol-price"] }),
+        queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/swaps/tokens"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/beta/status"] }),
+      ]);
+      toast({
+        title: "Refreshed",
+        description: "Balance updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh failed",
+        description: "Could not refresh balance. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Fetch SOL price
   const { data: solPrice } = useQuery<number>({
@@ -118,8 +150,18 @@ export function WalletCard({ balance, address, username }: WalletCardProps) {
               Solana
             </span>
           </div>
-          <div className="px-3 py-1.5 rounded-full bg-primary/20 backdrop-blur-sm border border-primary/30 text-primary text-xs font-medium">
-            Mainnet
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-50"
+              data-testid="button-refresh-balance"
+            >
+              <RefreshCw className={`w-4 h-4 text-white/80 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <div className="px-3 py-1.5 rounded-full bg-primary/20 backdrop-blur-sm border border-primary/30 text-primary text-xs font-medium">
+              Mainnet
+            </div>
           </div>
         </div>
 
