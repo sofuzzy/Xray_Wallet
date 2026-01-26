@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
 import { VaultUnlockModal } from "@/components/VaultUnlockModal";
+import { WalletOnboarding } from "@/components/WalletOnboarding";
+import { SyncDevicesBanner } from "@/components/SyncDevicesBanner";
 import { CursorGlow } from "@/components/CursorGlow";
 import { BetaStatusBanner, useBetaStatus } from "@/components/BetaStatusBanner";
 import { SwapModal } from "@/components/SwapModal";
@@ -42,6 +44,7 @@ function VaultGate({ children }: { children: React.ReactNode }) {
   const vault = useVaultContext();
   const [location] = useLocation();
   const [isBuyXrayOpen, setIsBuyXrayOpen] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
   const { data: betaStatus } = useBetaStatus();
   
   // Get the XRAY token mint for the swap modal
@@ -73,10 +76,22 @@ function VaultGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (vault.status === "needs_migration" || vault.status === "no_vault") {
+  // New wallet-first onboarding for new users
+  if (vault.status === "no_vault") {
+    return (
+      <WalletOnboarding
+        onComplete={vault.setupWithWalletData}
+        isLoading={vault.isSettingUp}
+        error={vault.error}
+      />
+    );
+  }
+
+  // Migration flow for users with legacy data
+  if (vault.status === "needs_migration") {
     return (
       <VaultUnlockModal
-        mode={vault.status === "needs_migration" ? "migrate" : "setup"}
+        mode="migrate"
         onUnlock={vault.unlock}
         onSetup={vault.setupVault}
         error={vault.error}
@@ -88,6 +103,7 @@ function VaultGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       <BetaStatusBanner onBuyXray={() => setIsBuyXrayOpen(true)} />
+      <SyncDevicesBanner onEnableSync={() => setShowSyncModal(true)} />
       {children}
       {isBuyXrayOpen && xrayTokenMint && (
         <SwapModal 

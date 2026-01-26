@@ -185,7 +185,9 @@ export default function Home() {
     );
   }
 
-  if (!isAuthenticated && !isPasskeyAuth) {
+  // Show wallet interface if user has a local wallet (address set), regardless of auth status
+  // Authentication is only needed for cloud sync features
+  if (!isAuthenticated && !isPasskeyAuth && !address) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
         {/* Subtle gradient background */}

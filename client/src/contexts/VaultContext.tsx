@@ -31,6 +31,13 @@ export type VaultStatus =
   | "locked"
   | "unlocked";
 
+interface WalletSetupData {
+  type: "create" | "import" | "restore";
+  mnemonic?: string;
+  privateKey?: string;
+  backupData?: string;
+}
+
 interface VaultContextValue {
   status: VaultStatus;
   wallets: StoredWallet[];
@@ -39,6 +46,7 @@ interface VaultContextValue {
   error: string | null;
   pin: string | null;
   setupVault: (pin: string) => Promise<void>;
+  setupWithWalletData: (pin: string, walletData: WalletSetupData) => Promise<void>;
   unlock: (pin: string) => Promise<void>;
   lock: () => void;
   resetVault: () => void;
@@ -231,6 +239,116 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, [updateKeypairForWallet]);
 
+  const setupWithWalletData = useCallback(async (newPin: string, walletData: WalletSetupData) => {
+    setIsSettingUp(true);
+    setError(null);
+    try {
+      let parsedWallets: StoredWallet[] = [];
+      
+      if (walletData.type === "create") {
+        const mnemonic = generateMnemonic();
+        const kp = await keypairFromMnemonic(mnemonic);
+        parsedWallets = [{
+          id: crypto.randomUUID(),
+          name: "Main Wallet",
+          mnemonic,
+          publicKey: kp.publicKey.toString(),
+          createdAt: Date.now(),
+        }];
+      } else if (walletData.type === "import") {
+        if (walletData.mnemonic) {
+          const normalizedMnemonic = walletData.mnemonic.trim().toLowerCase();
+          if (!validateMnemonic(normalizedMnemonic)) {
+            throw new Error("Invalid seed phrase");
+          }
+          const kp = await keypairFromMnemonic(normalizedMnemonic);
+          parsedWallets = [{
+            id: crypto.randomUUID(),
+            name: "Imported Wallet",
+            mnemonic: normalizedMnemonic,
+            publicKey: kp.publicKey.toString(),
+            createdAt: Date.now(),
+          }];
+        } else if (walletData.privateKey) {
+          const secretKey = bs58.decode(walletData.privateKey.trim());
+          if (secretKey.length !== 64) {
+            throw new Error("Invalid private key");
+          }
+          const kp = Keypair.fromSecretKey(secretKey);
+          parsedWallets = [{
+            id: crypto.randomUUID(),
+            name: "Imported Wallet",
+            mnemonic: `pk:${walletData.privateKey.trim()}`,
+            publicKey: kp.publicKey.toString(),
+            createdAt: Date.now(),
+          }];
+        } else {
+          throw new Error("No seed phrase or private key provided");
+        }
+      } else if (walletData.type === "restore") {
+        if (!walletData.backupData) {
+          throw new Error("No backup data provided");
+        }
+        try {
+          const rawWallets = JSON.parse(walletData.backupData) as StoredWallet[];
+          if (!Array.isArray(rawWallets) || rawWallets.length === 0) {
+            throw new Error("Invalid backup format");
+          }
+          
+          const validatedWallets: StoredWallet[] = [];
+          for (const wallet of rawWallets) {
+            if (!wallet.mnemonic || !wallet.id || !wallet.name) {
+              throw new Error("Invalid wallet data in backup");
+            }
+            
+            if (wallet.mnemonic.startsWith("pk:")) {
+              const privateKey = wallet.mnemonic.slice(3);
+              const secretKey = bs58.decode(privateKey);
+              if (secretKey.length !== 64) {
+                throw new Error(`Invalid private key in wallet: ${wallet.name}`);
+              }
+              const kp = Keypair.fromSecretKey(secretKey);
+              validatedWallets.push({
+                ...wallet,
+                publicKey: kp.publicKey.toString(),
+              });
+            } else if (validateMnemonic(wallet.mnemonic)) {
+              const kp = await keypairFromMnemonic(wallet.mnemonic);
+              validatedWallets.push({
+                ...wallet,
+                publicKey: kp.publicKey.toString(),
+              });
+            } else {
+              throw new Error(`Invalid mnemonic in wallet: ${wallet.name}`);
+            }
+          }
+          parsedWallets = validatedWallets;
+        } catch (e: any) {
+          throw new Error(e.message || "Failed to parse backup data");
+        }
+      }
+      
+      const walletDataStr = JSON.stringify(parsedWallets);
+      await createLocalVault(walletDataStr, newPin);
+      clearLegacyPlaintextData();
+      
+      setWallets(parsedWallets);
+      setPin(newPin);
+      
+      const active = parsedWallets[0];
+      setActiveWallet(active);
+      setActiveWalletId(active.id);
+      await updateKeypairForWallet(active);
+      
+      setStatus("unlocked");
+    } catch (err: any) {
+      setError(err.message || "Failed to set up wallet");
+      throw err;
+    } finally {
+      setIsSettingUp(false);
+    }
+  }, [updateKeypairForWallet]);
+
   const lock = useCallback(() => {
     clearActiveWalletId();
     setWallets([]);
@@ -389,6 +507,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         error,
         pin,
         setupVault,
+        setupWithWalletData,
         unlock,
         lock,
         resetVault,
