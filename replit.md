@@ -43,13 +43,24 @@ The server follows a modular pattern with distinct routes, abstracted database o
 - **Schema Location**: `shared/schema.ts` and `shared/models/auth.ts`.
 - **Key Tables**: `users`, `sessions`, `wallets`, `transactions`, `tokenLaunches`, `autoTradeRules`, `watchlistTokens`.
 
+### Wallet-First Onboarding
+The app uses a Phantom-style wallet-first onboarding approach:
+1. **Welcome Screen**: Simple branding with "Continue" button
+2. **Wallet Setup**: Three options - Create new wallet, Import wallet, Restore from backup
+3. **PIN Creation**: 8+ character PIN for local vault encryption
+4. **Dashboard**: User lands on the main wallet interface immediately after setup
+
+Authentication (Passkey/Replit) is **optional** and only needed for the "Sync across devices" cloud backup feature. Users can use all core wallet features (send, receive, swap, launchpad) without creating an account.
+
+Key files: `client/src/components/WalletOnboarding.tsx`, `client/src/components/SyncDevicesBanner.tsx`
+
 ### Wallet Implementation
 - **Non-Custodial Security**: Keypairs generated client-side; private keys never leave the user's device.
 - **Encrypted Local Vault**: All wallet data is encrypted at rest in `localStorage` using AES-256-GCM with PBKDF2 key derivation. Data is decrypted into memory only when the user provides a PIN.
 - **No Plaintext Secrets**: Mnemonic phrases and private keys are NEVER stored in plaintext localStorage. All sensitive wallet data goes through the encrypted vault system only.
 - **Memory-Only Unlock**: Decrypted wallet data lives only in React state (memory) while unlocked. A short-lived memory token tracks unlock status. On page refresh, vault returns to locked state - no secrets persisted to sessionStorage.
 - **Multi-Wallet Support**: Users can create, manage, and switch between multiple wallets, stored encrypted within the local vault.
-- **Multi-Device Wallet Sync**: Public wallet addresses (never private keys) are synced to a cloud registry (`userWallets` table) for cross-device visibility.
+- **Multi-Device Wallet Sync**: Public wallet addresses (never private keys) are synced to a cloud registry (`userWallets` table) for cross-device visibility. Requires authentication.
 - **Seed Phrase Management**: Supports BIP39 12-word mnemonic for backup, restore, and generation of new wallets.
 - **Key Files**: `client/src/lib/localVault.ts`, `client/src/lib/vaultCrypto.ts`, `client/src/contexts/VaultContext.tsx`
 
