@@ -15,11 +15,13 @@ export interface RiskShieldCheckConfig {
 
 export interface RiskShieldSettings {
   enabled: boolean;
+  shameMode: boolean;
   checks: RiskShieldCheckConfig;
 }
 
 const DEFAULT_SETTINGS: RiskShieldSettings = {
   enabled: true,
+  shameMode: false,
   checks: {
     lowLiquidity: true,
     volumeAnomaly: true,
@@ -43,6 +45,7 @@ function loadSettings(): RiskShieldSettings {
       const parsed = JSON.parse(stored);
       return {
         enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_SETTINGS.enabled,
+        shameMode: typeof parsed.shameMode === "boolean" ? parsed.shameMode : DEFAULT_SETTINGS.shameMode,
         checks: {
           ...DEFAULT_SETTINGS.checks,
           ...(typeof parsed.checks === "object" ? parsed.checks : {}),
@@ -68,10 +71,28 @@ export function useRiskShieldSettings() {
 
   useEffect(() => {
     saveSettings(settings);
+    window.dispatchEvent(new Event("risk-shield-settings-changed"));
   }, [settings]);
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setSettingsState(loadSettings());
+    };
+    window.addEventListener("risk-shield-settings-changed", handleStorageChange);
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY) handleStorageChange();
+    });
+    return () => {
+      window.removeEventListener("risk-shield-settings-changed", handleStorageChange);
+    };
+  }, []);
 
   const setEnabled = useCallback((enabled: boolean) => {
     setSettingsState((prev) => ({ ...prev, enabled }));
+  }, []);
+
+  const setShameMode = useCallback((shameMode: boolean) => {
+    setSettingsState((prev) => ({ ...prev, shameMode }));
   }, []);
 
   const setCheck = useCallback((key: keyof RiskShieldCheckConfig, value: boolean) => {
@@ -144,6 +165,7 @@ export function useRiskShieldSettings() {
   return {
     settings,
     setEnabled,
+    setShameMode,
     setCheck,
     setAllChecks,
     resetToDefaults,

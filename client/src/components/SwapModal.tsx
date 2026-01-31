@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { RiskShieldModal, type RiskShieldDecision } from "@/components/RiskShieldModal";
+import { RiskChecksModal } from "@/components/RiskChecksModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -252,6 +253,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   const [txError, setTxError] = useState<string>("");
   const [dexOption, setDexOption] = useState<DexOption>("auto");
   const [riskModalOpen, setRiskModalOpen] = useState(false);
+  const [riskChecksModalOpen, setRiskChecksModalOpen] = useState(false);
   const [riskDecision, setRiskDecision] = useState<RiskShieldDecision | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [riskAckedMints, setRiskAckedMints] = useState<Set<string>>(() => {
@@ -1359,6 +1361,27 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             )}
           </div>
 
+          <div className="flex items-center justify-between pt-2 border-t border-border/30">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-primary" />
+              <span className="text-sm">Risk Shield</span>
+              {riskShieldSettings.shameMode && (
+                <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+                  Shame Mode
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRiskChecksModalOpen(true)}
+              className="text-xs h-7"
+              data-testid="button-risk-shield-settings"
+            >
+              Settings
+            </Button>
+          </div>
+
           {showHighSlippageConfirm && (
             <Alert className="border-destructive/50 bg-destructive/10">
               <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -1494,6 +1517,10 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
           // For quote stage, the query will auto-refetch because isRiskAcked is in the queryKey
           setRiskPendingStage(null);
         }}
+      />
+      <RiskChecksModal 
+        open={riskChecksModalOpen} 
+        onOpenChange={setRiskChecksModalOpen} 
       />
 </Dialog>
   );

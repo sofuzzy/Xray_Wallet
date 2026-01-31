@@ -2,12 +2,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Shield, AlertTriangle, ShieldCheck, Droplets, TrendingUp, Clock, Users, Lock, Coins, Activity, Eye, Database, ArrowLeft } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Shield, AlertTriangle, ShieldCheck, Droplets, TrendingUp, Clock, Users, Lock, Coins, Activity, Eye, Database, Skull } from "lucide-react";
+import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 
 export function RiskChecksModal(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { settings, setShameMode } = useRiskShieldSettings();
+  
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh]">
@@ -27,6 +31,25 @@ export function RiskChecksModal(props: {
               <p className="text-sm">
                 Risk Shield automatically analyzes tokens before you swap to help protect you from scams and risky trades.
               </p>
+            </div>
+            
+            <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <Skull className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Shame Mode</p>
+                    <p className="text-xs text-muted-foreground">
+                      Get brutally honest warnings for high-risk tokens. No sugar-coating.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.shameMode}
+                  onCheckedChange={setShameMode}
+                  data-testid="switch-shame-mode"
+                />
+              </div>
             </div>
 
             <section className="space-y-3">
