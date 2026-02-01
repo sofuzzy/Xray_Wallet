@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle, ShieldAlert, ShieldCheck, Info, Skull } from "lucide-react";
+import { AlertTriangle, ShieldAlert, ShieldCheck, Info, Skull, Dices } from "lucide-react";
 import { RiskChecksModal } from "./RiskChecksModal";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
+import { useToast } from "@/hooks/use-toast";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
 
@@ -141,7 +142,8 @@ export function RiskShieldModal(props: {
 }) {
   const [showRiskChecks, setShowRiskChecks] = useState(false);
   const [shameConfirmed, setShameConfirmed] = useState(false);
-  const { settings } = useRiskShieldSettings();
+  const { settings, setEnabled } = useRiskShieldSettings();
+  const { toast } = useToast();
   const decision = props.decision;
   const assessment = decision?.assessment;
   const isNativeSol = isNativeSolAssessment(assessment);
@@ -342,18 +344,39 @@ export function RiskShieldModal(props: {
 
         <RiskChecksModal open={showRiskChecks} onOpenChange={setShowRiskChecks} />
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => props.onOpenChange(false)}>
-            Cancel
-          </Button>
-          {!decision?.blocked && decision?.requiresAcknowledgement && (
+        <DialogFooter className="flex-col gap-3 sm:flex-col">
+          <div className="flex gap-2 w-full justify-end">
+            <Button variant="outline" onClick={() => props.onOpenChange(false)}>
+              Cancel
+            </Button>
+            {!decision?.blocked && decision?.requiresAcknowledgement && (
+              <Button 
+                onClick={props.onAcknowledge}
+                variant={level === "critical" || level === "high" ? "destructive" : "default"}
+                disabled={shameModeActive && !shameConfirmed}
+                data-testid="button-acknowledge-risk"
+              >
+                {shameModeActive ? "Proceed anyway" : "I understand the risks, proceed"}
+              </Button>
+            )}
+          </div>
+          {!isTrusted && (
             <Button 
-              onClick={props.onAcknowledge}
-              variant={level === "critical" || level === "high" ? "destructive" : "default"}
-              disabled={shameModeActive && !shameConfirmed}
-              data-testid="button-acknowledge-risk"
+              variant="ghost" 
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setEnabled(false);
+                toast({
+                  title: "Risk Shield disabled",
+                  description: "Turn it back on in settings.",
+                });
+                props.onOpenChange(false);
+                props.onAcknowledge();
+              }}
+              data-testid="button-disable-risk-shield"
             >
-              {shameModeActive ? "Proceed anyway" : "I understand the risks, proceed"}
+              <Dices className="w-4 h-4 mr-2" />
+              Screw it! Let me gamble!
             </Button>
           )}
         </DialogFooter>
