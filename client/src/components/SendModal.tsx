@@ -10,6 +10,7 @@ import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedT
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { verifyLegacyTransactionIntegrity, parseTransactionError, serializeTransactionToBase64 } from "@/lib/transactionIntegrity";
+import { addLocalTransaction } from "@/hooks/use-local-transactions";
 import {
   Select,
   SelectContent,
@@ -231,7 +232,17 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
       
       const { signature } = await sendRes.json();
       
-      // Record in DB (optional - may fail if not authenticated)
+      // Save to local storage (always works)
+      addLocalTransaction({
+        fromAddr: keypair.publicKey.toString(),
+        toAddr: destAddr,
+        amount: amount,
+        signature: signature,
+        status: "confirmed",
+        type: "transfer",
+      });
+      
+      // Also record in DB if authenticated (optional)
       try {
         await recordTx({
           fromAddr: keypair.publicKey.toString(),

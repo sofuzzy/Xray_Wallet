@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { useBetaStatus } from "@/components/BetaStatusBanner";
+import { addLocalTransaction } from "@/hooks/use-local-transactions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
@@ -722,11 +723,24 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     onSuccess: async (data: any) => {
       setTxStep("success");
       
-      // Save swap transaction to database
+      const decimals = quote?.outputDecimals ?? outputToken?.decimals ?? 9;
+      const calculatedOutputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, decimals)).toString() : "0";
+      
+      // Save to local storage (always works)
+      addLocalTransaction({
+        fromAddr: address || "",
+        toAddr: address || "",
+        amount: inputAmount,
+        signature: data.signature,
+        status: "confirmed",
+        type: "swap",
+        inputToken: inputToken?.symbol || "?",
+        outputToken: outputToken?.symbol || "?",
+        outputAmount: calculatedOutputAmount,
+      });
+      
+      // Also save to database if authenticated (optional)
       try {
-        const decimals = quote?.outputDecimals ?? outputToken?.decimals ?? 9;
-        const calculatedOutputAmount = quote ? (parseInt(quote.outAmount) / Math.pow(10, decimals)).toString() : "0";
-        
         await apiRequest("POST", "/api/transactions", {
           fromAddr: address,
           toAddr: address,
@@ -740,7 +754,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       } catch (e) {
-        console.error("Failed to save swap transaction:", e);
+        console.log("[swap] Transaction recording skipped (not authenticated)");
       }
       
       toast({

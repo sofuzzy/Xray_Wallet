@@ -1,7 +1,8 @@
 import { Transaction, ActivityLog } from "@shared/schema";
+import { LocalTransaction } from "@/hooks/use-local-transactions";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle, ChevronRight, X } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Clock, ArrowRightLeft, ExternalLink, ShieldAlert, AlertCircle, ChevronRight, X, Smartphone } from "lucide-react";
 import { shortenAddress } from "@/lib/solana";
 import { formatDistanceToNow } from "date-fns";
 import { useMutation } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 
 interface TransactionListProps {
   transactions: Transaction[];
+  localTransactions?: LocalTransaction[];
   currentAddress?: string;
   isLoading: boolean;
   activityLogs?: ActivityLog[];
@@ -28,7 +30,7 @@ function getBlockReasonText(code: string): string {
   return reasons[code] || code;
 }
 
-export function TransactionList({ transactions, currentAddress, isLoading, activityLogs = [], limit, showViewAll }: TransactionListProps) {
+export function TransactionList({ transactions, localTransactions = [], currentAddress, isLoading, activityLogs = [], limit, showViewAll }: TransactionListProps) {
   const dismissMutation = useMutation({
     mutationFn: async (logId: number) => {
       await apiRequest("DELETE", `/api/activity-logs/${logId}`);
@@ -53,9 +55,36 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
     );
   }
 
-  const hasNoActivity = transactions.length === 0 && activityLogs.length === 0;
-  const displayTransactions = limit ? transactions.slice(0, limit) : transactions;
-  const hasMore = limit && transactions.length > limit;
+  // Merge DB transactions with local transactions (dedupe by signature)
+  const dbSignatures = new Set(transactions.map(tx => tx.signature));
+  const uniqueLocalTxs = localTransactions.filter(ltx => !dbSignatures.has(ltx.signature));
+  
+  // Convert local transactions to display format and merge
+  const allTransactions = [
+    ...uniqueLocalTxs.map(ltx => ({
+      id: ltx.id,
+      fromAddr: ltx.fromAddr,
+      toAddr: ltx.toAddr,
+      amount: ltx.amount,
+      signature: ltx.signature,
+      status: ltx.status,
+      type: ltx.type,
+      inputToken: ltx.inputToken || null,
+      outputToken: ltx.outputToken || null,
+      outputAmount: ltx.outputAmount || null,
+      timestamp: new Date(ltx.timestamp),
+      isLocal: true,
+    })),
+    ...transactions.map(tx => ({ ...tx, isLocal: false })),
+  ].sort((a, b) => {
+    const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const hasNoActivity = allTransactions.length === 0 && activityLogs.length === 0;
+  const displayTransactions = limit ? allTransactions.slice(0, limit) : allTransactions;
+  const hasMore = limit && allTransactions.length > limit;
 
   if (hasNoActivity) {
     return (
@@ -209,7 +238,7 @@ export function TransactionList({ transactions, currentAddress, isLoading, activ
             className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
             data-testid="link-view-all-transactions"
           >
-            <span className="text-sm font-medium">View all {transactions.length} transactions</span>
+            <span className="text-sm font-medium">View all {allTransactions.length} transactions</span>
             <ChevronRight className="w-4 h-4" />
           </motion.div>
         </Link>

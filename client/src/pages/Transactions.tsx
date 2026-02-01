@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useTransactions } from "@/hooks/use-transactions";
+import { useLocalTransactions } from "@/hooks/use-local-transactions";
 import { useWallet } from "@/hooks/use-wallet";
 import { useQuery } from "@tanstack/react-query";
 import { type ActivityLog } from "@shared/schema";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 export default function Transactions() {
   const { address } = useWallet();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
+  const { transactions: localTransactions } = useLocalTransactions(address);
   const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
     queryKey: ["/api/activity-logs", address],
     queryFn: async () => {
@@ -37,6 +39,7 @@ export default function Transactions() {
       <main className="max-w-2xl mx-auto py-6">
         <TransactionList 
           transactions={transactions || []} 
+          localTransactions={localTransactions}
           currentAddress={address} 
           isLoading={txLoading}
           activityLogs={activityLogs}

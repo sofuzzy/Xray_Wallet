@@ -6,6 +6,7 @@ import { usePasskey } from "@/hooks/use-passkey";
 import { useWalletRegistry } from "@/hooks/use-wallet-registry";
 import { useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
+import { useLocalTransactions } from "@/hooks/use-local-transactions";
 import { type ActivityLog } from "@shared/schema";
 import { WalletCard } from "@/components/WalletCard";
 import { Holdings } from "@/components/Holdings";
@@ -64,6 +65,7 @@ export default function Home() {
   } = useWallet();
   const { data: dbUser } = useCurrentUser();
   const { data: transactions, isLoading: txLoading } = useTransactions(address);
+  const { transactions: localTransactions } = useLocalTransactions(address);
   const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
     queryKey: ["/api/activity-logs", address],
     queryFn: async () => {
@@ -491,6 +493,7 @@ export default function Home() {
 
         <TransactionList 
           transactions={transactions || []} 
+          localTransactions={localTransactions}
           currentAddress={address} 
           isLoading={txLoading}
           activityLogs={activityLogs}
