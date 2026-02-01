@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
@@ -831,6 +831,23 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                     checked={riskShield.settings.enabled}
                     onCheckedChange={riskShield.setEnabled}
                     data-testid="switch-risk-shield"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border mb-4">
+                  <div className="flex items-center gap-3">
+                    <Skull className={`w-5 h-5 ${riskShield.settings.shameMode ? "text-destructive" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className="text-sm font-medium">Shame Mode</p>
+                      <p className="text-xs text-muted-foreground">
+                        {riskShield.settings.shameMode ? "Brutally honest warnings" : "Standard warnings"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={riskShield.settings.shameMode}
+                    onCheckedChange={riskShield.setShameMode}
+                    data-testid="switch-shame-mode-settings"
                   />
                 </div>
 
