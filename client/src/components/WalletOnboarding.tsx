@@ -184,7 +184,7 @@ export function WalletOnboarding({ onComplete, isLoading, error }: WalletOnboard
             exit={{ opacity: 0, y: -20 }}
             className="w-full max-w-md text-center"
           >
-            <img src={xrayLogo} alt="XRAY" className="h-16 mx-auto mb-4" />
+            <img src={xrayLogo} alt="XRAY" className="h-16 mx-auto mb-4 mix-blend-screen" />
             <p className="text-muted-foreground mb-8">Your non-custodial Solana wallet</p>
             
             <div className="w-20 h-20 mx-auto mb-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -219,7 +219,7 @@ export function WalletOnboarding({ onComplete, isLoading, error }: WalletOnboard
             className="w-full max-w-md"
           >
             <div className="text-center mb-8">
-              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2" />
+              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2 mix-blend-screen" />
               <h2 className="text-xl font-semibold mb-2">Set Up Your Wallet</h2>
               <p className="text-muted-foreground">
                 Choose how you want to get started
@@ -294,7 +294,7 @@ export function WalletOnboarding({ onComplete, isLoading, error }: WalletOnboard
             className="w-full max-w-md"
           >
             <div className="text-center mb-6">
-              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2" />
+              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2 mix-blend-screen" />
               <h2 className="text-xl font-semibold mb-2">Import Wallet</h2>
               <p className="text-muted-foreground">
                 Enter your seed phrase or private key
@@ -400,7 +400,7 @@ export function WalletOnboarding({ onComplete, isLoading, error }: WalletOnboard
             className="w-full max-w-md"
           >
             <div className="text-center mb-6">
-              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2" />
+              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-2 mix-blend-screen" />
               <h2 className="text-xl font-semibold mb-2">Restore from Backup</h2>
               <p className="text-muted-foreground">
                 Paste your encrypted backup data
@@ -468,7 +468,7 @@ export function WalletOnboarding({ onComplete, isLoading, error }: WalletOnboard
             className="w-full max-w-md"
           >
             <div className="text-center mb-8">
-              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-4" />
+              <img src={xrayLogo} alt="XRAY" className="h-10 mx-auto mb-4 mix-blend-screen" />
               <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
                 <Shield className="w-8 h-8 text-primary" />
               </div>
