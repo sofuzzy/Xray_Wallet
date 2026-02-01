@@ -1035,7 +1035,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid request body" });
       }
       console.error("Error sending close transaction:", error);
-      const message = error instanceof Error ? error.message : "Failed to send close transaction";
+      let message = error instanceof Error ? error.message : "Failed to send close transaction";
+      
+      // Detect insufficient SOL for transaction fees - provide user-friendly message
+      if (message.includes("no record of a prior credit") || message.includes("insufficient funds") || message.includes("insufficient lamports")) {
+        return res.status(400).json({ 
+          error: "INSUFFICIENT_SOL_FOR_FEES",
+          message: "Your wallet doesn't have enough SOL to pay for transaction fees. Please add some SOL to your wallet first."
+        });
+      }
+      
       res.status(500).json({ error: message });
     }
   });
