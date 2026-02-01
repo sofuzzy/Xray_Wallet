@@ -13,3 +13,6 @@ vite.config.ts.*
 
 # Local/dev
 .local
+
+# Replit config
+.replit
