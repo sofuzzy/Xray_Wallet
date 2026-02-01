@@ -3,8 +3,16 @@ import { PublicKey, VersionedTransaction, Transaction } from "@solana/web3.js";
 import { getRpcService } from "../services/rpcService";
 import { TOKEN_PROGRAM_ID, getMint } from "@solana/spl-token";
 
+const BETA_LOCK = process.env.BETA_LOCK;
 const BETA_UNLOCK_TOKEN = process.env.BETA_UNLOCK_TOKEN;
 const REQUIRED_UI_BALANCE = 5000;
+
+// Check if beta gating is enabled
+function isBetaLockEnabled(): boolean {
+  // If BETA_LOCK is not set or is "N", beta is disabled (everyone can use)
+  // If BETA_LOCK is "Y", beta is enabled (requires token holding)
+  return BETA_LOCK === "Y";
+}
 
 interface CacheEntry {
   unlocked: boolean;
@@ -76,7 +84,7 @@ async function getTokenDecimals(): Promise<number> {
     return tokenDecimalsCache;
   }
   
-  if (!BETA_UNLOCK_TOKEN) {
+  if (!isBetaLockEnabled() || !BETA_UNLOCK_TOKEN) {
     return 9;
   }
   
@@ -100,7 +108,8 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
   balanceUi: number;
   requiredUi: number;
 }> {
-  if (!BETA_UNLOCK_TOKEN) {
+  // If beta lock is disabled, everyone is unlocked
+  if (!isBetaLockEnabled() || !BETA_UNLOCK_TOKEN) {
     return { unlocked: true, balanceRaw: "0", balanceUi: 0, requiredUi: REQUIRED_UI_BALANCE };
   }
 
@@ -168,7 +177,7 @@ export async function checkBetaUnlock(walletAddress: string): Promise<{
 }
 
 function isSwapToUnlockToken(req: Request): boolean {
-  if (!BETA_UNLOCK_TOKEN) return false;
+  if (!isBetaLockEnabled() || !BETA_UNLOCK_TOKEN) return false;
   const body = req.body;
   if (!body) return false;
   
@@ -181,7 +190,8 @@ function isSwapToUnlockToken(req: Request): boolean {
 }
 
 export function requireBetaUnlock(req: Request, res: Response, next: NextFunction) {
-  if (!BETA_UNLOCK_TOKEN) {
+  // If beta lock is disabled, allow all requests
+  if (!isBetaLockEnabled() || !BETA_UNLOCK_TOKEN) {
     return next();
   }
 
@@ -219,7 +229,8 @@ export function requireBetaUnlock(req: Request, res: Response, next: NextFunctio
 
 // Variant that allows swaps purchasing the unlock token
 export function requireBetaUnlockOrBuyingToken(req: Request, res: Response, next: NextFunction) {
-  if (!BETA_UNLOCK_TOKEN) {
+  // If beta lock is disabled, allow all requests
+  if (!isBetaLockEnabled() || !BETA_UNLOCK_TOKEN) {
     return next();
   }
 
@@ -233,7 +244,15 @@ export function requireBetaUnlockOrBuyingToken(req: Request, res: Response, next
 }
 
 export function getBetaUnlockToken(): string | undefined {
+  // Only return the token if beta lock is enabled
+  if (!isBetaLockEnabled()) {
+    return undefined;
+  }
   return BETA_UNLOCK_TOKEN;
+}
+
+export function isBetaEnabled(): boolean {
+  return isBetaLockEnabled() && !!BETA_UNLOCK_TOKEN;
 }
 
 export function clearBetaCache(wallet?: string) {
