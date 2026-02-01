@@ -1,4 +1,4 @@
-import { assessTokenRisk, isNativeSol, type TokenRiskAssessment, type RiskLevel } from "./tokenRiskEngine";
+import { assessTokenRisk, isNativeSol, isTrustedToken, type TokenRiskAssessment, type RiskLevel } from "./tokenRiskEngine";
 
 export interface RiskShieldPolicy {
   blockLevel: RiskLevel;            // tokens at or above this level are blocked
@@ -81,17 +81,24 @@ export async function decideTokenAction(opts: {
     };
   }
 
-  // Short-circuit for native SOL - always allowed, no risk checks needed
-  if (isNativeSol(mint)) {
-    const nativeSolAssessment: TokenRiskAssessment = {
+  // Short-circuit for trusted tokens (SOL, USDC) - always allowed, no risk checks needed
+  if (isTrustedToken(mint)) {
+    const isSol = isNativeSol(mint);
+    const label = isSol ? "Native SOL" : "USDC";
+    const note = isSol 
+      ? "Native SOL is not subject to token-specific risk checks."
+      : "USDC is a trusted stablecoin and is not subject to token-specific risk checks.";
+    
+    const trustedAssessment: TokenRiskAssessment = {
       mint,
       score: 0,
       level: "low",
       flags: [],
       inputs: {
-        isNativeSol: true,
-        label: "Native SOL",
-        note: "Native SOL is not subject to token-specific risk checks.",
+        isNativeSol: isSol,
+        isTrustedToken: true,
+        label,
+        note,
       },
       updatedAt: Date.now(),
     };
@@ -102,8 +109,8 @@ export async function decideTokenAction(opts: {
       blocked: false,
       requiresAcknowledgement: false,
       policy,
-      assessment: opts.includeAssessment ? nativeSolAssessment : undefined,
-      reason: "Native SOL",
+      assessment: opts.includeAssessment ? trustedAssessment : undefined,
+      reason: label,
     };
   }
 

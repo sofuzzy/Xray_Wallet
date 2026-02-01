@@ -8,12 +8,26 @@ const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 // Native SOL wrapped mint address - this should never be evaluated with SPL token risk checks
 export const NATIVE_SOL_MINT = "So11111111111111111111111111111111111111112";
 
+// USDC mint address - trusted stablecoin that should skip risk checks
+export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+// Trusted tokens that should always be allowed without risk checks
+export const TRUSTED_MINTS = new Set([NATIVE_SOL_MINT, USDC_MINT]);
+
 /**
  * Check if a mint address is native SOL (wrapped SOL).
  */
 export function isNativeSol(mint: string): boolean {
   const normalized = (mint || "").trim();
   return normalized === NATIVE_SOL_MINT;
+}
+
+/**
+ * Check if a mint address is a trusted token (SOL, USDC, etc.) that skips risk checks.
+ */
+export function isTrustedToken(mint: string): boolean {
+  const normalized = (mint || "").trim();
+  return TRUSTED_MINTS.has(normalized);
 }
 
 /**
@@ -194,22 +208,29 @@ export async function assessTokenRisk(mint: string): Promise<TokenRiskAssessment
   // Basic mint sanity check
   if (!isProbablyMint(key)) return null;
 
-  // Short-circuit for native SOL - it's a native asset and should not be evaluated
+  // Short-circuit for trusted tokens (SOL, USDC) - they should not be evaluated
   // with SPL token risk heuristics (liquidity locks, holder concentration, etc.)
-  if (isNativeSol(key)) {
-    const nativeSolAssessment: TokenRiskAssessment = {
+  if (isTrustedToken(key)) {
+    const isSol = isNativeSol(key);
+    const label = isSol ? "Native SOL" : "USDC";
+    const note = isSol 
+      ? "Native SOL is not subject to token-specific risk checks."
+      : "USDC is a trusted stablecoin and is not subject to token-specific risk checks.";
+    
+    const trustedAssessment: TokenRiskAssessment = {
       mint: key,
       score: 0,
       level: "low",
       flags: [],
       inputs: {
-        isNativeSol: true,
-        label: "Native SOL",
-        note: "Native SOL is not subject to token-specific risk checks.",
+        isNativeSol: isSol,
+        isTrustedToken: true,
+        label,
+        note,
       },
       updatedAt: nowMs(),
     };
-    return nativeSolAssessment;
+    return trustedAssessment;
   }
 
   const cacheKey = `${hashKey(key)}:v2`;

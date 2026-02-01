@@ -503,7 +503,10 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
           console.error("Failed to fetch token details:", e);
         }
       }
-      if (token.mint !== "SOL" && riskShieldSettings.enabled) {
+      // Skip risk prefetch for trusted tokens (SOL, USDC)
+      const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      const isTrustedToken = token.mint === "SOL" || token.mint === USDC_MINT;
+      if (!isTrustedToken && riskShieldSettings.enabled) {
         fetch(`/api/risk-assessment/${token.mint}`, { credentials: "include" }).catch(() => {});
       }
     }

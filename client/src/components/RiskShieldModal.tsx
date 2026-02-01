@@ -128,6 +128,11 @@ function isNativeSolAssessment(assessment?: TokenRiskAssessment): boolean {
   return assessment?.inputs?.isNativeSol === true;
 }
 
+// Check if the assessment is for a trusted token (SOL, USDC)
+function isTrustedTokenAssessment(assessment?: TokenRiskAssessment): boolean {
+  return assessment?.inputs?.isTrustedToken === true;
+}
+
 export function RiskShieldModal(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -140,6 +145,7 @@ export function RiskShieldModal(props: {
   const decision = props.decision;
   const assessment = decision?.assessment;
   const isNativeSol = isNativeSolAssessment(assessment);
+  const isTrusted = isTrustedTokenAssessment(assessment);
 
   const level = (assessment?.level || (decision?.blocked ? "critical" : "high")) as RiskLevel;
   const score = assessment?.score;
@@ -158,10 +164,11 @@ export function RiskShieldModal(props: {
     setShameConfirmed(false);
   }, [decision?.mint]);
 
-  // Native SOL should never trigger this modal since it's always allowed,
-  // but handle it gracefully if it does
-  const title = isNativeSol
-    ? "Native SOL"
+  // Trusted tokens (SOL, USDC) should never trigger this modal since they're always allowed,
+  // but handle it gracefully if they do
+  const trustedLabel = assessment?.inputs?.label || "Trusted Token";
+  const title = isTrusted
+    ? trustedLabel
     : decision?.blocked
       ? "This token is blocked"
       : shameModeActive
@@ -170,8 +177,9 @@ export function RiskShieldModal(props: {
           ? "Review before swapping"
           : "Token Safety Check";
 
-  const description = isNativeSol
-    ? "Native SOL is not subject to token-specific risk checks."
+  const trustedNote = assessment?.inputs?.note || "This is a trusted token and is not subject to risk checks.";
+  const description = isTrusted
+    ? trustedNote
     : decision?.blocked
       ? "Risk Shield has blocked this swap to protect your funds."
       : shameModeActive
