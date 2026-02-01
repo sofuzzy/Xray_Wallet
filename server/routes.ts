@@ -1041,7 +1041,7 @@ export async function registerRoutes(
       if (message.includes("no record of a prior credit") || message.includes("insufficient funds") || message.includes("insufficient lamports")) {
         return res.status(400).json({ 
           error: "INSUFFICIENT_SOL_FOR_FEES",
-          message: "Your wallet doesn't have enough SOL to pay for transaction fees. Please add some SOL to your wallet first."
+          message: "Your wallet doesn't have enough SOL to pay for transaction fees. You need at least 0.001 SOL to cover fees."
         });
       }
       

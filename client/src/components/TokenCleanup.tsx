@@ -129,7 +129,7 @@ export function TokenCleanup() {
         const err = await sendRes.json();
         // Handle specific error codes with user-friendly messages
         if (err.error === "INSUFFICIENT_SOL_FOR_FEES") {
-          throw new Error("You need some SOL in your wallet to pay for transaction fees. Add SOL and try again.");
+          throw new Error("You need at least 0.001 SOL in your wallet to pay for transaction fees. Add SOL and try again.");
         }
         throw new Error(err.message || err.error || "Failed to send transaction");
       }
