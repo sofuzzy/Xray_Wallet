@@ -1046,8 +1046,8 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <div className="relative">
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0 gap-0">
+        <div className="relative flex-1 overflow-y-auto p-6 pb-0">
           <AnimatePresence>
             {txStep !== "idle" && <TransactionProgress step={txStep} errorMessage={txError} />}
           </AnimatePresence>
@@ -1458,6 +1458,11 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             </Alert>
           )}
 
+          </div>
+        </div>
+        
+        {/* Sticky footer with swap button - always visible */}
+        <div className="sticky bottom-0 p-4 pt-3 border-t border-border/30 bg-background">
           <Button
             onClick={handleSwap}
             disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient || isBetaLocked}
@@ -1493,7 +1498,6 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
               "Swap"
             )}
           </Button>
-          </div>
         </div>
       </DialogContent>
     
