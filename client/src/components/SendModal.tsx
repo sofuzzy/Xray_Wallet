@@ -83,9 +83,17 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
 
   const handleMaxClick = () => {
     if (selectedToken === "SOL") {
-      // Leave some SOL for transaction fees
-      const maxAmount = Math.max(0, balance - 0.005);
-      setAmount(maxAmount > 0 ? maxAmount.toFixed(9).replace(/\.?0+$/, '') : "0");
+      // Leave some SOL for transaction fees (~5000 lamports = 0.000005 SOL)
+      const feeReserve = 0.000005;
+      const maxAmount = Math.max(0, balance - feeReserve);
+      // Format nicely without unnecessary trailing zeros
+      if (maxAmount <= 0) {
+        setAmount("0");
+      } else {
+        // Use a reasonable precision based on the amount
+        const formatted = maxAmount.toFixed(9).replace(/\.?0+$/, '');
+        setAmount(formatted);
+      }
     } else {
       setAmount(currentBalance.toString());
     }
@@ -223,13 +231,18 @@ export function SendModal({ isOpen, onClose }: SendModalProps) {
       
       const { signature } = await sendRes.json();
       
-      // Record in DB
-      await recordTx({
-        fromAddr: keypair.publicKey.toString(),
-        toAddr: destAddr,
-        amount: amount,
-        signature: signature,
-      });
+      // Record in DB (optional - may fail if not authenticated)
+      try {
+        await recordTx({
+          fromAddr: keypair.publicKey.toString(),
+          toAddr: destAddr,
+          amount: amount,
+          signature: signature,
+        });
+      } catch (recordError) {
+        // Recording failed (likely not authenticated), but transaction succeeded
+        console.log("[send] Transaction recording skipped (not authenticated)");
+      }
 
       refreshBalance();
       queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] });
