@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Shield, AlertTriangle, ShieldCheck, Droplets, TrendingUp, Clock, Users, Lock, Coins, Activity, Eye, Database } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
+import xrayLogo from "@/assets/xray-logo.png";
 
 export default function RiskChecks() {
   return (
@@ -12,7 +13,7 @@ export default function RiskChecks() {
             <ArrowLeft className="w-4 h-4" />
             <span className="font-mono text-sm">Back</span>
           </Link>
-          <h1 className="text-xl font-mono font-bold text-primary">&gt;_XRAY</h1>
+          <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen" />
         </div>
         <ThemeToggle />
       </header>

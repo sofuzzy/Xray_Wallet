@@ -8,6 +8,7 @@ import { useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useLocalTransactions } from "@/hooks/use-local-transactions";
 import { type ActivityLog } from "@shared/schema";
+import xrayLogo from "@/assets/xray-logo.png";
 import { WalletCard } from "@/components/WalletCard";
 import { Holdings } from "@/components/Holdings";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -390,7 +391,7 @@ export default function Home() {
 
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold text-primary whitespace-nowrap tracking-tight">XRAY</h1>
+          <img src={xrayLogo} alt="XRAY" className="h-8 mix-blend-screen" />
           <WalletSwitcher
             wallets={wallets}
             activeWallet={activeWallet}

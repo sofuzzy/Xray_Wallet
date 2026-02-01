@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Shield } from "lucide-react";
 import { SiX, SiGithub } from "react-icons/si";
+import xrayLogo from "@/assets/xray-logo.png";
 
 export function Footer() {
   return (
@@ -60,9 +61,11 @@ export function Footer() {
           </Link>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground/60 font-mono">
-          &gt; XRAY Wallet | Solana Mainnet | v.0.9.9
-        </p>
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60 font-mono">
+          <span>&gt;</span>
+          <img src={xrayLogo} alt="XRAY" className="h-4 mix-blend-screen inline-block" />
+          <span>Wallet | Solana Mainnet | v.0.9.9</span>
+        </div>
       </div>
     </footer>
   );

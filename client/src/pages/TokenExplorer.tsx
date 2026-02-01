@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import xrayLogo from "@/assets/xray-logo.png";
 import { SwapModal } from "@/components/SwapModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -525,7 +526,7 @@ export default function TokenExplorer() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-6 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <Link href="/" data-testid="link-logo-home">
-            <h1 className="text-xl font-mono font-bold text-primary glow-text cursor-pointer hover:opacity-80 transition-opacity">&gt;_XRAY</h1>
+            <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen hover:opacity-80 transition-opacity" />
           </Link>
         </div>
         <div className="flex items-center gap-3">
