@@ -100,6 +100,20 @@ Key files: `client/src/components/WalletOnboarding.tsx`, `client/src/components/
 - **Gated Routes**: `/api/solana/send-transaction`, `/api/swaps/*`, `/api/launchpad/*`, `/api/liquidity-pool/build`
 - **Key File**: `server/middleware/requireBetaUnlock.ts`
 
+### Token Account Cleanup (Sol Incinerator-style)
+- **Reclaim SOL Rent**: Close empty SPL token accounts to reclaim rent deposits (~0.002 SOL per account)
+- **Endpoints**:
+  - `GET /api/cleanup/closeable-token-accounts?owner=<pubkey>` - List all closeable accounts (balance = 0)
+  - `POST /api/cleanup/build-close-tx` - Build unsigned close transaction(s)
+  - `POST /api/cleanup/send-close-tx` - Send signed transaction(s)
+- **Features**:
+  - Supports both SPL Token and Token-2022 programs
+  - Batches multiple close instructions per transaction (max 20 per tx)
+  - Rate-limited with Zod validation
+  - Client-side transaction signing (non-custodial)
+- **UI**: Accessible via Wallet Settings > Cleanup tab
+- **Key Files**: `server/services/tokenCleanup.ts`, `client/src/components/TokenCleanup.tsx`
+
 ### Token Swap Implementation (Jupiter)
 - **Jupiter API Integration**: Leverages Jupiter's API for server-side quote and swap transaction generation.
 - **Token Discovery**: Uses DexScreener API for comprehensive token data, prices, and trending information.

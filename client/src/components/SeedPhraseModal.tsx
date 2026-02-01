@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull, Coins } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TokenCleanup } from "./TokenCleanup";
 
 interface SeedPhraseModalProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const riskShield = useRiskShieldSettings();
   const vault = useVault();
   const localVault = useVaultContext();
-  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile">("backup");
+  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile" | "cleanup">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
@@ -210,8 +211,8 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud" | "profile")}>
-            <TabsList className="grid w-full grid-cols-5">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud" | "profile" | "cleanup")}>
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="profile" data-testid="tab-profile">
                 <User className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Profile</span>
@@ -231,6 +232,10 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
               <TabsTrigger value="security" data-testid="tab-security">
                 <Shield className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Security</span>
+              </TabsTrigger>
+              <TabsTrigger value="cleanup" data-testid="tab-cleanup">
+                <Coins className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Cleanup</span>
               </TabsTrigger>
             </TabsList>
 
@@ -939,6 +944,10 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                   </div>
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="cleanup" className="space-y-4 mt-4">
+              <TokenCleanup />
             </TabsContent>
           </Tabs>
         </div>

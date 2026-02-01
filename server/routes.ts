@@ -960,6 +960,86 @@ export async function registerRoutes(
     }
   });
 
+  // =========================================================================
+  // Token Account Cleanup (Sol Incinerator-style)
+  // =========================================================================
+
+  // Get closeable token accounts (empty balance)
+  app.get("/api/cleanup/closeable-token-accounts", strictRateLimiter, async (req, res) => {
+    try {
+      const ownerSchema = z.object({
+        owner: z.string().min(32).max(44),
+      });
+      const { owner } = ownerSchema.parse(req.query);
+      
+      const { getCloseableTokenAccounts } = await import("./services/tokenCleanup");
+      const accounts = await getCloseableTokenAccounts(owner);
+      
+      const totalLamports = accounts.reduce((sum, a) => sum + a.estimatedReclaimLamports, 0);
+      const totalSol = totalLamports / 1_000_000_000;
+      
+      res.json({
+        owner,
+        accounts,
+        totalAccounts: accounts.length,
+        totalReclaimableLamports: totalLamports,
+        totalReclaimableSol: totalSol,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid owner pubkey" });
+      }
+      console.error("Error fetching closeable accounts:", error);
+      res.status(500).json({ error: "Failed to fetch closeable token accounts" });
+    }
+  });
+
+  // Build close transaction(s)
+  app.post("/api/cleanup/build-close-tx", strictRateLimiter, async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        owner: z.string().min(32).max(44),
+        tokenAccounts: z.array(z.string().min(32).max(44)).min(1).max(100),
+      });
+      const { owner, tokenAccounts } = bodySchema.parse(req.body);
+      
+      const { buildCloseTransactions } = await import("./services/tokenCleanup");
+      const result = await buildCloseTransactions(owner, tokenAccounts);
+      
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request body" });
+      }
+      console.error("Error building close transaction:", error);
+      const message = error instanceof Error ? error.message : "Failed to build close transaction";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Send signed close transaction(s)
+  app.post("/api/cleanup/send-close-tx", strictRateLimiter, async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        owner: z.string().min(32).max(44),
+        signedTxsBase64: z.array(z.string()).min(1).max(10),
+      });
+      const { owner, signedTxsBase64 } = bodySchema.parse(req.body);
+      
+      const { sendCloseTransactions } = await import("./services/tokenCleanup");
+      const result = await sendCloseTransactions(owner, signedTxsBase64);
+      
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request body" });
+      }
+      console.error("Error sending close transaction:", error);
+      const message = error instanceof Error ? error.message : "Failed to send close transaction";
+      res.status(500).json({ error: message });
+    }
+  });
+
   app.get(api.transactions.list.path, hybridAuth, async (req, res) => {
     const userId = req.tokenUser!.sub;
     const { address } = req.query;

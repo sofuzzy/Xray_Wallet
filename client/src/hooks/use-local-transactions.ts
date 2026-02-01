@@ -7,7 +7,7 @@ export interface LocalTransaction {
   amount: string;
   signature: string;
   status: string;
-  type: "transfer" | "swap";
+  type: "transfer" | "swap" | "cleanup";
   inputToken?: string;
   outputToken?: string;
   outputAmount?: string;
