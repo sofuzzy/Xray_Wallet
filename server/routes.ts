@@ -1050,7 +1050,8 @@ export async function registerRoutes(
   });
 
   // Pre-swap balance validation with caching
-  app.get("/api/swaps/validate-balance", hybridAuth, async (req, res) => {
+  // Use optionalAuth - users can validate balance without being logged in (wallet-first approach)
+  app.get("/api/swaps/validate-balance", optionalAuth, async (req, res) => {
     try {
       const { walletAddress, inputMint, amount } = req.query;
       
@@ -1436,7 +1437,8 @@ export async function registerRoutes(
   });
 
   // Jupiter Quote (supports direct DEX routing via 'dex' param: auto, orca, raydium)
-  app.get(api.swaps.quote.path, hybridAuth, async (req, res) => {
+  // Use optionalAuth - users can get quotes without being logged in (wallet-first approach)
+  app.get(api.swaps.quote.path, optionalAuth, async (req, res) => {
     try {
       const { inputMint, outputMint, amount, slippage, dex, riskShieldDisabled, enabledCheckCodes } = req.query;
 
