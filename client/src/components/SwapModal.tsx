@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet, Lock } from "lucide-react";
+import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet, Lock, ChevronDown, Settings } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { tokenManager } from "@/lib/tokenManager";
@@ -268,6 +268,9 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
     }
   });
   const [riskPendingStage, setRiskPendingStage] = useState<"quote" | "transaction" | null>(null);
+  
+  // Settings expanded state
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   
   // Slippage state
   const [slippageMode, setSlippageMode] = useState<"auto" | "custom">("auto");
@@ -1275,145 +1278,177 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             </Alert>
           )}
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Slippage Tolerance</label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-muted-foreground">
-                    <HelpCircle className="w-3.5 h-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-[280px] p-3">
-                  <p className="text-xs">
-                    <strong>Slippage</strong> is the maximum price change you'll accept between when you request a swap and when it executes.
-                  </p>
-                  <p className="text-xs mt-2 text-muted-foreground">
-                    For popular tokens (USDC, SOL), 1-2% is usually safe. For newer or less liquid tokens (like pump.fun coins), you may need 5-10% or higher.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="grid grid-cols-4 gap-1">
-              <Button
-                variant={slippageMode === "auto" ? "default" : "outline"}
-                size="sm"
-                className="flex-col h-auto py-1.5 px-2"
-                onClick={() => { setSlippageMode("auto"); setCustomSlippage(""); }}
-                disabled={isSwapping}
-                data-testid="button-slippage-auto"
-              >
-                <span className="text-xs">Auto</span>
-                <span className="text-[10px] opacity-70">{getSlippageForRiskLevel(tokenRiskLevel)}%</span>
-              </Button>
-              {[1, 3, 5].map((pct) => (
-                <Button
-                  key={pct}
-                  variant={slippageMode === "custom" && customSlippage === pct.toString() ? "default" : "outline"}
-                  size="sm"
-                  className="flex-col h-auto py-1.5 px-2"
-                  onClick={() => { setSlippageMode("custom"); setCustomSlippage(pct.toString()); }}
-                  disabled={isSwapping}
-                  data-testid={`button-slippage-${pct}`}
-                >
-                  <span className="text-xs">{pct}%</span>
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Custom %"
-                value={slippageMode === "custom" && !["1", "3", "5"].includes(customSlippage) ? customSlippage : ""}
-                onChange={(e) => { setSlippageMode("custom"); setCustomSlippage(e.target.value); }}
-                className="flex-1"
-                step="0.1"
-                min="0.1"
-                max="50"
-                disabled={isSwapping}
-                data-testid="input-custom-slippage"
-              />
-              <span className="text-sm text-muted-foreground">%</span>
-            </div>
-            {isHighSlippage && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                High slippage increases risk of unfavorable trade execution
-              </p>
-            )}
-          </div>
+          {/* Collapsible Swap Settings */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setSettingsExpanded(!settingsExpanded)}
+              className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-muted/50 hover-elevate"
+              data-testid="button-swap-settings-toggle"
+            >
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Swap Settings</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Slippage: {slippageMode === "auto" ? `Auto (${effectiveSlippagePct}%)` : `${effectiveSlippagePct}%`}
+                  {" · "}
+                  Route: {dexOption === "auto" ? "Best" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1)}
+                  {" · "}
+                  Priority: {priorityFee.charAt(0).toUpperCase() + priorityFee.slice(1)}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${settingsExpanded ? "rotate-180" : ""}`} />
+              </div>
+            </button>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Routing</label>
-            <div className="grid grid-cols-3 gap-1">
-              {(["auto", "orca", "raydium"] as const).map((dex) => (
-                <Button
-                  key={dex}
-                  variant={dexOption === dex ? "default" : "outline"}
-                  size="sm"
-                  className="flex-col h-auto py-1.5 px-2"
-                  onClick={() => setDexOption(dex)}
-                  disabled={isSwapping}
-                  data-testid={`button-dex-${dex}`}
-                >
-                  <span className="capitalize text-xs">{dex === "auto" ? "Best Route" : dex}</span>
-                  <span className="text-[10px] opacity-70">
-                    {dex === "auto" ? "Jupiter" : "Direct"}
-                  </span>
-                </Button>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              {dexOption === "auto" 
-                ? "Jupiter finds the best price across all DEXes" 
-                : `Swap directly on ${dexOption.charAt(0).toUpperCase() + dexOption.slice(1)} - faster for small trades`}
-            </p>
-          </div>
+            {settingsExpanded && (
+              <div className="space-y-4 p-3 rounded-lg border border-border/30 bg-muted/20">
+                {/* Slippage Tolerance */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Slippage Tolerance</label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-muted-foreground">
+                          <HelpCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[280px] p-3">
+                        <p className="text-xs">
+                          <strong>Slippage</strong> is the maximum price change you'll accept between when you request a swap and when it executes.
+                        </p>
+                        <p className="text-xs mt-2 text-muted-foreground">
+                          For popular tokens (USDC, SOL), 1-2% is usually safe. For newer or less liquid tokens (like pump.fun coins), you may need 5-10% or higher.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    <Button
+                      variant={slippageMode === "auto" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-col h-auto py-1.5 px-2"
+                      onClick={() => { setSlippageMode("auto"); setCustomSlippage(""); }}
+                      disabled={isSwapping}
+                      data-testid="button-slippage-auto"
+                    >
+                      <span className="text-xs">Auto</span>
+                      <span className="text-[10px] opacity-70">{getSlippageForRiskLevel(tokenRiskLevel)}%</span>
+                    </Button>
+                    {[1, 3, 5].map((pct) => (
+                      <Button
+                        key={pct}
+                        variant={slippageMode === "custom" && customSlippage === pct.toString() ? "default" : "outline"}
+                        size="sm"
+                        className="flex-col h-auto py-1.5 px-2"
+                        onClick={() => { setSlippageMode("custom"); setCustomSlippage(pct.toString()); }}
+                        disabled={isSwapping}
+                        data-testid={`button-slippage-${pct}`}
+                      >
+                        <span className="text-xs">{pct}%</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Custom %"
+                      value={slippageMode === "custom" && !["1", "3", "5"].includes(customSlippage) ? customSlippage : ""}
+                      onChange={(e) => { setSlippageMode("custom"); setCustomSlippage(e.target.value); }}
+                      className="flex-1"
+                      step="0.1"
+                      min="0.1"
+                      max="50"
+                      disabled={isSwapping}
+                      data-testid="input-custom-slippage"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  {isHighSlippage && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      High slippage increases risk of unfavorable trade execution
+                    </p>
+                  )}
+                </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Priority Fee</label>
-            <div className="grid grid-cols-4 gap-1">
-              {(["low", "medium", "high"] as const).map((level) => {
-                const feeInSol = priorityFeeAmounts[level] / 1_000_000_000;
-                return (
-                  <Button
-                    key={level}
-                    variant={priorityFee === level ? "default" : "outline"}
-                    size="sm"
-                    className="flex-col h-auto py-1.5 px-1"
-                    onClick={() => setPriorityFee(level)}
-                    disabled={isSwapping}
-                  >
-                    <span className="capitalize text-xs">{level}</span>
-                    <span className="text-[10px] opacity-70">{feeInSol.toFixed(5)}</span>
-                  </Button>
-                );
-              })}
-              <Button
-                variant={priorityFee === "custom" ? "default" : "outline"}
-                size="sm"
-                className="flex-col h-auto py-1.5 px-1"
-                onClick={() => setPriorityFee("custom")}
-                disabled={isSwapping}
-              >
-                <span className="text-xs">Custom</span>
-                <span className="text-[10px] opacity-70">Set own</span>
-              </Button>
-            </div>
-            {priorityFee === "custom" && (
-              <div className="flex items-center gap-2 mt-2">
-                <Input
-                  type="number"
-                  placeholder="0.0001"
-                  value={customPriorityFee}
-                  onChange={(e) => setCustomPriorityFee(e.target.value)}
-                  className="flex-1"
-                  step="0.000001"
-                  min="0"
-                  disabled={isSwapping}
-                  data-testid="input-custom-priority-fee"
-                />
-                <span className="text-sm text-muted-foreground">SOL</span>
+                {/* Routing */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Routing</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(["auto", "orca", "raydium"] as const).map((dex) => (
+                      <Button
+                        key={dex}
+                        variant={dexOption === dex ? "default" : "outline"}
+                        size="sm"
+                        className="flex-col h-auto py-1.5 px-2"
+                        onClick={() => setDexOption(dex)}
+                        disabled={isSwapping}
+                        data-testid={`button-dex-${dex}`}
+                      >
+                        <span className="capitalize text-xs">{dex === "auto" ? "Best Route" : dex}</span>
+                        <span className="text-[10px] opacity-70">
+                          {dex === "auto" ? "Jupiter" : "Direct"}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {dexOption === "auto" 
+                      ? "Jupiter finds the best price across all DEXes" 
+                      : `Swap directly on ${dexOption.charAt(0).toUpperCase() + dexOption.slice(1)} - faster for small trades`}
+                  </p>
+                </div>
+
+                {/* Priority Fee */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Priority Fee</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(["low", "medium", "high"] as const).map((level) => {
+                      const feeInSol = priorityFeeAmounts[level] / 1_000_000_000;
+                      return (
+                        <Button
+                          key={level}
+                          variant={priorityFee === level ? "default" : "outline"}
+                          size="sm"
+                          className="flex-col h-auto py-1.5 px-1"
+                          onClick={() => setPriorityFee(level)}
+                          disabled={isSwapping}
+                        >
+                          <span className="capitalize text-xs">{level}</span>
+                          <span className="text-[10px] opacity-70">{feeInSol.toFixed(5)}</span>
+                        </Button>
+                      );
+                    })}
+                    <Button
+                      variant={priorityFee === "custom" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-col h-auto py-1.5 px-1"
+                      onClick={() => setPriorityFee("custom")}
+                      disabled={isSwapping}
+                    >
+                      <span className="text-xs">Custom</span>
+                      <span className="text-[10px] opacity-70">Set own</span>
+                    </Button>
+                  </div>
+                  {priorityFee === "custom" && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Input
+                        type="number"
+                        placeholder="0.0001"
+                        value={customPriorityFee}
+                        onChange={(e) => setCustomPriorityFee(e.target.value)}
+                        className="flex-1"
+                        step="0.000001"
+                        min="0"
+                        disabled={isSwapping}
+                        data-testid="input-custom-priority-fee"
+                      />
+                      <span className="text-sm text-muted-foreground">SOL</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
