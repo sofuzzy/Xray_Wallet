@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull, Coins } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull, Coins, Zap } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
+import { useTurboMode } from "@/hooks/use-turbo-mode";
 import { useVault } from "@/hooks/use-vault";
 import { useVaultContext } from "@/contexts/VaultContext";
 import { useCurrentUser, useUpdateUser } from "@/hooks/use-users";
@@ -54,6 +55,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const { toast } = useToast();
   const biometric = useBiometric();
   const riskShield = useRiskShieldSettings();
+  const turboMode = useTurboMode();
   const vault = useVault();
   const localVault = useVaultContext();
   const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile" | "cleanup">("backup");
@@ -809,6 +811,71 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 </Button>
               )}
 
+              {/* Turbo Mode Section */}
+              <div className="border-t border-border pt-4 mt-4">
+                <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex gap-3 mb-4">
+                  <Zap className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                  <div className="text-sm text-foreground/80">
+                    <p className="font-medium text-foreground">Turbo Mode</p>
+                    <p className="mt-1">Ultra-fast transactions via Helius Sender with Jito tips. Adds a small tip ({turboMode.tipAmountSol} SOL) to each transaction for priority processing.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border mb-4">
+                  <div className="flex items-center gap-3">
+                    {turboMode.enabled ? (
+                      <Zap className="w-5 h-5 text-yellow-500" />
+                    ) : (
+                      <Zap className="w-5 h-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">Enable Turbo Mode</p>
+                      <p className="text-xs text-muted-foreground">
+                        {turboMode.enabled ? `Active (+${turboMode.tipAmountSol} SOL per tx)` : "Disabled"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={turboMode.enabled}
+                    onCheckedChange={turboMode.setEnabled}
+                    data-testid="switch-turbo-mode"
+                  />
+                </div>
+
+                {turboMode.enabled && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border mb-4">
+                    <label className="text-xs text-muted-foreground mb-2 block">Jito Tip Amount (SOL)</label>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={turboMode.tipAmountSol === 0.0002 ? "default" : "outline"}
+                        onClick={() => turboMode.setTipAmount(0.0002)}
+                        data-testid="button-tip-low"
+                      >
+                        0.0002 (Min)
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={turboMode.tipAmountSol === 0.0005 ? "default" : "outline"}
+                        onClick={() => turboMode.setTipAmount(0.0005)}
+                        data-testid="button-tip-medium"
+                      >
+                        0.0005
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={turboMode.tipAmountSol === 0.001 ? "default" : "outline"}
+                        onClick={() => turboMode.setTipAmount(0.001)}
+                        data-testid="button-tip-high"
+                      >
+                        0.001
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* X-Ray Shield Section */}
               <div className="border-t border-border pt-4 mt-4">
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex gap-3 mb-4">
                   <ShieldAlert className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />

@@ -3,7 +3,6 @@ import { getRpcService } from "./rpcService";
 export interface HeliusSenderConfig {
   enabled: boolean;
   senderUrl: string;
-  apiKey: string | null;
 }
 
 export interface HeliusSenderResult {
@@ -11,26 +10,43 @@ export interface HeliusSenderResult {
   usedSender: boolean;
 }
 
+// Jito tip accounts for Helius Sender (pick one randomly per transaction)
+export const JITO_TIP_ACCOUNTS = [
+  "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+  "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
+  "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
+  "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
+  "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
+  "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfEGJ",
+  "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
+  "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+  "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+  "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or",
+];
+
+// Default tip amount: 0.0002 SOL (minimum required)
+export const DEFAULT_JITO_TIP_LAMPORTS = 200_000;
+
 function getHeliusSenderConfig(): HeliusSenderConfig {
   const enabled = process.env.ENABLE_HELIUS_SENDER === "true";
   const senderUrl = process.env.HELIUS_SENDER_URL || "https://sender.helius-rpc.com/fast";
-  const apiKey = process.env.HELIUS_API_KEY || null;
   
-  return { enabled, senderUrl, apiKey };
+  return { enabled, senderUrl };
+}
+
+export function getRandomTipAccount(): string {
+  return JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
 }
 
 export async function sendTransactionViaSender(signedTxBase64: string): Promise<string> {
   const config = getHeliusSenderConfig();
   
-  if (!config.apiKey) {
-    throw new Error("HELIUS_API_KEY is required for Helius Sender");
-  }
-  
-  const url = `${config.senderUrl}?api-key=${config.apiKey}`;
+  // Helius Sender doesn't require API key - it's free for all users
+  const url = config.senderUrl;
   
   const payload = {
     jsonrpc: "2.0",
-    id: 1,
+    id: Date.now().toString(),
     method: "sendTransaction",
     params: [
       signedTxBase64,
@@ -78,7 +94,7 @@ export async function broadcastTransaction(
   const config = getHeliusSenderConfig();
   const rpc = getRpcService();
   
-  if (config.enabled && config.apiKey) {
+  if (config.enabled) {
     try {
       console.log(`[broadcast] Attempting Helius Sender...`);
       const signature = await sendTransactionViaSender(signedTxBase64);
@@ -139,17 +155,13 @@ export async function broadcastAndConfirmTransaction(
 
 export function isHeliusSenderEnabled(): boolean {
   const config = getHeliusSenderConfig();
-  return config.enabled && !!config.apiKey;
+  return config.enabled;
 }
 
 export function logHeliusSenderStatus(): void {
   const config = getHeliusSenderConfig();
   if (config.enabled) {
-    if (config.apiKey) {
-      console.log(`[config] Helius Sender: enabled (${config.senderUrl})`);
-    } else {
-      console.warn(`[config] Helius Sender: enabled but HELIUS_API_KEY not set`);
-    }
+    console.log(`[config] Helius Sender: enabled (${config.senderUrl})`);
   } else {
     console.log(`[config] Helius Sender: disabled`);
   }
