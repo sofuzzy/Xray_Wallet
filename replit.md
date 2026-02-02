@@ -114,6 +114,16 @@ Key files: `client/src/components/WalletOnboarding.tsx`, `client/src/components/
 - **UI**: Accessible via Wallet Settings > Cleanup tab
 - **Key Files**: `server/services/tokenCleanup.ts`, `client/src/components/TokenCleanup.tsx`
 
+### Turbo Mode (Optional Fast Transactions)
+- **Feature**: Ultra-fast transaction processing via Helius Sender with Jito tips
+- **Optional**: Disabled by default - users can enable in Settings > Security tab
+- **Tip Amounts**: Configurable tip (0.0002 SOL minimum, 0.0005, or 0.001 SOL options)
+- **How It Works**: Adds a Jito tip instruction to transactions for priority validator processing
+- **Endpoint**: `GET /api/turbo/tip-account` - Returns random Jito tip account and default tip amount
+- **Helius Sender**: Uses `https://sender.helius-rpc.com/fast` (free, no API key required)
+- **Jito Tip Accounts**: 10 designated accounts in `JITO_TIP_ACCOUNTS` array
+- **Key Files**: `client/src/hooks/use-turbo-mode.ts`, `server/services/heliusSender.ts`
+
 ### Token Swap Implementation (Jupiter)
 - **Jupiter API Integration**: Leverages Jupiter's API for server-side quote and swap transaction generation.
 - **Token Discovery**: Uses DexScreener API for comprehensive token data, prices, and trending information.

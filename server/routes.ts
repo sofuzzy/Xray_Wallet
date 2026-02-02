@@ -69,6 +69,7 @@ import {
 } from "./services/solanaTransactions";
 import { getRpcService } from "./services/rpcService";
 import { balanceCache } from "./services/balanceCache";
+import { getRandomTipAccount, DEFAULT_JITO_TIP_LAMPORTS } from "./services/heliusSender";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -957,6 +958,21 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching RPC health:", error);
       res.status(500).json({ error: "Failed to fetch RPC health" });
+    }
+  });
+
+  // Turbo Mode: Get random Jito tip account for priority processing
+  app.get("/api/turbo/tip-account", async (req, res) => {
+    try {
+      const tipAccount = getRandomTipAccount();
+      res.json({
+        tipAccount,
+        defaultTipLamports: DEFAULT_JITO_TIP_LAMPORTS,
+        defaultTipSol: DEFAULT_JITO_TIP_LAMPORTS / 1_000_000_000,
+      });
+    } catch (error) {
+      console.error("Error getting tip account:", error);
+      res.status(500).json({ error: "Failed to get tip account" });
     }
   });
 
