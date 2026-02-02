@@ -69,7 +69,7 @@ import {
 } from "./services/solanaTransactions";
 import { getRpcService } from "./services/rpcService";
 import { balanceCache } from "./services/balanceCache";
-import { getRandomTipAccount, DEFAULT_JITO_TIP_LAMPORTS } from "./services/heliusSender";
+import { getRandomTipAccount, DEFAULT_JITO_TIP_LAMPORTS, broadcastAndConfirmTransaction } from "./services/heliusSender";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -730,17 +730,35 @@ export async function registerRoutes(
   // Send signed transaction (beta-gated)
   app.post("/api/solana/send-transaction", requireBetaUnlock, async (req, res) => {
     try {
-      const { serializedTransaction } = req.body;
+      const { serializedTransaction, turboMode } = req.body;
       if (!serializedTransaction) {
         return res.status(400).json({ error: "Missing serializedTransaction" });
       }
-      const signature = await sendRawTransaction(serializedTransaction);
       
       // Add dev headers
       const rpcInfo = getRpcHealthInfo();
       res.setHeader("X-RPC-HOST", rpcInfo.host);
       res.setHeader("X-RPC-TIER", rpcInfo.tier);
+
+      // Use Helius Sender for turbo mode (fast transaction processing)
+      if (turboMode) {
+        try {
+          console.log("[turbo-mode] Using Helius Sender for fast transaction processing");
+          const { signature, usedSender } = await broadcastAndConfirmTransaction(serializedTransaction);
+          console.log(`[turbo-mode] Transaction ${usedSender ? "sent via Helius Sender" : "sent via fallback RPC"}: ${signature}`);
+          
+          return res.json({ 
+            signature,
+            turboMode: true,
+            usedSender,
+          });
+        } catch (turboError: any) {
+          console.error("[turbo-mode] Helius Sender failed:", turboError);
+          // Fall through to standard send
+        }
+      }
       
+      const signature = await sendRawTransaction(serializedTransaction);
       res.json({ signature });
     } catch (error: any) {
       console.error("Error sending transaction:", error);
@@ -1716,10 +1734,29 @@ export async function registerRoutes(
   // Send signed transaction (beta-gated)
   app.post("/api/swaps/send", hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
-      const { signedTransaction, skipPreflight, lastValidBlockHeight } = req.body;
+      const { signedTransaction, skipPreflight, lastValidBlockHeight, turboMode } = req.body;
       
       if (!signedTransaction) {
         return res.status(400).json({ message: "Missing signed transaction" });
+      }
+
+      // Use Helius Sender for turbo mode (fast transaction processing)
+      if (turboMode) {
+        try {
+          console.log("[turbo-mode] Using Helius Sender for fast transaction processing");
+          const { signature, usedSender } = await broadcastAndConfirmTransaction(signedTransaction);
+          console.log(`[turbo-mode] Transaction ${usedSender ? "sent via Helius Sender" : "sent via fallback RPC"}: ${signature}`);
+          
+          return res.json({ 
+            signature, 
+            success: true,
+            turboMode: true,
+            usedSender,
+          });
+        } catch (turboError: any) {
+          console.error("[turbo-mode] Helius Sender failed:", turboError);
+          // Fall through to standard send
+        }
       }
 
       const result = await sendTransaction(

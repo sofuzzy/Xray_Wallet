@@ -9,6 +9,7 @@ import { tokenManager } from "@/lib/tokenManager";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
+import { useTurboMode } from "@/hooks/use-turbo-mode";
 import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { addLocalTransaction } from "@/hooks/use-local-transactions";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -215,6 +216,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
   const { balance, keypair, address } = useWallet();
   const { toast } = useToast();
   const { settings: riskShieldSettings, getEnabledCheckCodes } = useRiskShieldSettings();
+  const turboMode = useTurboMode();
   const { data: betaStatus } = useBetaStatus();
   const [inputAmount, setInputAmount] = useState("");
   const [debouncedInputAmount, setDebouncedInputAmount] = useState("");
@@ -715,6 +717,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         skipPreflight: true,
         lastValidBlockHeight: txResponse.lastValidBlockHeight,
         outputMint: normalizedOutputMint,
+        turboMode: turboMode.enabled,
       });
 
       setTxStep("confirming");
