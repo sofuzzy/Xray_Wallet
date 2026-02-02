@@ -1172,6 +1172,43 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             </div>
           </div>
 
+          {/* Swap button - placed right after You receive section */}
+          <Button
+            onClick={handleSwap}
+            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient || isBetaLocked}
+            className="w-full"
+            data-testid="button-execute-swap"
+          >
+            {isBetaLocked ? (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                Beta Locked
+              </>
+            ) : isSwapping ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Swapping...
+              </>
+            ) : isBalanceInsufficient ? (
+              <>
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Insufficient Balance
+              </>
+            ) : blockedReason ? (
+              <>
+                <ShieldAlert className="w-4 h-4 mr-2" />
+                Blocked by Risk Shield
+              </>
+            ) : isQuoteStale ? (
+              <>
+                <Clock className="w-4 h-4 mr-2" />
+                Refresh & Swap
+              </>
+            ) : (
+              "Swap"
+            )}
+          </Button>
+
           {outputToken && (outputToken.priceUsd || outputToken.marketCap) && (
             <div className="space-y-2 p-3 rounded-lg bg-muted/50 text-sm">
               <div className="flex justify-between">
@@ -1479,45 +1516,6 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
           )}
 
           </div>
-        </div>
-        
-        {/* Sticky footer with swap button - always visible */}
-        <div className="sticky bottom-0 p-4 pt-3 border-t border-border/30 bg-background">
-          <Button
-            onClick={handleSwap}
-            disabled={isSwapping || !inputAmount || parseFloat(inputAmount) <= 0 || !quote || !!blockedReason || !!isBalanceInsufficient || isBetaLocked}
-            className="w-full"
-            data-testid="button-execute-swap"
-          >
-            {isBetaLocked ? (
-              <>
-                <Lock className="w-4 h-4 mr-2" />
-                Beta Locked
-              </>
-            ) : isSwapping ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Swapping...
-              </>
-            ) : isBalanceInsufficient ? (
-              <>
-                <AlertCircle className="w-4 h-4 mr-2" />
-                Insufficient Balance
-              </>
-            ) : blockedReason ? (
-              <>
-                <ShieldAlert className="w-4 h-4 mr-2" />
-                Blocked by Risk Shield
-              </>
-            ) : isQuoteStale ? (
-              <>
-                <Clock className="w-4 h-4 mr-2" />
-                Refresh & Swap
-              </>
-            ) : (
-              "Swap"
-            )}
-          </Button>
         </div>
       </DialogContent>
     
