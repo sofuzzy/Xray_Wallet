@@ -10,38 +10,7 @@
   --font-mono: 'JetBrains Mono', monospace;
   --radius: 0.5rem;
 
-  /* Light Theme - Clean Futuristic */
-  --background: 220 15% 97%;
-  --foreground: 220 20% 10%;
-
-  --card: 0 0% 100%;
-  --card-foreground: 220 20% 10%;
-
-  --popover: 0 0% 100%;
-  --popover-foreground: 220 20% 10%;
-
-  --primary: 165 80% 40%;
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 220 15% 92%;
-  --secondary-foreground: 220 20% 20%;
-
-  --muted: 220 15% 94%;
-  --muted-foreground: 220 10% 45%;
-
-  --accent: 270 80% 60%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 75% 55%;
-  --destructive-foreground: 0 0% 100%;
-
-  --border: 220 15% 88%;
-  --input: 220 15% 88%;
-  --ring: 165 80% 40%;
-}
-
-.dark {
-  /* Dark Theme - Clean Futuristic */
+  /* Dark Theme Only - Clean Futuristic */
   --background: 225 25% 6%;
   --foreground: 220 15% 90%;
 
@@ -86,13 +55,9 @@
 }
 
 @layer utilities {
-  /* Modern glassmorphism panel */
+  /* Modern glassmorphism panel (dark mode only) */
   .glass-panel {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-xl;
-  }
-
-  .dark .glass-panel {
-    @apply bg-card/60 border-white/5 shadow-2xl;
+    @apply bg-card/60 backdrop-blur-xl border border-white/5 shadow-2xl;
     box-shadow: 
       0 25px 50px -12px rgba(0, 0, 0, 0.4),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
@@ -100,10 +65,6 @@
 
   /* Subtle accent glow for important elements */
   .accent-glow {
-    box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.4);
-  }
-
-  .dark .accent-glow {
     box-shadow: 0 0 60px -15px hsl(var(--primary) / 0.3);
   }
 

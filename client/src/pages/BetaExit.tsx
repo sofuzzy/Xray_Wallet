@@ -1,7 +1,6 @@
 import { FlaskConical, Mail, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function BetaExit() {
   const handleGoBack = () => {
@@ -12,10 +11,6 @@ export default function BetaExit() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">

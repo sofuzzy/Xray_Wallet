@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { ArrowLeft, Shield, AlertTriangle, ShieldAlert, Zap } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import xrayLogo from "@/assets/xray-logo.png";
 
 export default function Disclaimer() {
@@ -14,7 +13,6 @@ export default function Disclaimer() {
           </Link>
           <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen" />
         </div>
-        <ThemeToggle />
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-8">

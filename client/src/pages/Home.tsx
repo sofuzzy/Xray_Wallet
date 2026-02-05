@@ -30,7 +30,6 @@ import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDiscl
 import { OnboardingWalkthrough, hasCompletedWalkthrough } from "@/components/OnboardingWalkthrough";
 import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass, Lock } from "lucide-react";
 import { Link } from "wouter";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { SiX, SiGithub } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -196,9 +195,6 @@ export default function Home() {
         {/* Subtle gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/3" />
         
-        <div className="absolute top-4 right-4 z-20">
-          <ThemeToggle />
-        </div>
         
         <div className="relative z-10 text-center space-y-8 max-w-md w-full">
           {/* Logo */}
@@ -412,7 +408,6 @@ export default function Home() {
           {user?.profileImageUrl && (
             <img src={user.profileImageUrl} alt="Profile" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-border hidden sm:block" />
           )}
-          <ThemeToggle />
           <Link href="/explore" className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
             <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
           </Link>
