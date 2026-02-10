@@ -1659,8 +1659,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get swap transaction from Jupiter (beta-gated)
-  app.post("/api/swaps/transaction", hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
+  // Get swap transaction from Jupiter (beta-gated, no auth required - wallet-first approach)
+  app.post("/api/swaps/transaction", optionalAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const { quote, userPublicKey, priorityFee, riskShieldDisabled, enabledCheckCodes } = req.body;
 
@@ -1731,8 +1731,8 @@ export async function registerRoutes(
     }
   });
 
-  // Send signed transaction (beta-gated)
-  app.post("/api/swaps/send", hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
+  // Send signed transaction (beta-gated, no auth required - wallet-first approach)
+  app.post("/api/swaps/send", optionalAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const { signedTransaction, skipPreflight, lastValidBlockHeight, turboMode } = req.body;
       
@@ -1789,8 +1789,8 @@ export async function registerRoutes(
     }
   });
 
-  // Legacy execute endpoint (backward compatibility, beta-gated)
-  app.post(api.swaps.execute.path, hybridAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
+  // Legacy execute endpoint (backward compatibility, beta-gated, no auth required)
+  app.post(api.swaps.execute.path, optionalAuth, strictRateLimiter, requireBetaUnlockOrBuyingToken, async (req, res) => {
     try {
       const input = api.swaps.execute.input.parse(req.body);
       
@@ -1811,8 +1811,8 @@ export async function registerRoutes(
     }
   });
 
-  // Price history routes
-  app.get("/api/prices/:mint", hybridAuth, async (req, res) => {
+  // Price history routes (no auth required - wallet-first approach)
+  app.get("/api/prices/:mint", optionalAuth, async (req, res) => {
     try {
       const { mint } = req.params;
       const timeframe = (req.query.timeframe as string) || "24h";
