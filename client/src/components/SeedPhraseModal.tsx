@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, User, Skull, Coins, Zap } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Download, Upload, AlertTriangle, Check, Loader2, Fingerprint, Shield, Trash2, Key, ShieldAlert, ShieldCheck, RotateCcw, Cloud, CloudUpload, CloudDownload, Lock, Skull, Coins, Zap, SlidersHorizontal } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { useBiometric } from "@/hooks/use-biometric";
@@ -8,7 +8,6 @@ import { useRiskShieldSettings } from "@/hooks/use-risk-shield-settings";
 import { useTurboMode } from "@/hooks/use-turbo-mode";
 import { useVault } from "@/hooks/use-vault";
 import { useVaultContext } from "@/contexts/VaultContext";
-import { useCurrentUser, useUpdateUser } from "@/hooks/use-users";
 import { validateMnemonic } from "@/lib/solana";
 import { validatePassphrase, getPassphraseStrength } from "@/lib/vaultCrypto";
 import { Button } from "@/components/ui/button";
@@ -58,7 +57,7 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const turboMode = useTurboMode();
   const vault = useVault();
   const localVault = useVaultContext();
-  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "profile" | "cleanup">("backup");
+  const [tab, setTab] = useState<"backup" | "restore" | "security" | "cloud" | "trade" | "cleanup">("backup");
   const [showPhrase, setShowPhrase] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
@@ -73,9 +72,6 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
   const [showCloudPassphrase, setShowCloudPassphrase] = useState(false);
   const [cloudMode, setCloudMode] = useState<"backup" | "restore">("backup");
   const [confirmDeleteVault, setConfirmDeleteVault] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
-  const { data: currentUser } = useCurrentUser();
-  const updateUserMutation = useUpdateUser();
 
   const seedPhrase = getSeedPhrase();
   const words = seedPhrase?.split(" ") || [];
@@ -213,12 +209,8 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
             <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud" | "profile" | "cleanup")}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "backup" | "restore" | "security" | "cloud" | "trade" | "cleanup")}>
             <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="profile" data-testid="tab-profile">
-                <User className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Profile</span>
-              </TabsTrigger>
               <TabsTrigger value="backup" data-testid="tab-backup">
                 <Download className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Export</span>
@@ -235,67 +227,15 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 <Shield className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
+              <TabsTrigger value="trade" data-testid="tab-trade-settings">
+                <SlidersHorizontal className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Trade</span>
+              </TabsTrigger>
               <TabsTrigger value="cleanup" data-testid="tab-cleanup">
                 <Coins className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Cleanup</span>
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="profile" className="space-y-4 mt-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Current Username</label>
-                  <div className="p-3 rounded-lg bg-muted border border-border">
-                    <p className="text-sm font-mono">{currentUser?.user?.username || currentUser?.user?.firstName || "Not set"}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">New Username</label>
-                  <Input
-                    type="text"
-                    placeholder="Enter new username (3-30 characters)"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    data-testid="input-new-username"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Username must be 3-30 characters long.
-                  </p>
-                </div>
-
-                <Button
-                  onClick={async () => {
-                    if (newUsername.length < 3 || newUsername.length > 30) {
-                      toast({ title: "Invalid Username", description: "Username must be 3-30 characters.", variant: "destructive" });
-                      return;
-                    }
-                    try {
-                      await updateUserMutation.mutateAsync({ username: newUsername });
-                      toast({ title: "Username Updated", description: "Your username has been changed successfully." });
-                      setNewUsername("");
-                    } catch {
-                      toast({ title: "Update Failed", description: "Could not update username.", variant: "destructive" });
-                    }
-                  }}
-                  disabled={!newUsername.trim() || newUsername.length < 3 || updateUserMutation.isPending}
-                  className="w-full"
-                  data-testid="button-update-username"
-                >
-                  {updateUserMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Update Username
-                    </>
-                  )}
-                </Button>
-              </div>
-            </TabsContent>
 
             <TabsContent value="backup" className="space-y-4 mt-4">
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
@@ -811,71 +751,70 @@ export function SeedPhraseModal({ isOpen, onClose }: SeedPhraseModalProps) {
                 </Button>
               )}
 
-              {/* Turbo Mode Section */}
-              <div className="border-t border-border pt-4 mt-4">
-                <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex gap-3 mb-4">
-                  <Zap className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-                  <div className="text-sm text-foreground/80">
-                    <p className="font-medium text-foreground">Turbo Mode</p>
-                    <p className="mt-1">Ultra-fast transactions via Helius Sender with Jito tips. Adds a small tip ({turboMode.tipAmountSol} SOL) to each transaction for priority processing.</p>
-                  </div>
-                </div>
+            </TabsContent>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border mb-4">
-                  <div className="flex items-center gap-3">
-                    {turboMode.enabled ? (
-                      <Zap className="w-5 h-5 text-yellow-500" />
-                    ) : (
-                      <Zap className="w-5 h-5 text-muted-foreground" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium">Enable Turbo Mode</p>
-                      <p className="text-xs text-muted-foreground">
-                        {turboMode.enabled ? `Active (+${turboMode.tipAmountSol} SOL per tx)` : "Disabled"}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={turboMode.enabled}
-                    onCheckedChange={turboMode.setEnabled}
-                    data-testid="switch-turbo-mode"
-                  />
+            <TabsContent value="trade" className="space-y-4 mt-4">
+              <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex gap-3 mb-4">
+                <Zap className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                <div className="text-sm text-foreground/80">
+                  <p className="font-medium text-foreground">Turbo Mode</p>
+                  <p className="mt-1">Ultra-fast transactions via Helius Sender with Jito tips. Adds a small tip ({turboMode.tipAmountSol} SOL) to each transaction for priority processing.</p>
                 </div>
-
-                {turboMode.enabled && (
-                  <div className="p-3 rounded-lg bg-muted/50 border border-border mb-4">
-                    <label className="text-xs text-muted-foreground mb-2 block">Jito Tip Amount (SOL)</label>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant={turboMode.tipAmountSol === 0.0002 ? "default" : "outline"}
-                        onClick={() => turboMode.setTipAmount(0.0002)}
-                        data-testid="button-tip-low"
-                      >
-                        0.0002 (Min)
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={turboMode.tipAmountSol === 0.0005 ? "default" : "outline"}
-                        onClick={() => turboMode.setTipAmount(0.0005)}
-                        data-testid="button-tip-medium"
-                      >
-                        0.0005
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={turboMode.tipAmountSol === 0.001 ? "default" : "outline"}
-                        onClick={() => turboMode.setTipAmount(0.001)}
-                        data-testid="button-tip-high"
-                      >
-                        0.001
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* X-Ray Shield Section */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border mb-4">
+                <div className="flex items-center gap-3">
+                  {turboMode.enabled ? (
+                    <Zap className="w-5 h-5 text-yellow-500" />
+                  ) : (
+                    <Zap className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">Enable Turbo Mode</p>
+                    <p className="text-xs text-muted-foreground">
+                      {turboMode.enabled ? `Active (+${turboMode.tipAmountSol} SOL per tx)` : "Disabled"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={turboMode.enabled}
+                  onCheckedChange={turboMode.setEnabled}
+                  data-testid="switch-turbo-mode"
+                />
+              </div>
+
+              {turboMode.enabled && (
+                <div className="p-3 rounded-lg bg-muted/50 border border-border mb-4">
+                  <label className="text-xs text-muted-foreground mb-2 block">Jito Tip Amount (SOL)</label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={turboMode.tipAmountSol === 0.0002 ? "default" : "outline"}
+                      onClick={() => turboMode.setTipAmount(0.0002)}
+                      data-testid="button-tip-low"
+                    >
+                      0.0002 (Min)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={turboMode.tipAmountSol === 0.0005 ? "default" : "outline"}
+                      onClick={() => turboMode.setTipAmount(0.0005)}
+                      data-testid="button-tip-medium"
+                    >
+                      0.0005
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={turboMode.tipAmountSol === 0.001 ? "default" : "outline"}
+                      onClick={() => turboMode.setTipAmount(0.001)}
+                      data-testid="button-tip-high"
+                    >
+                      0.001
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-border pt-4 mt-4">
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex gap-3 mb-4">
                   <ShieldAlert className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
