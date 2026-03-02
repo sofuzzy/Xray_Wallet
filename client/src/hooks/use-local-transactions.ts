@@ -39,7 +39,7 @@ function saveTransactions(transactions: LocalTransaction[]) {
 export function useLocalTransactions(walletAddress?: string) {
   const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
 
-  useEffect(() => {
+  const loadTransactions = useCallback(() => {
     const all = getStoredTransactions();
     if (walletAddress) {
       const filtered = all.filter(
@@ -50,6 +50,16 @@ export function useLocalTransactions(walletAddress?: string) {
       setTransactions(all);
     }
   }, [walletAddress]);
+
+  useEffect(() => {
+    loadTransactions();
+  }, [loadTransactions]);
+
+  useEffect(() => {
+    const handler = () => loadTransactions();
+    window.addEventListener("local-transaction-added", handler);
+    return () => window.removeEventListener("local-transaction-added", handler);
+  }, [loadTransactions]);
 
   const addTransaction = useCallback((tx: Omit<LocalTransaction, "id" | "timestamp">) => {
     const newTx: LocalTransaction = {

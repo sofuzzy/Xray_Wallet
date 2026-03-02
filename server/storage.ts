@@ -53,6 +53,7 @@ export interface IStorage {
   getWalletByPublicKey(publicKey: string): Promise<Wallet | undefined>;
 
   getTransactions(userId: string): Promise<Transaction[]>;
+  getTransactionsByAddress(address: string): Promise<Transaction[]>;
   createTransaction(tx: InsertTransaction): Promise<Transaction>;
 
   getTokenLaunches(userId: string): Promise<TokenLaunch[]>;
@@ -132,6 +133,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.timestamp));
+  }
+
+  async getTransactionsByAddress(address: string): Promise<Transaction[]> {
+    return await db
+      .select()
+      .from(transactions)
+      .where(or(eq(transactions.fromAddr, address), eq(transactions.toAddr, address)))
       .orderBy(desc(transactions.timestamp));
   }
 

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
-import { userWallets } from "@shared/schema";
+import { userWallets, type Transaction } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -1083,12 +1083,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.transactions.list.path, hybridAuth, async (req, res) => {
-    const userId = req.tokenUser!.sub;
+  app.get(api.transactions.list.path, optionalAuth, async (req, res) => {
+    const userId = req.tokenUser?.sub || null;
     const { address } = req.query;
     
-    // Get database transactions
-    const dbTxs = await storage.getTransactions(userId);
+    // Get database transactions (by userId if authenticated, or by address)
+    let dbTxs: Transaction[] = [];
+    if (userId) {
+      dbTxs = await storage.getTransactions(userId);
+    } else if (address && typeof address === "string") {
+      dbTxs = await storage.getTransactionsByAddress(address);
+    }
     
     // If wallet address provided, also fetch on-chain transactions
     if (address && typeof address === "string") {
@@ -1109,21 +1114,20 @@ export async function registerRoutes(
         return res.json(allTxs);
       } catch (error) {
         console.error("Error fetching on-chain transactions:", error);
-        // Fall back to just database transactions
       }
     }
     
     res.json(dbTxs);
   });
 
-  app.post(api.transactions.create.path, hybridAuth, strictRateLimiter, async (req, res) => {
-    const userId = req.tokenUser!.sub;
+  app.post(api.transactions.create.path, optionalAuth, strictRateLimiter, async (req, res) => {
+    const userId = req.tokenUser?.sub || null;
 
     try {
       const input = api.transactions.create.input.parse(req.body);
       const tx = await storage.createTransaction({
         ...input,
-        userId, // Force userId to current user
+        userId,
       });
       res.status(201).json(tx);
     } catch (err) {
@@ -1227,7 +1231,7 @@ export async function registerRoutes(
   });
 
   // Activity logs endpoint - supports both authenticated users and wallet-based queries
-  app.get("/api/activity-logs", hybridAuth, async (req, res) => {
+  app.get("/api/activity-logs", optionalAuth, async (req, res) => {
     try {
       const userId = req.tokenUser?.sub;
       const { walletAddress } = req.query;
