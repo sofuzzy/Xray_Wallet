@@ -9,7 +9,7 @@ import { VaultUnlockModal } from "@/components/VaultUnlockModal";
 import { WalletOnboarding } from "@/components/WalletOnboarding";
 import { SyncDevicesBanner } from "@/components/SyncDevicesBanner";
 import { CursorGlow } from "@/components/CursorGlow";
-import { BetaStatusBanner, useBetaStatus } from "@/components/BetaStatusBanner";
+import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { SwapModal } from "@/components/SwapModal";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
@@ -102,7 +102,6 @@ function VaultGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <BetaStatusBanner onBuyXray={() => setIsBuyXrayOpen(true)} />
       <SyncDevicesBanner onEnableSync={() => setShowSyncModal(true)} />
       {children}
       {isBuyXrayOpen && xrayTokenMint && (
