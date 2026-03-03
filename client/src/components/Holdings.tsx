@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, Coins, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Coins, TrendingUp, TrendingDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/use-wallet";
 import { TradingViewModal } from "./TradingViewModal";
 
@@ -112,17 +112,38 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
 
   if (isLoading) {
     return (
-      <Card className="p-6">
-        <div className="flex justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="rounded-md border border-border/40 p-6" data-testid="holdings-skeleton">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <Skeleton className="h-5 w-20 mb-2" />
+            <Skeleton className="h-7 w-28" />
+          </div>
+          <Skeleton className="h-4 w-16" />
         </div>
-      </Card>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-20 mb-1.5" />
+                  <Skeleton className="h-3 w-14" />
+                </div>
+              </div>
+              <div className="text-right">
+                <Skeleton className="h-4 w-16 mb-1.5" />
+                <Skeleton className="h-3 w-12 ml-auto" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
     <>
-      <Card className="p-6">
+      <div className="rounded-md border border-border/40 p-6">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger asChild>
             <button
@@ -147,10 +168,10 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
               </div>
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4">
-            <div className="space-y-2">
+          <CollapsibleContent className="mt-5">
+            <div className="space-y-3">
               <div
-                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-all duration-200"
                 onClick={() => handleAssetClick({
                   mint: SOL_MINT,
                   name: "Solana",
@@ -191,15 +212,15 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                   const displaySymbol = token.symbol || token.mint.slice(0, 4).toUpperCase();
                   const priceChange = token.priceChange24h;
                   const priceChangeColor = priceChange && priceChange > 0 
-                    ? "text-green-500" 
+                    ? "text-green-500/70" 
                     : priceChange && priceChange < 0 
-                      ? "text-destructive" 
+                      ? "text-destructive/70" 
                       : "text-muted-foreground";
                   
                   return (
                     <div
                       key={token.mint}
-                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                      className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-all duration-200"
                       onClick={() => handleAssetClick({
                         mint: token.mint,
                         name: displayName,
@@ -266,7 +287,7 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
             </div>
           </CollapsibleContent>
         </Collapsible>
-      </Card>
+      </div>
 
       {selectedToken && (
         <TradingViewModal

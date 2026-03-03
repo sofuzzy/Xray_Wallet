@@ -1082,7 +1082,6 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                 <Zap className="w-3 h-3 mr-1" />
                 Jupiter
               </Badge>
-              <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
             </DialogTitle>
           </DialogHeader>
 
@@ -1090,16 +1089,40 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">You send</label>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-primary hover:text-primary"
-                onClick={handleMaxClick}
-                disabled={isSwapping || inputTokenBalance <= 0}
-                data-testid="button-max-amount"
-              >
-                MAX
-              </Button>
+              <div className="flex items-center gap-1">
+                {[25, 50, 100].map((pct) => (
+                  <Button
+                    key={pct}
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                    onClick={() => {
+                      if (inputMint === "SOL") {
+                        const maxAmount = Math.max(0, balance - 0.01);
+                        const amount = maxAmount * (pct / 100);
+                        setInputAmount(amount > 0 ? amount.toFixed(9).replace(/\.?0+$/, '') : "0");
+                      } else {
+                        const amount = inputTokenBalance * (pct / 100);
+                        setInputAmount(amount.toString());
+                      }
+                    }}
+                    disabled={isSwapping || inputTokenBalance <= 0}
+                    data-testid={`button-amount-${pct}`}
+                  >
+                    {pct}%
+                  </Button>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-primary"
+                  onClick={handleMaxClick}
+                  disabled={isSwapping || inputTokenBalance <= 0}
+                  data-testid="button-max-amount"
+                >
+                  MAX
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Input
@@ -1107,7 +1130,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                 placeholder="0.0"
                 value={inputAmount}
                 onChange={(e) => setInputAmount(e.target.value)}
-                className="flex-1"
+                className="flex-1 border-border/50 focus:border-border"
                 disabled={isSwapping}
                 data-testid="input-swap-amount"
               />
@@ -1150,7 +1173,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                 placeholder="0.0"
                 value={quoteLoading ? "Loading..." : quoteError ? "No route" : outputAmount}
                 readOnly
-                className="flex-1"
+                className="flex-1 border-border/50"
                 data-testid="output-swap-amount"
               />
               <Button
@@ -1283,23 +1306,20 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             <button
               type="button"
               onClick={() => setSettingsExpanded(!settingsExpanded)}
-              className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-muted/50 hover-elevate"
+              className="flex items-center justify-between w-full py-1.5 px-2.5 rounded-md hover-elevate"
               data-testid="button-swap-settings-toggle"
             >
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Swap Settings</span>
-              </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  Slippage: {slippageMode === "auto" ? `Auto (${effectiveSlippagePct}%)` : `${effectiveSlippagePct}%`}
+                  {slippageMode === "auto" ? `${effectiveSlippagePct}% slip` : `${effectiveSlippagePct}%`}
                   {" · "}
-                  Route: {dexOption === "auto" ? "Best" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1)}
+                  {dexOption === "auto" ? "Auto" : dexOption.charAt(0).toUpperCase() + dexOption.slice(1)}
                   {" · "}
-                  Priority: {priorityFee.charAt(0).toUpperCase() + priorityFee.slice(1)}
+                  {priorityFee.charAt(0).toUpperCase() + priorityFee.slice(1)}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${settingsExpanded ? "rotate-180" : ""}`} />
               </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${settingsExpanded ? "rotate-180" : ""}`} />
             </button>
 
             {settingsExpanded && (
@@ -1453,13 +1473,13 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-border/30">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-primary" />
-              <span className="text-sm">Risk Shield</span>
+          <div className="flex items-center justify-between pt-1.5">
+            <div className="flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Risk Shield {riskShieldSettings.enabled ? "active" : "off"}</span>
               {riskShieldSettings.shameMode && (
-                <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
-                  Shame Mode
+                <Badge variant="secondary" className="text-[10px]">
+                  Shame
                 </Badge>
               )}
             </div>
@@ -1467,10 +1487,10 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
               variant="ghost"
               size="sm"
               onClick={() => setRiskChecksModalOpen(true)}
-              className="text-xs h-7"
+              className="text-xs h-6"
               data-testid="button-risk-shield-settings"
             >
-              Settings
+              Configure
             </Button>
           </div>
 

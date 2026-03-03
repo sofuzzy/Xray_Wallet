@@ -371,8 +371,8 @@ export default function Home() {
               </Link>
             </div>
 
-            <p className="text-center text-xs text-muted-foreground/50">
-              XRAY Wallet v0.9.9
+            <p className="text-center text-[10px] text-muted-foreground/40">
+              XRAY Wallet
             </p>
           </div>
         </div>
@@ -385,9 +385,9 @@ export default function Home() {
       {/* Subtle gradient accent */}
       <div className="fixed inset-0 pointer-events-none bg-gradient-to-br from-primary/3 via-transparent to-accent/2" />
 
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <img src={xrayLogo} alt="XRAY" className="h-8 mix-blend-screen" />
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen" />
           <WalletSwitcher
             wallets={wallets}
             activeWallet={activeWallet}
@@ -398,15 +398,11 @@ export default function Home() {
             registeredWallets={registeredWallets}
             isAuthenticated={isAuthenticated}
           />
-          <span className="hidden sm:inline-block px-2 py-1 text-[10px] font-semibold tracking-wide rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">BETA</span>
+          <span className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-medium tracking-wide rounded-full bg-amber-500/10 text-amber-500/70">BETA</span>
         </div>
-        <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
-          <div className="text-right hidden md:block">
-            <p className="text-sm font-medium text-foreground">{user?.firstName || "User"}</p>
-            <p className="text-xs text-muted-foreground">@{user?.email?.split("@")[0] || "user"}</p>
-          </div>
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {user?.profileImageUrl && (
-            <img src={user.profileImageUrl} alt="Profile" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-border hidden sm:block" />
+            <img src={user.profileImageUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-border/50 hidden sm:block" />
           )}
           <Link href="/explore" className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
             <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -435,12 +431,9 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto pt-8 space-y-8 relative z-10">
+      <main className="max-w-2xl mx-auto pt-8 space-y-10 relative z-10">
         <div className="px-6">
           <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
-          <div className="flex justify-center mt-3 sm:hidden">
-            <span className="px-2 py-1 text-[10px] font-semibold tracking-wide rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">BETA</span>
-          </div>
         </div>
 
         <div className="px-6">
@@ -472,15 +465,6 @@ export default function Home() {
 
         <div className="px-6">
           <MyTokens />
-        </div>
-
-        <div className="px-6">
-          <div className="flex items-center justify-center gap-3 p-3 rounded border border-primary/30 bg-primary/5 text-sm font-mono">
-            <Shield className="w-4 h-4 text-primary flex-shrink-0" />
-            <span className="text-muted-foreground">
-              <span className="text-primary font-bold">NON_CUSTODIAL:</span> Server cannot sign transactions. Your keys are stored locally.
-            </span>
-          </div>
         </div>
 
         <div className="px-6">

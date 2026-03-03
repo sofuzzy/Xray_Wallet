@@ -16,6 +16,7 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
       icon: ArrowUpRight, 
       onClick: onSend, 
       variant: "default" as const,
+      className: "bg-emerald-600 dark:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-600",
       testId: "button-send" 
     },
     { 
@@ -33,37 +34,36 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
       testId: "button-swap" 
     },
     { 
-      label: "Coming Soon", 
+      label: "Launch", 
       icon: Rocket, 
-      onClick: () => {}, 
+      onClick: onLaunch || (() => {}), 
       variant: "secondary" as const,
-      className: "opacity-50 cursor-not-allowed",
       testId: "button-launch",
-      disabled: true
+      disabled: !onLaunch
     },
   ];
 
   return (
-    <div className="flex gap-5 justify-center py-6">
+    <div className="flex gap-8 justify-center py-8">
       {buttons.map((btn, idx) => (
         <motion.div
           key={btn.label}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: idx * 0.08, type: "spring", stiffness: 200 }}
-          className="flex flex-col items-center gap-2.5"
+          className="flex flex-col items-center gap-3"
         >
           <Button
             size="icon"
             variant={btn.variant}
             onClick={btn.onClick}
-            disabled={'disabled' in btn && btn.disabled}
-            className={`w-14 h-14 rounded-2xl ${btn.className || ''}`}
+            disabled={btn.disabled}
+            className={`w-16 h-16 rounded-2xl ${btn.className || ''}`}
             data-testid={btn.testId}
           >
-            <btn.icon className="w-5 h-5" strokeWidth={2} />
+            <btn.icon className="w-6 h-6" strokeWidth={2} />
           </Button>
-          <span className="text-sm font-medium text-muted-foreground">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {btn.label}
           </span>
         </motion.div>

@@ -1,0 +1,64 @@
+UI/UX Polish Request (based on current screens)
+
+Goal:
+Make Xray feel like a premium, professional consumer wallet (Phantom-level polish): calmer visuals, clearer hierarchy, less clutter, more whitespace, consistent components. This is a UI-only change (no core logic changes).
+
+Global Design System
+1) Reduce visual noise
+- Tone down glows and heavy gradients on cards (especially the main balance card).
+- Prefer subtle borders + soft shadows over neon outlines.
+- Reduce the thickness/contrast of card borders across the app.
+
+2) Spacing + layout consistency
+- Standardize paddings/margins using an 8px scale (8/16/24/32).
+- Increase internal card padding (20–24px minimum).
+- Add more vertical spacing between sections (home/portfolio currently feels compressed).
+
+3) Typography hierarchy
+- Make “Total Balance” and the USD value the primary hero.
+- De-emphasize secondary labels (e.g., SOLANA/Mainnet/NON_CUSTODIAL) using lighter color and smaller size.
+- Standardize number formatting + alignment (SOL + USD + token amounts).
+
+4) Buttons and controls
+- One primary action per view (solid green).
+- Secondary actions should be outline or subtle fill.
+- Remove unnecessary outlined icon button styling where it looks “dev UI”.
+- Add clear disabled states with tooltips/reasons.
+
+Specific Screen Changes
+
+A) Home / Portfolio
+- Remove the version badge from the wallet card (e.g., v0.9.9).
+- Simplify the wallet header area: reduce repeated “BETA” tags (keep one global Beta tag in header only).
+- Make Send / Receive / Swap buttons larger, aligned, and more “wallet-like” (Phantom style).
+- Reduce the heavy border on the Holdings panel; make it feel lighter and more integrated.
+- Non-custodial notice should be smaller and less visually dominant (more “info” than “banner”).
+
+B) Token Explorer
+- Reduce card border thickness and remove heavy glow.
+- Increase spacing between token cards.
+- Make % change badges less intense so they don’t dominate.
+- Reduce “Hot” badges frequency/visual weight (too many looks spammy).
+- Ensure search behavior feels instant and results are visually clear.
+
+C) Token Detail Modal
+- Simplify the header (reduce icons and clutter).
+- Make the chart area larger.
+- Reduce third-party embed chrome/branding appearance if possible (or style container so it feels native).
+- Replace “Trade [TOKEN]” with “Swap” and make it a clean primary button.
+
+D) Swap Modal
+- Cleaner amount inputs: reduce strong outlines; show balance subtly below.
+- Add quick % buttons (25/50/100) in addition to Max.
+- Make slippage/route/priority line smaller and calmer (less prominent).
+- Make Risk Shield section look informational (not alarmist) and consistent with the rest of the modal.
+
+Micro-interactions + polish
+- Add skeleton loaders for portfolio, token list, chart, swap quote.
+- Add toasts for copy, tx submitted, tx confirmed/failed.
+- Smooth modal open/close transitions and hover states on cards/buttons.
+
+Constraints / Deliverable
+- UI/UX changes only; keep functionality the same.
+- Must look consistent on desktop + mobile widths.
+- End result should feel like “Phantom meets modern fintech”: calmer, cleaner, more trustworthy.

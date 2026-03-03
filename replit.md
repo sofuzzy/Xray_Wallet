@@ -13,12 +13,15 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Design Philosophy
-The UI adopts a clean, edgy futuristic aesthetic:
+The UI adopts a premium, calmer aesthetic (Phantom-level polish):
 - **Color Palette**: Deep slate backgrounds with teal/emerald primary and purple accent.
 - **Typography**: Inter for body text, JetBrains Mono for monospace data.
-- **Effects**: Subtle glassmorphism with backdrop-blur, modern gradients, and minimal shadows.
-- **Components**: Utilizes shadcn/ui Button components.
-- **Cards**: Modern gradient backgrounds with subtle mesh overlays and gradient borders.
+- **Effects**: Subtle glassmorphism with backdrop-blur, toned-down gradients, soft shadows (not neon).
+- **Components**: Utilizes shadcn/ui Button components, Skeleton loaders for loading states.
+- **Cards**: Soft borders (border-border/40), minimal gradient overlays, professional feel.
+- **Spacing**: 8px scale (8/16/24/32), generous internal card padding, spacious section gaps.
+- **Visual Hierarchy**: Hero balance display, de-emphasized secondary labels, single BETA badge in header only.
+- **Action Buttons**: Large (w-16 h-16), Phantom-style, Send as primary green, others secondary.
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript.

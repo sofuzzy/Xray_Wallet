@@ -72,7 +72,7 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
 }) {
   return (
     <Card 
-      className="p-4 cursor-pointer hover-elevate active-elevate-2 transition-all"
+      className="p-4 cursor-pointer hover-elevate active-elevate-2 transition-all border-border/50"
       onClick={onClick}
       data-testid={`token-card-${token.symbol}`}
     >
@@ -89,8 +89,8 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-foreground">{token.symbol}</h3>
               {token.isTrending && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  <Flame className="w-2.5 h-2.5 mr-0.5 text-orange-500" />
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 opacity-70">
+                  <Flame className="w-2.5 h-2.5 mr-0.5 text-orange-400" />
                   Hot
                 </Badge>
               )}
@@ -115,9 +115,15 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
         <div className="flex items-center justify-between">
           <span className="text-lg font-bold text-foreground">{formatPrice(token.priceUsd)}</span>
           {token.priceChange24h !== undefined && (
-            <Badge variant={token.priceChange24h >= 0 ? "default" : "destructive"} className="text-xs">
-              {token.priceChange24h >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-              {Math.abs(token.priceChange24h).toFixed(1)}%
+            <Badge variant="secondary" className="text-[11px]">
+              {token.priceChange24h >= 0 ? (
+                <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
+              ) : (
+                <TrendingDown className="w-3 h-3 mr-1 text-red-500" />
+              )}
+              <span className={token.priceChange24h >= 0 ? "text-green-500" : "text-red-500"}>
+                {Math.abs(token.priceChange24h).toFixed(1)}%
+              </span>
             </Badge>
           )}
         </div>
@@ -522,7 +528,7 @@ export default function TokenExplorer() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b-2 border-border px-6 py-4 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/60 px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <Link href="/" data-testid="link-logo-home">
             <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen hover:opacity-80 transition-opacity" />
@@ -536,9 +542,9 @@ export default function TokenExplorer() {
       </header>
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold font-mono text-primary glow-text">&gt; TOKEN_EXPLORER</h1>
-          <p className="text-muted-foreground">Discover and track Solana tokens</p>
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-foreground">Token Explorer</h1>
+          <p className="text-sm text-muted-foreground">Discover and track Solana tokens</p>
         </div>
 
       <div className="flex gap-2">
@@ -598,7 +604,7 @@ export default function TokenExplorer() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {displayTokens.map((token) => (
             <TokenCard
               key={token.mint}

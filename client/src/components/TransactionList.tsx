@@ -47,9 +47,20 @@ export function TransactionList({ transactions, localTransactions = [], currentA
 
   if (isLoading) {
     return (
-      <div className="space-y-4 px-4">
+      <div className="space-y-3 px-4">
+        <div className="h-5 w-32 bg-muted rounded-md animate-pulse mb-4 ml-1" />
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 w-full bg-muted rounded-2xl animate-pulse" />
+          <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-muted/30">
+            <div className="w-10 h-10 rounded-full bg-muted animate-pulse flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-20 bg-muted rounded-md animate-pulse" />
+              <div className="h-3 w-28 bg-muted/70 rounded-md animate-pulse" />
+            </div>
+            <div className="space-y-2 text-right">
+              <div className="h-4 w-24 bg-muted rounded-md animate-pulse ml-auto" />
+              <div className="h-3 w-16 bg-muted/70 rounded-md animate-pulse ml-auto" />
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -103,7 +114,7 @@ export function TransactionList({ transactions, localTransactions = [], currentA
 
   return (
     <div className="space-y-3 px-4 pb-20">
-      <h3 className="text-lg font-bold mb-4 ml-1">Recent Activity</h3>
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 ml-1">Recent Activity</h3>
       
       {swapBlockLogs.length > 0 && (
         <div className="space-y-2 mb-4">
@@ -174,7 +185,7 @@ export function TransactionList({ transactions, localTransactions = [], currentA
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className="flex items-center justify-between p-4 rounded-2xl bg-muted/50 border border-border hover:bg-muted transition-colors cursor-pointer group block"
+            className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group block"
             data-testid={`transaction-item-${tx.id}`}
           >
             <div className="flex items-center gap-4">

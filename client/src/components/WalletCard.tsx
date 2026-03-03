@@ -142,7 +142,7 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
       
       {/* Subtle mesh gradient overlay */}
-      <div className="absolute inset-0 opacity-60" style={{
+      <div className="absolute inset-0 opacity-30" style={{
         background: `
           radial-gradient(ellipse at 20% 20%, hsl(165 85% 45% / 0.15) 0%, transparent 50%),
           radial-gradient(ellipse at 80% 80%, hsl(270 80% 65% / 0.1) 0%, transparent 50%)
@@ -150,7 +150,7 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
       }} />
       
       {/* Grid pattern */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{
+      <div className="absolute inset-0 opacity-[0.015]" style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
         backgroundSize: '30px 30px'
       }} />
@@ -158,20 +158,20 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
       {/* Gradient border effect */}
       <div className="absolute inset-0 rounded-2xl" style={{
         padding: '1px',
-        background: 'linear-gradient(135deg, hsl(165 85% 45% / 0.4), hsl(270 80% 65% / 0.2), transparent)',
+        background: 'linear-gradient(135deg, hsl(165 85% 45% / 0.2), hsl(270 80% 65% / 0.1), transparent)',
         WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
         WebkitMaskComposite: 'xor',
         maskComposite: 'exclude'
       }} />
 
       {/* Content */}
-      <div className="relative h-full p-6 md:p-8 flex flex-col justify-between z-10">
+      <div className="relative h-full p-7 md:p-9 flex flex-col justify-between z-10">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
               <Wallet className="w-4 h-4 text-white/80" />
             </div>
-            <span className="text-white/60 text-xs font-medium tracking-wide uppercase">
+            <span className="text-white/40 text-[10px] font-medium tracking-widest uppercase">
               Solana
             </span>
           </div>
@@ -184,14 +184,14 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
             >
               <RefreshCw className={`w-4 h-4 text-white/80 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            <div className="px-3 py-1.5 rounded-full bg-primary/20 backdrop-blur-sm border border-primary/30 text-primary text-xs font-medium">
+            <div className="px-2 py-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-white/40 text-[10px] font-medium tracking-wide">
               Mainnet
             </div>
           </div>
         </div>
 
-        <div className="space-y-1">
-          <p className="text-white/60 text-sm font-medium tracking-wide uppercase">Total Balance</p>
+        <div className="space-y-1.5">
+          <p className="text-white/40 text-xs font-medium tracking-widest uppercase">Total Balance</p>
           {isLoadingPrice ? (
             <div className="flex items-center gap-2">
               <Loader2 className="w-5 h-5 animate-spin text-white/50" />
@@ -199,13 +199,13 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
             </div>
           ) : (
             <>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white" data-testid="text-total-usd-balance">
+              <h2 className="text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-none" data-testid="text-total-usd-balance">
                 ${totalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h2>
-              <p className="text-white/60 text-sm font-medium mt-1 font-mono" data-testid="text-sol-balance">
+              <p className="text-white/50 text-sm font-medium mt-1.5 font-mono" data-testid="text-sol-balance">
                 {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
                 {tokensUsdValue > 0 && (
-                  <span className="text-emerald-300"> + ${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} tokens</span>
+                  <span className="text-emerald-300/80"> + ${tokensUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} tokens</span>
                 )}
               </p>
             </>
@@ -219,9 +219,6 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
               {address ? shortenAddress(address, 6) : "Loading..."}
               <Copy className="w-3.5 h-3.5" />
             </div>
-          </div>
-          <div className="text-white/30 text-xs font-medium px-2 py-1 rounded-md bg-white/10">
-            v0.9.9
           </div>
         </div>
       </div>

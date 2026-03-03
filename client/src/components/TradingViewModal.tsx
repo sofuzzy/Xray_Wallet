@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, TrendingDown, ExternalLink, Copy, Check, 
   ArrowDownUp
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface Token {
   mint: string;
@@ -104,7 +102,6 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
               <div>
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-lg font-bold">{currentToken.name}</DialogTitle>
-                  <span className="px-2 py-0.5 text-xs font-bold font-mono rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">BETA</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{currentToken.symbol}</span>
@@ -158,9 +155,9 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
           </div>
 
           {!isSolToken && (
-            <div className="bg-muted/30 rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between p-3 border-b border-border">
-                <span className="text-sm text-muted-foreground">Live Chart</span>
+            <div className="rounded-lg overflow-hidden border border-border/50">
+              <div className="flex items-center justify-between gap-2 p-3 bg-muted/20">
+                <span className="text-sm font-medium text-muted-foreground">Live Chart</span>
                 <a
                   href={`https://dexscreener.com/solana/${token.mint}`}
                   target="_blank"
@@ -172,7 +169,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
                   Open in DexScreener
                 </a>
               </div>
-              <div className="relative w-full" style={{ height: "300px" }}>
+              <div className="relative w-full" style={{ height: "350px" }}>
                 <iframe
                   src={`https://dexscreener.com/solana/${token.mint}?embed=1&theme=dark&trades=0&info=0`}
                   className="absolute inset-0 w-full h-full border-0"
@@ -191,7 +188,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
               data-testid="button-trade-token"
             >
               <ArrowDownUp className="w-4 h-4 mr-2" />
-              Trade {currentToken.symbol}
+              Swap {currentToken.symbol}
             </Button>
           )}
 
