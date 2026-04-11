@@ -1,6 +1,6 @@
 const BIRDEYE_API = "https://public-api.birdeye.so";
-const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-const PROVIDER_TIMEOUT = 3000;
+const GECKOTERMINAL_API = "https://api.geckoterminal.com/api/v2";
+const PROVIDER_TIMEOUT = 5000;
 const CACHE_TTL = 7 * 60 * 1000;
 
 export interface OHLCPoint {
@@ -52,6 +52,15 @@ const INTERVAL_TO_LOOKBACK_SECONDS: Record<string, number> = {
   "1d":  365 * 24 * 60 * 60,
 };
 
+const GECKO_TIMEFRAME: Record<string, { tf: string; agg: number }> = {
+  "1m":  { tf: "minute", agg: 1 },
+  "5m":  { tf: "minute", agg: 5 },
+  "15m": { tf: "minute", agg: 15 },
+  "1h":  { tf: "hour",   agg: 1 },
+  "4h":  { tf: "hour",   agg: 4 },
+  "1d":  { tf: "day",    agg: 1 },
+};
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, ms: number): Promise<Response> {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), ms);
@@ -67,6 +76,9 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, ms: numb
 }
 
 async function fetchFromBirdeye(mint: string, interval: string): Promise<OHLCPoint[] | null> {
+  const apiKey = process.env.BIRDEYE_API_KEY;
+  if (!apiKey) return null;
+
   const birdeyeType = INTERVAL_TO_BIRDEYE[interval];
   if (!birdeyeType) return null;
 
@@ -74,9 +86,10 @@ async function fetchFromBirdeye(mint: string, interval: string): Promise<OHLCPoi
   const lookback = INTERVAL_TO_LOOKBACK_SECONDS[interval] ?? 24 * 60 * 60;
   const fromSec = nowSec - lookback;
 
-  const apiKey = process.env.BIRDEYE_API_KEY;
-  const headers: Record<string, string> = { "x-chain": "solana" };
-  if (apiKey) headers["X-API-KEY"] = apiKey;
+  const headers: Record<string, string> = {
+    "x-chain": "solana",
+    "X-API-KEY": apiKey,
+  };
 
   const url = `${BIRDEYE_API}/defi/ohlcv?address=${encodeURIComponent(mint)}&type=${birdeyeType}&time_from=${fromSec}&time_to=${nowSec}`;
 
@@ -101,34 +114,41 @@ async function fetchFromBirdeye(mint: string, interval: string): Promise<OHLCPoi
   }
 }
 
-async function fetchFromDexScreenerOHLC(mint: string, interval: string): Promise<OHLCPoint[] | null> {
+async function fetchFromGeckoTerminal(mint: string, interval: string): Promise<OHLCPoint[] | null> {
+  const cfg = GECKO_TIMEFRAME[interval];
+  if (!cfg) return null;
+
   try {
-    const tokensRes = await fetchWithTimeout(`${DEXSCREENER_API}/tokens/${encodeURIComponent(mint)}`, {}, PROVIDER_TIMEOUT);
-    if (!tokensRes.ok) return null;
-    const tokensJson = await tokensRes.json();
-    if (!tokensJson.pairs || tokensJson.pairs.length === 0) return null;
+    const poolsRes = await fetchWithTimeout(
+      `${GECKOTERMINAL_API}/networks/solana/tokens/${encodeURIComponent(mint)}/pools?page=1`,
+      { headers: { "Accept": "application/json;version=20230302" } },
+      PROVIDER_TIMEOUT,
+    );
+    if (!poolsRes.ok) return null;
+    const poolsJson = await poolsRes.json();
 
-    const pair = tokensJson.pairs[0];
-    const pairAddress: string = pair.pairAddress;
+    const pools = poolsJson?.data;
+    if (!Array.isArray(pools) || pools.length === 0) return null;
 
-    const intervalMap: Record<string, string> = {
-      "1m": "1", "5m": "5", "15m": "15", "1h": "60", "4h": "240", "1d": "1440"
-    };
-    const res = intervalMap[interval] ?? "15";
-    const nowSec = Math.floor(Date.now() / 1000);
-    const lookback = INTERVAL_TO_LOOKBACK_SECONDS[interval] ?? 24 * 60 * 60;
-    const fromSec = nowSec - lookback;
+    const poolAddr: string = pools[0]?.attributes?.address;
+    if (!poolAddr) return null;
 
-    const ohlcUrl = `${DEXSCREENER_API}/ohlcv/solana/${encodeURIComponent(pairAddress)}?from=${fromSec}&to=${nowSec}&res=${res}`;
-    const ohlcRes = await fetchWithTimeout(ohlcUrl, {}, PROVIDER_TIMEOUT);
+    const limit = cfg.tf === "minute" ? 1000 : cfg.tf === "hour" ? 1000 : 365;
+    const ohlcUrl = `${GECKOTERMINAL_API}/networks/solana/pools/${encodeURIComponent(poolAddr)}/ohlcv/${cfg.tf}?aggregate=${cfg.agg}&limit=${limit}&currency=usd`;
+
+    const ohlcRes = await fetchWithTimeout(
+      ohlcUrl,
+      { headers: { "Accept": "application/json;version=20230302" } },
+      PROVIDER_TIMEOUT,
+    );
     if (!ohlcRes.ok) return null;
-
     const ohlcJson = await ohlcRes.json();
-    if (!Array.isArray(ohlcJson.ohlcv) || ohlcJson.ohlcv.length === 0) return null;
 
-    const intervalSec = INTERVAL_TO_SECONDS[interval] ?? 900;
-    const points: OHLCPoint[] = ohlcJson.ohlcv.map((item: any[]) => ({
-      time:   Math.floor(item[0] / 1000),
+    const raw: any[] = ohlcJson?.data?.attributes?.ohlcv_list;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+
+    const points: OHLCPoint[] = raw.map((item: any[]) => ({
+      time:   Math.floor(Number(item[0])),
       open:   Number(item[1]),
       high:   Number(item[2]),
       low:    Number(item[3]),
@@ -137,13 +157,9 @@ async function fetchFromDexScreenerOHLC(mint: string, interval: string): Promise
     })).filter((p: OHLCPoint) => p.time > 0 && p.close > 0);
 
     return points.length >= 2 ? points : null;
-  } catch {
+  } catch (err) {
     return null;
   }
-}
-
-function generateApproxOHLC(mint: string, interval: string): OHLCPoint[] {
-  return [];
 }
 
 export async function getChartData(mint: string, interval: string): Promise<ChartResponse> {
@@ -161,11 +177,7 @@ export async function getChartData(mint: string, interval: string): Promise<Char
   points = await fetchFromBirdeye(mint, safeInterval);
 
   if (!points) {
-    points = await fetchFromDexScreenerOHLC(mint, safeInterval);
-  }
-
-  if (!points) {
-    points = generateApproxOHLC(mint, safeInterval);
+    points = await fetchFromGeckoTerminal(mint, safeInterval);
   }
 
   const result: ChartResponse = {
