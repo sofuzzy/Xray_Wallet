@@ -21,6 +21,7 @@ import {
   type DexOption
 } from "./services/jupiterSwap";
 import { getTokenPriceHistory, getTokenMetadata, getMultipleTokenMetadata } from "./services/priceHistory";
+import { getChartData } from "./services/chartService";
 import { assessTokenRisk, assessTokenRiskBatch } from "./services/tokenRiskEngine";
 import { decideTokenAction, getRiskShieldPolicy } from "./services/riskShield";
 import { buildCreatePoolTransaction, getEstimatedPoolCost } from "./services/raydiumPool";
@@ -1838,6 +1839,23 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Price history error:", error);
       res.status(500).json({ message: "Failed to fetch price history" });
+    }
+  });
+
+  // Native OHLC chart data endpoint
+  app.get("/api/charts/:mint", async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const interval = (req.query.interval as string) || "15m";
+      const validIntervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
+      if (!validIntervals.includes(interval)) {
+        return res.status(400).json({ message: "Invalid interval" });
+      }
+      const data = await getChartData(mint, interval);
+      return res.json(data);
+    } catch (error) {
+      console.error("[charts] Error:", error);
+      return res.json({ mint: req.params.mint, interval: req.query.interval || "15m", points: [] });
     }
   });
 

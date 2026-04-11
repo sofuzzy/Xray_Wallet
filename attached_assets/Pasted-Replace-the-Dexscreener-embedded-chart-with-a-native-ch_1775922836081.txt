@@ -1,0 +1,96 @@
+Replace the Dexscreener embedded chart with a native chart component.
+
+Goal:
+- Remove the Dexscreener iframe chart from the token detail modal.
+- Render a native chart inside Xray.
+- Show attribution text:
+  “Chart powered by aggregated market data”
+
+Tech choice:
+- Client chart library: lightweight-charts
+- Server data source: Birdeye OHLC endpoint (or existing server chart source if already available)
+
+Implementation requirements:
+
+1) Server endpoint
+Create:
+GET /api/charts/:mint?interval=1m|5m|15m|1h|4h|1d
+
+Response shape:
+{
+  "mint": "string",
+  "interval": "15m",
+  "points": [
+    {
+      "time": 1737068400,
+      "open": 0.0000041,
+      "high": 0.0000049,
+      "low": 0.0000038,
+      "close": 0.0000047,
+      "volume": 12345.67
+    }
+  ]
+}
+
+Rules:
+- Cache by mint + interval for 5–10 minutes
+- Timeout external chart fetches at 3 seconds
+- If source fails, return:
+  {
+    "mint": "...",
+    "interval": "...",
+    "points": []
+  }
+
+2) Client component
+Create:
+client/src/components/TokenChart.tsx
+
+Props:
+- mint: string
+- symbol?: string
+- interval?: string
+
+Behavior:
+- Fetch chart data from /api/charts/:mint?interval=...
+- Render a candlestick chart using lightweight-charts
+- Render volume bars below the candles if possible
+- Show timeframe buttons:
+  1m / 5m / 15m / 1h / 4h / 1d
+- Default timeframe: 15m
+- Use skeleton loading while fetching
+- If no data:
+  show “Chart unavailable right now”
+
+3) Styling
+- Match current Xray dark theme
+- Subtle grid lines
+- Clean spacing
+- Rounded chart container
+- No third-party branding visible
+- Add small muted attribution text under the chart:
+  “Chart powered by aggregated market data”
+
+4) Integrate into token detail modal
+- Replace the current Dexscreener iframe/embed with <TokenChart />
+- Keep current token detail stats above the chart
+- Keep Swap button below chart
+
+5) UX details
+- Do not refetch on every render
+- Refetch only when:
+  - mint changes
+  - interval changes
+  - user manually refreshes
+- Use React Query with staleTime 5 minutes
+- Disable refetchOnWindowFocus
+
+6) Constraints
+- Do not expose API keys to client
+- Keep data fetching server-side
+- If Birdeye is not yet configured, stub the endpoint cleanly so UI still works
+
+Deliverable:
+- Token detail modal uses a native chart component instead of Dexscreener embed
+- Attribution text reads:
+  “Chart powered by aggregated market data”

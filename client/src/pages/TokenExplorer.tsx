@@ -14,6 +14,7 @@ import {
 import { Link } from "wouter";
 import xrayLogo from "@/assets/xray-logo.png";
 import { SwapModal } from "@/components/SwapModal";
+import { TokenChart } from "@/components/TokenChart";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { PublicKey } from "@solana/web3.js";
@@ -245,14 +246,7 @@ function TokenDetail({ token, onBack, onAddToWatchlist, onSwap }: {
       </div>
 
       <Card className="p-4">
-        <h3 className="font-medium text-foreground mb-4">Chart</h3>
-        <div className="aspect-video rounded-lg bg-muted flex items-center justify-center">
-          <iframe
-            src={`https://dexscreener.com/solana/${token.mint}?embed=1&theme=dark&trades=0&info=0`}
-            className="w-full h-full rounded-lg border-0"
-            title={`${token.symbol} Chart`}
-          />
-        </div>
+        <TokenChart mint={token.mint} symbol={token.symbol} />
       </Card>
 
       <div className="flex flex-wrap gap-3">

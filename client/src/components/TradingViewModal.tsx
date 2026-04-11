@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { TokenChart } from "./TokenChart";
 
 interface Token {
   mint: string;
@@ -155,30 +156,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
           </div>
 
           {!isSolToken && (
-            <div className="rounded-lg overflow-hidden border border-border/50">
-              <div className="flex items-center justify-between gap-2 p-3 bg-muted/20">
-                <span className="text-sm font-medium text-muted-foreground">Live Chart</span>
-                <a
-                  href={`https://dexscreener.com/solana/${token.mint}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                  data-testid="link-dexscreener-chart"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  Open in DexScreener
-                </a>
-              </div>
-              <div className="relative w-full" style={{ height: "350px" }}>
-                <iframe
-                  src={`https://dexscreener.com/solana/${token.mint}?embed=1&theme=dark&trades=0&info=0`}
-                  className="absolute inset-0 w-full h-full border-0"
-                  title="DexScreener Chart"
-                  sandbox="allow-scripts allow-same-origin"
-                  data-testid="iframe-dexscreener"
-                />
-              </div>
-            </div>
+            <TokenChart mint={token.mint} symbol={currentToken.symbol} />
           )}
 
           {!isSolToken && (

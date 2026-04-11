@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, ChevronDown, ChevronUp, Eye, Trash2, Plus, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { TokenChart } from "./TokenChart";
+import { TradingViewModal } from "./TradingViewModal";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WatchlistToken } from "@shared/schema";
@@ -341,12 +341,18 @@ export function Watchlist() {
         </Collapsible>
       </Card>
 
-      <TokenChart
-        isOpen={showChartModal}
-        onClose={() => setShowChartModal(false)}
-        tokenMint={selectedToken?.tokenMint || ""}
-        tokenSymbol={selectedToken?.tokenSymbol}
-      />
+      {showChartModal && selectedToken && (
+        <TradingViewModal
+          isOpen={showChartModal}
+          onClose={() => setShowChartModal(false)}
+          token={{
+            mint: selectedToken.tokenMint,
+            name: selectedToken.tokenName,
+            symbol: selectedToken.tokenSymbol,
+            decimals: selectedToken.tokenDecimals ?? 9,
+          }}
+        />
+      )}
     </>
   );
 }

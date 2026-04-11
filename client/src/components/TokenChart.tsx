@@ -1,178 +1,245 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, RefreshCw, ArrowRightLeft, ExternalLink } from "lucide-react";
-import { tokenManager } from "@/lib/tokenManager";
+import { Loader2, RefreshCw, BarChart2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  createChart,
+  ColorType,
+  CrosshairMode,
+  CandlestickSeries,
+  HistogramSeries,
+} from "lightweight-charts";
+
+interface OHLCPoint {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface ChartResponse {
+  mint: string;
+  interval: string;
+  points: OHLCPoint[];
+}
 
 interface TokenChartProps {
-  isOpen: boolean;
-  onClose: () => void;
-  tokenMint: string;
-  tokenSymbol?: string;
-  onSwap?: () => void;
-}
-
-interface TokenInfo {
   mint: string;
-  symbol: string;
-  name: string;
-  currentPrice: number;
-  priceChange24h: number;
-  pairAddress?: string;
+  symbol?: string;
+  interval?: string;
 }
 
-function formatPrice(price: number): string {
-  if (price < 0.0001) return price.toExponential(2);
-  if (price < 0.01) return price.toFixed(6);
-  if (price < 1) return price.toFixed(4);
-  if (price < 100) return price.toFixed(2);
-  return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
+const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
+type Interval = typeof INTERVALS[number];
 
-function ChartSkeleton() {
-  return (
-    <div className="space-y-4" data-testid="chart-skeleton">
-      <div className="text-center space-y-2">
-        <Skeleton className="h-9 w-32 mx-auto" />
-        <Skeleton className="h-4 w-24 mx-auto" />
-      </div>
-      <div className="h-[400px] w-full">
-        <Skeleton className="h-full w-full" />
-      </div>
-    </div>
-  );
-}
+export function TokenChart({ mint, symbol, interval: initialInterval }: TokenChartProps) {
+  const [activeInterval, setActiveInterval] = useState<Interval>((initialInterval as Interval) ?? "15m");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+  const candleSeriesRef = useRef<any>(null);
+  const volumeSeriesRef = useRef<any>(null);
 
-export function TokenChart({ isOpen, onClose, tokenMint, tokenSymbol, onSwap }: TokenChartProps) {
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-
-  const { data: tokenInfo, isLoading, refetch, isFetching } = useQuery<TokenInfo>({
-    queryKey: ["/api/prices", tokenMint, "info"],
+  const { data, isLoading, isFetching } = useQuery<ChartResponse>({
+    queryKey: ["/api/charts", mint, activeInterval, refreshKey],
     queryFn: async () => {
-      const token = await tokenManager.getValidAccessToken();
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-      
-      const response = await fetch(`/api/prices/${tokenMint}?timeframe=24h`, {
-        credentials: "include",
-        headers,
-      });
-      if (!response.ok) throw new Error("Failed to fetch token info");
-      const data = await response.json();
-      return {
-        mint: data.mint,
-        symbol: data.symbol,
-        name: data.name,
-        currentPrice: data.currentPrice,
-        priceChange24h: data.priceChange24h,
-        pairAddress: data.pairAddress,
-      };
+      const res = await fetch(`/api/charts/${encodeURIComponent(mint)}?interval=${activeInterval}`);
+      if (!res.ok) throw new Error("Chart fetch failed");
+      return res.json();
     },
-    enabled: isOpen && !!tokenMint,
-    staleTime: 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  const isPositive = (tokenInfo?.priceChange24h ?? 0) >= 0;
-  
-  const dexScreenerUrl = `https://dexscreener.com/solana/${tokenMint}?embed=1&theme=dark&trades=0&info=0`;
-  const dexScreenerLink = `https://dexscreener.com/solana/${tokenMint}`;
+  const buildChart = useCallback(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
 
-  const handleSwap = () => {
-    if (onSwap) {
-      onSwap();
-      onClose();
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
     }
-  };
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: 280,
+      layout: {
+        background: { type: ColorType.Solid, color: "#0c1017" },
+        textColor: "rgba(148,163,184,0.75)",
+        fontSize: 11,
+        fontFamily: "JetBrains Mono, monospace",
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,0.035)" },
+        horzLines: { color: "rgba(255,255,255,0.035)" },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
+        horzLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
+      },
+      rightPriceScale: {
+        borderVisible: false,
+        scaleMargins: { top: 0.08, bottom: 0.28 },
+      },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: activeInterval === "1m" || activeInterval === "5m",
+        fixLeftEdge: false,
+        fixRightEdge: false,
+      },
+      handleScroll: true,
+      handleScale: true,
+    });
+
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor:          "#10b981",
+      downColor:        "#ef4444",
+      borderUpColor:    "#10b981",
+      borderDownColor:  "#ef4444",
+      wickUpColor:      "#10b981",
+      wickDownColor:    "#ef4444",
+    });
+
+    const volSeries = chart.addSeries(HistogramSeries, {
+      color: "rgba(16,185,129,0.15)",
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+    });
+    chart.priceScale("vol").applyOptions({
+      scaleMargins: { top: 0.82, bottom: 0 },
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+    volumeSeriesRef.current = volSeries;
+
+    const ro = new ResizeObserver(() => {
+      if (chartRef.current && chartContainerRef.current) {
+        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
+    });
+    ro.observe(container);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [activeInterval]);
+
+  useEffect(() => {
+    const cleanup = buildChart();
+    return cleanup;
+  }, [buildChart]);
+
+  useEffect(() => {
+    if (!data || !candleSeriesRef.current || !volumeSeriesRef.current) return;
+    if (data.points.length === 0) return;
+
+    const sorted = [...data.points].sort((a, b) => a.time - b.time);
+
+    const deduped: OHLCPoint[] = [];
+    for (const pt of sorted) {
+      if (deduped.length === 0 || deduped[deduped.length - 1].time !== pt.time) {
+        deduped.push(pt);
+      }
+    }
+
+    try {
+      candleSeriesRef.current.setData(
+        deduped.map((p) => ({ time: p.time as any, open: p.open, high: p.high, low: p.low, close: p.close }))
+      );
+      volumeSeriesRef.current.setData(
+        deduped.map((p) => ({
+          time: p.time as any,
+          value: p.volume,
+          color: p.close >= p.open ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.15)",
+        }))
+      );
+      chartRef.current?.timeScale().fitContent();
+    } catch (err) {
+      console.warn("[TokenChart] render error:", err);
+    }
+  }, [data]);
+
+  const hasData = data && data.points.length > 0;
+  const showEmpty = !isLoading && !isFetching && !hasData;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 flex-wrap">
-            <span>{tokenInfo?.symbol || tokenSymbol || "Token"} Price Chart</span>
-            {tokenInfo && (
-              <Badge variant={isPositive ? "default" : "destructive"}>
-                {isPositive ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                {isPositive ? "+" : ""}{tokenInfo.priceChange24h.toFixed(2)}%
-              </Badge>
-            )}
-            <div className="ml-auto flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => refetch()}
-                disabled={isFetching}
-                className="h-8 w-8"
-                data-testid="button-refresh-chart"
-              >
-                <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => window.open(dexScreenerLink, "_blank")}
-                className="h-8 w-8"
-                title="Open in DexScreener"
-                data-testid="button-open-dexscreener"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </Button>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {isLoading ? (
-            <ChartSkeleton />
-          ) : (
-            <>
-              {tokenInfo && (
-                <div className="text-center">
-                  <p className="text-3xl font-bold">${formatPrice(tokenInfo.currentPrice)}</p>
-                  <p className="text-sm text-muted-foreground">{tokenInfo.name}</p>
-                </div>
-              )}
-
-              <div className="relative h-[400px] w-full rounded-lg overflow-hidden bg-black/50">
-                {!iframeLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Skeleton className="h-full w-full" />
-                  </div>
-                )}
-                <iframe
-                  src={dexScreenerUrl}
-                  className="w-full h-full border-0"
-                  onLoad={() => setIframeLoaded(true)}
-                  title="DexScreener Chart"
-                  allow="clipboard-write"
-                  loading="lazy"
-                />
-              </div>
-
-              <div className="flex gap-3 justify-center">
-                {onSwap && (
-                  <Button
-                    onClick={handleSwap}
-                    className="flex-1 max-w-xs"
-                    data-testid="button-swap-from-chart"
-                  >
-                    <ArrowRightLeft className="w-4 h-4 mr-2" />
-                    Swap {tokenInfo?.symbol || tokenSymbol || "Token"}
-                  </Button>
-                )}
-              </div>
-
-              <div className="text-center text-xs text-muted-foreground">
-                <p>Chart powered by DexScreener</p>
-              </div>
-            </>
-          )}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-0.5">
+          {INTERVALS.map((iv) => (
+            <button
+              key={iv}
+              onClick={() => setActiveInterval(iv)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                activeInterval === iv
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              data-testid={`chart-interval-${iv}`}
+            >
+              {iv}
+            </button>
+          ))}
         </div>
-      </DialogContent>
-    </Dialog>
+        <button
+          onClick={() => setRefreshKey((k) => k + 1)}
+          disabled={isFetching}
+          className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-30"
+          data-testid="chart-refresh"
+          title="Refresh chart"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      <div
+        className="rounded-lg overflow-hidden relative border border-border/20"
+        style={{ minHeight: 280, background: "#0c1017" }}
+      >
+        {isLoading && !data ? (
+          <div className="p-3" style={{ height: 280 }}>
+            <Skeleton className="h-full w-full rounded opacity-20" />
+          </div>
+        ) : showEmpty ? (
+          <div
+            className="flex flex-col items-center justify-center gap-2 text-muted-foreground"
+            style={{ height: 280 }}
+          >
+            <BarChart2 className="w-8 h-8 opacity-20" />
+            <p className="text-sm">Chart unavailable right now</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              data-testid="chart-retry"
+            >
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <>
+            {isFetching && (
+              <div className="absolute top-2 right-2 z-10">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/40" />
+              </div>
+            )}
+            <div ref={chartContainerRef} className="w-full" data-testid="chart-canvas" />
+          </>
+        )}
+      </div>
+
+      <p className="text-[10px] text-muted-foreground/35 text-right pr-1">
+        Chart powered by aggregated market data
+      </p>
+    </div>
   );
 }
