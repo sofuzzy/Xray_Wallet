@@ -106,8 +106,18 @@ export function TokenChart({ mint, symbol, interval: initialInterval }: TokenCha
   const queryClient       = useQueryClient();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
+  // Note: queryFn is explicit because the default fetcher joins the queryKey
+  // array as path segments, but our route uses ?interval= query param.
+  const fetchChart = useCallback(
+    (iv: string) =>
+      fetch(`/api/charts/${mint}?interval=${iv}`, { credentials: "include" })
+        .then(r => r.json() as Promise<ChartResponse>),
+    [mint],
+  );
+
   const { data, isLoading, isFetching } = useQuery<ChartResponse>({
     queryKey: ["/api/charts", mint, activeInterval, refreshKey],
+    queryFn: () => fetchChart(activeInterval),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -122,10 +132,11 @@ export function TokenChart({ mint, symbol, interval: initialInterval }: TokenCha
     adjacent.forEach(iv => {
       queryClient.prefetchQuery({
         queryKey: ["/api/charts", mint, iv, 0],
+        queryFn: () => fetchChart(iv),
         staleTime: 5 * 60 * 1000,
       });
     });
-  }, [mint, activeInterval, queryClient]);
+  }, [mint, activeInterval, fetchChart, queryClient]);
 
   // ── Chart initialisation — only when `mint` changes (not on interval change)
   useEffect(() => {
