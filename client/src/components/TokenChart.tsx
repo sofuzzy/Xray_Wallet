@@ -1,178 +1,262 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, RefreshCw, BarChart2 } from "lucide-react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  createChart,
-  ColorType,
-  CrosshairMode,
-  CandlestickSeries,
-  HistogramSeries,
-} from "lightweight-charts";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
 interface OHLCPoint {
   time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
+  open: number; high: number; low: number; close: number;
   volume: number;
 }
+interface ChartResponse { mint: string; interval: string; points: OHLCPoint[]; }
+interface TokenChartProps { mint: string; symbol?: string; interval?: string; }
 
-interface ChartResponse {
-  mint: string;
-  interval: string;
-  points: OHLCPoint[];
+const INTERVALS  = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
+type  Interval   = typeof INTERVALS[number];
+const CHART_H    = 280;
+
+// Adjacent intervals to prefetch when the user opens a chart
+const PREFETCH_FOR: Record<Interval, Interval[]> = {
+  "1m":  ["5m", "15m"],
+  "5m":  ["1m", "15m", "1h"],
+  "15m": ["5m", "1h", "4h"],
+  "1h":  ["15m", "4h", "1d"],
+  "4h":  ["1h", "1d"],
+  "1d":  ["4h"],
+};
+
+// ─── Data processing (pure, memoised outside component) ──────────────────────
+function processPoints(points: OHLCPoint[]) {
+  if (!points.length) return { candles: [], volumes: [] };
+  const sorted = [...points].sort((a, b) => a.time - b.time);
+  const deduped: OHLCPoint[] = [];
+  for (const pt of sorted) {
+    if (!deduped.length || deduped[deduped.length - 1].time !== pt.time) {
+      deduped.push(pt);
+    }
+  }
+  return {
+    candles: deduped.map(p => ({
+      time: p.time as any,
+      open: p.open, high: p.high, low: p.low, close: p.close,
+    })),
+    volumes: deduped.map(p => ({
+      time: p.time as any,
+      value: p.volume,
+      color: p.close >= p.open ? "rgba(16,185,129,0.22)" : "rgba(239,68,68,0.16)",
+    })),
+  };
 }
 
-interface TokenChartProps {
-  mint: string;
-  symbol?: string;
-  interval?: string;
+// ─── Skeleton shimmer ─────────────────────────────────────────────────────────
+function ChartSkeleton() {
+  return (
+    <div
+      className="w-full rounded-lg overflow-hidden relative"
+      style={{ height: CHART_H, background: "#0c1017" }}
+    >
+      {/* Simulated candle silhouettes */}
+      <div className="absolute inset-0 flex items-end gap-[3px] px-4 pb-8 pt-10 opacity-20">
+        {Array.from({ length: 48 }).map((_, i) => {
+          const h = 20 + Math.sin(i * 0.6) * 40 + Math.random() * 30;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+              <div
+                className="w-full rounded-sm animate-pulse"
+                style={{
+                  height: h,
+                  background: i % 3 === 0 ? "rgba(239,68,68,0.4)" : "rgba(16,185,129,0.4)",
+                  animationDelay: `${i * 30}ms`,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {/* Grid lines */}
+      <div className="absolute inset-0 flex flex-col justify-between px-3 py-6 pointer-events-none">
+        {[0,1,2,3].map(i => (
+          <div key={i} className="h-px bg-white/[0.03]" />
+        ))}
+      </div>
+      {/* Loading label */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-white/25 font-mono">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse" />
+          Loading chart…
+        </div>
+      </div>
+    </div>
+  );
 }
 
-const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
-type Interval = typeof INTERVALS[number];
-
+// ─── Main chart component ─────────────────────────────────────────────────────
 export function TokenChart({ mint, symbol, interval: initialInterval }: TokenChartProps) {
-  const [activeInterval, setActiveInterval] = useState<Interval>((initialInterval as Interval) ?? "15m");
+  const [activeInterval, setActiveInterval] = useState<Interval>(
+    (initialInterval as Interval) ?? "15m"
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
-  const candleSeriesRef = useRef<any>(null);
-  const volumeSeriesRef = useRef<any>(null);
+  const chartRef          = useRef<any>(null);
+  const candleRef         = useRef<any>(null);
+  const volumeRef         = useRef<any>(null);
+  const roRef             = useRef<ResizeObserver | null>(null);
+  const resizeTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient       = useQueryClient();
 
+  // ── Data fetching ──────────────────────────────────────────────────────────
   const { data, isLoading, isFetching } = useQuery<ChartResponse>({
     queryKey: ["/api/charts", mint, activeInterval, refreshKey],
-    queryFn: async () => {
-      const res = await fetch(`/api/charts/${encodeURIComponent(mint)}?interval=${activeInterval}`);
-      if (!res.ok) throw new Error("Chart fetch failed");
-      return res.json();
-    },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
 
-  const buildChart = useCallback(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
+  // ── Memoised data processing — avoids re-sorting on every parent re-render
+  const processed = useMemo(() => processPoints(data?.points ?? []), [data?.points]);
 
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
+  // ── Prefetch adjacent intervals silently when chart mounts or token changes
+  useEffect(() => {
+    const adjacent = PREFETCH_FOR[activeInterval] ?? [];
+    adjacent.forEach(iv => {
+      queryClient.prefetchQuery({
+        queryKey: ["/api/charts", mint, iv, 0],
+        staleTime: 5 * 60 * 1000,
+      });
+    });
+  }, [mint, activeInterval, queryClient]);
+
+  // ── Chart initialisation — only when `mint` changes (not on interval change)
+  useEffect(() => {
+    let cancelled = false;
+    let chart: any = null;
+
+    async function init() {
+      const container = chartContainerRef.current;
+      if (!container) return;
+
+      // Dynamic import — library only loaded when a chart is actually needed
+      const { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries }
+        = await import("lightweight-charts");
+
+      if (cancelled || !container) return;
+
+      // Destroy previous instance (token switch)
+      if (chartRef.current) {
+        roRef.current?.disconnect();
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+
+      chart = createChart(container, {
+        width:  container.clientWidth,
+        height: CHART_H,
+        layout: {
+          background: { type: ColorType.Solid, color: "#0c1017" },
+          textColor:  "rgba(148,163,184,0.75)",
+          fontSize:   11,
+          fontFamily: "JetBrains Mono, monospace",
+        },
+        grid: {
+          vertLines: { color: "rgba(255,255,255,0.03)" },
+          horzLines: { color: "rgba(255,255,255,0.03)" },
+        },
+        crosshair: {
+          mode:     CrosshairMode.Normal,
+          vertLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
+          horzLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
+        },
+        rightPriceScale: {
+          borderVisible: false,
+          scaleMargins:  { top: 0.08, bottom: 0.28 },
+        },
+        timeScale: {
+          borderVisible:  false,
+          timeVisible:    true,
+          secondsVisible: false,
+          fixLeftEdge:    false,
+          fixRightEdge:   false,
+        },
+        handleScroll: true,
+        handleScale:  true,
+      });
+
+      const candleSeries = chart.addSeries(CandlestickSeries, {
+        upColor:         "#10b981",
+        downColor:       "#ef4444",
+        borderUpColor:   "#10b981",
+        borderDownColor: "#ef4444",
+        wickUpColor:     "#10b981",
+        wickDownColor:   "#ef4444",
+      });
+
+      const volSeries = chart.addSeries(HistogramSeries, {
+        color:       "rgba(16,185,129,0.15)",
+        priceFormat: { type: "volume" },
+        priceScaleId:"vol",
+      });
+      chart.priceScale("vol").applyOptions({
+        scaleMargins: { top: 0.82, bottom: 0 },
+      });
+
+      chartRef.current  = chart;
+      candleRef.current = candleSeries;
+      volumeRef.current = volSeries;
+
+      // Debounced ResizeObserver — prevents repaint storm during window resize
+      roRef.current = new ResizeObserver(() => {
+        if (resizeTimer.current) clearTimeout(resizeTimer.current);
+        resizeTimer.current = setTimeout(() => {
+          if (chartRef.current && chartContainerRef.current) {
+            chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+          }
+        }, 60);
+      });
+      roRef.current.observe(container);
     }
 
-    const chart = createChart(container, {
-      width: container.clientWidth,
-      height: 280,
-      layout: {
-        background: { type: ColorType.Solid, color: "#0c1017" },
-        textColor: "rgba(148,163,184,0.75)",
-        fontSize: 11,
-        fontFamily: "JetBrains Mono, monospace",
-      },
-      grid: {
-        vertLines: { color: "rgba(255,255,255,0.035)" },
-        horzLines: { color: "rgba(255,255,255,0.035)" },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
-        horzLine: { color: "rgba(148,163,184,0.25)", width: 1, style: 3, labelBackgroundColor: "#1e293b" },
-      },
-      rightPriceScale: {
-        borderVisible: false,
-        scaleMargins: { top: 0.08, bottom: 0.28 },
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-        secondsVisible: activeInterval === "1m" || activeInterval === "5m",
-        fixLeftEdge: false,
-        fixRightEdge: false,
-      },
-      handleScroll: true,
-      handleScale: true,
-    });
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor:          "#10b981",
-      downColor:        "#ef4444",
-      borderUpColor:    "#10b981",
-      borderDownColor:  "#ef4444",
-      wickUpColor:      "#10b981",
-      wickDownColor:    "#ef4444",
-    });
-
-    const volSeries = chart.addSeries(HistogramSeries, {
-      color: "rgba(16,185,129,0.15)",
-      priceFormat: { type: "volume" },
-      priceScaleId: "vol",
-    });
-    chart.priceScale("vol").applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0 },
-    });
-
-    chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-    volumeSeriesRef.current = volSeries;
-
-    const ro = new ResizeObserver(() => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
-      }
-    });
-    ro.observe(container);
+    init();
 
     return () => {
-      ro.disconnect();
-      chart.remove();
+      cancelled = true;
+      if (resizeTimer.current) clearTimeout(resizeTimer.current);
+      roRef.current?.disconnect();
+      chart?.remove();
       chartRef.current = null;
     };
+  }, [mint]); // ← Only re-create chart when the TOKEN changes, not the interval
+
+  // ── When interval changes: update time-scale options only (no chart rebuild)
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.timeScale().applyOptions({
+      timeVisible:    true,
+      secondsVisible: activeInterval === "1m" || activeInterval === "5m",
+    });
   }, [activeInterval]);
 
+  // ── Push new data into existing series whenever data arrives
   useEffect(() => {
-    const cleanup = buildChart();
-    return cleanup;
-  }, [buildChart]);
-
-  useEffect(() => {
-    if (!data || !candleSeriesRef.current || !volumeSeriesRef.current) return;
-    if (data.points.length === 0) return;
-
-    const sorted = [...data.points].sort((a, b) => a.time - b.time);
-
-    const deduped: OHLCPoint[] = [];
-    for (const pt of sorted) {
-      if (deduped.length === 0 || deduped[deduped.length - 1].time !== pt.time) {
-        deduped.push(pt);
-      }
-    }
+    if (!candleRef.current || !volumeRef.current) return;
+    if (!processed.candles.length) return;
 
     try {
-      candleSeriesRef.current.setData(
-        deduped.map((p) => ({ time: p.time as any, open: p.open, high: p.high, low: p.low, close: p.close }))
-      );
-      volumeSeriesRef.current.setData(
-        deduped.map((p) => ({
-          time: p.time as any,
-          value: p.volume,
-          color: p.close >= p.open ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.15)",
-        }))
-      );
+      candleRef.current.setData(processed.candles);
+      volumeRef.current.setData(processed.volumes);
       chartRef.current?.timeScale().fitContent();
     } catch (err) {
-      console.warn("[TokenChart] render error:", err);
+      console.warn("[TokenChart] setData error:", err);
     }
-  }, [data]);
+  }, [processed]);
 
-  const hasData = data && data.points.length > 0;
+  const hasData  = processed.candles.length > 0;
   const showEmpty = !isLoading && !isFetching && !hasData;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="token-chart-root">
+
+      {/* Interval selector */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-0.5">
           {INTERVALS.map((iv) => (
@@ -191,7 +275,7 @@ export function TokenChart({ mint, symbol, interval: initialInterval }: TokenCha
           ))}
         </div>
         <button
-          onClick={() => setRefreshKey((k) => k + 1)}
+          onClick={() => setRefreshKey(k => k + 1)}
           disabled={isFetching}
           className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-30"
           data-testid="chart-refresh"
@@ -201,44 +285,51 @@ export function TokenChart({ mint, symbol, interval: initialInterval }: TokenCha
         </button>
       </div>
 
+      {/* Chart area */}
       <div
         className="rounded-lg overflow-hidden relative border border-border/20"
-        style={{ minHeight: 280, background: "#0c1017" }}
+        style={{ background: "#0c1017" }}
       >
-        {isLoading && !data ? (
-          <div className="p-3" style={{ height: 280 }}>
-            <Skeleton className="h-full w-full rounded opacity-20" />
-          </div>
-        ) : showEmpty ? (
+        {/* Skeleton while first load */}
+        {isLoading && !data && <ChartSkeleton />}
+
+        {/* Empty state */}
+        {showEmpty && (
           <div
             className="flex flex-col items-center justify-center gap-2 text-muted-foreground"
-            style={{ height: 280 }}
+            style={{ height: CHART_H }}
           >
             <BarChart2 className="w-8 h-8 opacity-20" />
-            <p className="text-sm">Chart unavailable right now</p>
+            <p className="text-sm">Chart unavailable</p>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setRefreshKey((k) => k + 1)}
+              onClick={() => setRefreshKey(k => k + 1)}
               data-testid="chart-retry"
             >
               Try again
             </Button>
           </div>
-        ) : (
-          <>
-            {isFetching && (
-              <div className="absolute top-2 right-2 z-10">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/40" />
-              </div>
-            )}
-            <div ref={chartContainerRef} className="w-full" data-testid="chart-canvas" />
-          </>
         )}
+
+        {/* Stale-data spinner overlay (non-blocking) */}
+        {isFetching && hasData && (
+          <div className="absolute top-2 right-2 z-10 opacity-60">
+            <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Canvas — always rendered so chart can attach */}
+        <div
+          ref={chartContainerRef}
+          className="w-full"
+          style={{ display: showEmpty ? "none" : "block" }}
+          data-testid="chart-canvas"
+        />
       </div>
 
-      <p className="text-[10px] text-muted-foreground/35 text-right pr-1">
-        Chart powered by aggregated market data
+      <p className="text-[10px] text-muted-foreground/30 text-right pr-1 font-mono">
+        Aggregated market data
       </p>
     </div>
   );

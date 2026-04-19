@@ -1,53 +1,27 @@
 # Xray - Solana Wallet Application
 
 ## Overview
-
-Xray is a non-custodial Solana mainnet wallet application designed for managing SOL tokens with a modern, futuristic interface. It provides essential wallet functionalities including sending/receiving SOL, token swaps, and a token launchpad. The application supports both Passkey (WebAuthn) and Replit Auth for user authentication, storing wallet data securely in a PostgreSQL database without ever exposing private keys to the server.
-
-The project's vision is to offer a secure, user-friendly, and feature-rich Solana wallet experience that leverages cutting-edge web technologies and blockchain capabilities.
+Xray is a non-custodial Solana mainnet wallet application for managing SOL tokens with a modern, futuristic interface. It offers essential wallet functionalities like sending/receiving SOL, token swaps, staking, and a token launchpad. The application supports both Passkey (WebAuthn) and Replit Auth for user authentication, storing wallet data securely in a PostgreSQL database without exposing private keys to the server. The project aims to provide a secure, user-friendly, and feature-rich Solana wallet experience leveraging cutting-edge web technologies and blockchain capabilities.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
 ### Design Philosophy
-The UI adopts a premium, calmer aesthetic (Phantom-level polish):
-- **Color Palette**: Deep slate backgrounds with teal/emerald primary and purple accent.
-- **Typography**: Inter for body text, JetBrains Mono for monospace data.
-- **Effects**: Subtle glassmorphism with backdrop-blur, toned-down gradients, soft shadows (not neon).
-- **Components**: Utilizes shadcn/ui Button components, Skeleton loaders for loading states.
-- **Cards**: Soft borders (border-border/40), minimal gradient overlays, professional feel.
-- **Spacing**: 8px scale (8/16/24/32), generous internal card padding, spacious section gaps.
-- **Visual Hierarchy**: Hero balance display, de-emphasized secondary labels, single BETA badge in header only.
-- **Action Buttons**: Large (w-16 h-16), Phantom-style, Send as primary green, others secondary.
+The UI emphasizes a premium, calm aesthetic with deep slate backgrounds, teal/emerald primary, and purple accent colors. Typography uses Inter for body text and JetBrains Mono for monospace. Visuals incorporate subtle glassmorphism, toned-down gradients, and soft shadows. Components utilize shadcn/ui, including Skeleton loaders and cards with soft borders and minimal gradients. Spacing follows an 8px scale for generous padding and section gaps. Visual hierarchy prioritizes balance display and de-emphasizes secondary labels. Action buttons are large and Phantom-style, with Send as the primary action.
 
-### App Header (Responsive)
-- **Component**: `client/src/components/AppHeader.tsx` — modular, replaces inline header in `Home.tsx`
-- **Desktop layout**: Logo | WalletSwitcher | BETA badge | DegenToggle | profile img | Compass | Settings | Lock | LogOut
-- **Mobile layout**: Logo | WalletSwitcher (max-w-80px truncated) | DegenToggle (compact) | ⋯ menu button
-- **Mobile ⋯ menu**: Bottom Sheet with Explore, Settings, Lock, Log Out — each with icon, label, description
-- WalletSwitcher name truncates at 80px mobile / 130px desktop to prevent overflow
-
-### Degen Mode
-A toggleable alternate UI mode with a trader-terminal aesthetic, accessible from the header.
-- **Toggle**: `DegenModeToggle` button in the main header; preference persisted in `localStorage` (`xray_degen_mode`)
-- **Context**: `client/src/contexts/DegenModeContext.tsx` — `useDegenMode()` hook provides `isDegenMode` + `toggle`
-- **Dashboard**: `client/src/components/degen/DegenDashboard.tsx` — full-page swap when degen is active
-  - Scrolling ticker strip with live prices
-  - Compact wallet balance bar
-  - Tab navigation: Trending / New & Low MC / Portfolio / Activity
-  - Trending tab: hot tokens sorted by price momentum with live data from `/api/swaps/trending`
-  - New/Low MC tab: tokens sorted by market cap ascending (early-stage opportunities)
-  - Portfolio tab: wraps existing `Holdings` component
-  - Activity tab: wraps existing `TransactionList` component
-- **Token Cards**: `client/src/components/degen/DegenTokenCard.tsx` — compact cards with:
-  - Automated badges: HOT, MOON, MOMENTUM, HIGH RISK, LOW LIQ, EARLY (based on live data)
-  - Stats grid: Vol 24h, Liquidity, Market Cap
-  - Quick actions: Chart (opens TradingViewModal), Swap (opens SwapModal), Solscan link, Copy contract
-- **All existing safety/risk logic is preserved**: risk checks, warnings, RiskShield, beta gating all remain active
-- **Data source**: reuses existing `/api/swaps/trending` and `/api/swaps/tokens` endpoints, no new backend routes needed
+### Core Features
+- **Degen Mode**: A toggleable alternate UI with a trader-terminal aesthetic, featuring live price tickers, compact balance bar, and tab navigation for trending tokens, new/low MC tokens, portfolio, and activity.
+- **Wallet-First Onboarding**: Streamlined onboarding process starting with wallet setup (create, import, restore), followed by PIN creation for local vault encryption. Authentication is optional for cloud backup.
+- **Non-Custodial Wallet Security**: Keypairs are generated client-side, with private keys never leaving the user's device. Wallet data is encrypted in `localStorage` using AES-256-GCM and PBKDF2, decrypted only when unlocked with a PIN. Multi-wallet support and multi-device sync (public addresses only) are included.
+- **Staking**: Supports native Solana staking including delegation, activation, deactivation, and withdrawal.
+- **Token Launchpad**: Enables server-assisted creation of custom SPL tokens with configurable parameters, optional image upload, and Raydium CPMM liquidity pool creation. Uses getSignatureStatuses for transaction confirmation.
+- **Chart Performance**: Optimized chart components with dynamic import of `lightweight-charts`, `useMemo` for data processing, prefetching, and debounced resizing. Zero-dependency SVG sparklines are used for token lists.
+- **Beta Unlock Gating**: Transaction features are gated by holding ≥5,000 XRAY tokens, enforced by server-side middleware and client-side UI disabling.
+- **Token Account Cleanup**: Allows users to close empty SPL token accounts to reclaim SOL rent deposits, supporting both SPL Token and Token-2022 programs with batching.
+- **Turbo Mode**: Optional feature for ultra-fast transaction processing via Helius Sender with Jito tips for priority validator processing.
+- **Token Swap**: Integrates Jupiter's API for server-side quote and swap transaction generation, DexScreener for token data, and advanced features like priority fees and direct DEX routing. All Solana RPC calls are routed through server endpoints to prevent API key exposure and centralize RPC control.
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript.
@@ -57,130 +31,33 @@ A toggleable alternate UI mode with a trader-terminal aesthetic, accessible from
 - **Animations**: Framer Motion.
 - **Build Tool**: Vite.
 
-The frontend is built with a component-based architecture, separating pages, reusable UI components, custom hooks for wallet, auth, and data fetching, and Solana blockchain utilities.
-
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript.
 - **Database ORM**: Drizzle ORM with PostgreSQL.
 - **Authentication**: Replit Auth (OpenID Connect via Passport.js).
 - **Session Storage**: PostgreSQL-backed sessions.
 
-The server follows a modular pattern with distinct routes, abstracted database operations, and isolated authentication integration.
-
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM.
-- **Schema Location**: `shared/schema.ts` and `shared/models/auth.ts`.
 - **Key Tables**: `users`, `sessions`, `wallets`, `transactions`, `tokenLaunches`, `autoTradeRules`, `watchlistTokens`.
-
-### Wallet-First Onboarding
-The app uses a Phantom-style wallet-first onboarding approach:
-1. **Welcome Screen**: Simple branding with "Continue" button
-2. **Wallet Setup**: Three options - Create new wallet, Import wallet, Restore from backup
-3. **PIN Creation**: 8+ character PIN for local vault encryption
-4. **Dashboard**: User lands on the main wallet interface immediately after setup
-
-Authentication (Passkey/Replit) is **optional** and only needed for the "Sync across devices" cloud backup feature. Users can use all core wallet features (send, receive, swap, launchpad) without creating an account.
-
-Key files: `client/src/components/WalletOnboarding.tsx`, `client/src/components/SyncDevicesBanner.tsx`
-
-### Wallet Implementation
-- **Non-Custodial Security**: Keypairs generated client-side; private keys never leave the user's device.
-- **Encrypted Local Vault**: All wallet data is encrypted at rest in `localStorage` using AES-256-GCM with PBKDF2 key derivation. Data is decrypted into memory only when the user provides a PIN.
-- **No Plaintext Secrets**: Mnemonic phrases and private keys are NEVER stored in plaintext localStorage. All sensitive wallet data goes through the encrypted vault system only.
-- **Memory-Only Unlock**: Decrypted wallet data lives only in React state (memory) while unlocked. A short-lived memory token tracks unlock status. On page refresh, vault returns to locked state - no secrets persisted to sessionStorage.
-- **Multi-Wallet Support**: Users can create, manage, and switch between multiple wallets, stored encrypted within the local vault.
-- **Multi-Device Wallet Sync**: Public wallet addresses (never private keys) are synced to a cloud registry (`userWallets` table) for cross-device visibility. Requires authentication.
-- **Seed Phrase Management**: Supports BIP39 12-word mnemonic for backup, restore, and generation of new wallets.
-- **Key Files**: `client/src/lib/localVault.ts`, `client/src/lib/vaultCrypto.ts`, `client/src/contexts/VaultContext.tsx`
-
-### Staking Implementation
-- Supports native Solana staking using `StakeProgram` from web3.js, including delegation, activation, deactivation, and withdrawal.
-
-### Token Launchpad Implementation
-- **Server-Assisted SPL Token Creation**: Users can create custom SPL tokens with configurable parameters
-  - Server builds unsigned transaction with mint creation, ATA, and mintTo instructions (`/api/launchpad/build-create-mint-tx`)
-  - Server signs with generated mint keypair, returns transaction to client
-  - Client signs with wallet keypair locally (non-custodial)
-  - Client submits signed transaction to server (`/api/launchpad/send-signed-tx`)
-  - Server broadcasts via Helius Sender with resend loop and getSignatureStatuses confirmation
-  - Configurable name, symbol, decimals (0-18), and total supply
-  - Optional token image upload to object storage
-  - Key file: `server/services/launchpadService.ts`
-- **Raydium CPMM Liquidity Pool Creation**: Optional pool creation after token launch
-  - Server-side transaction building via Raydium API v3 (`/api/liquidity-pool/build`)
-  - Client-side transaction signing and server-side broadcast/confirmation
-  - Configurable SOL amount (min 0.1) and token supply percentage (1-100%)
-  - Pool creation fee: ~0.3 SOL (fetched dynamically from `/api/liquidity-pool/cost`)
-  - Robust base64 decoding with URL-safe character handling
-  - Key files: `server/services/raydiumPool.ts`, `client/src/components/LaunchpadModal.tsx`
-- **Token Launch Tracking**: Launched tokens saved to database (`tokenLaunches` table)
-  - Displayed in "My Tokens" section with quick swap access
-- **Transaction Confirmation**: Uses getSignatureStatuses polling with resend loop instead of blockhash-based confirmation
-  - Avoids "block height exceeded" errors from confirming with mismatched blockhashes
-  - Key files: `server/services/heliusSender.ts`, `server/services/solanaTransactions.ts`
-
-### Beta Unlock Gating
-- **Token-Based Access Control**: Transaction features gated by holding ≥5,000 XRAY tokens
-- **Server Enforcement**: `requireBetaUnlock` middleware on all transaction routes extracts signer from request body or deserializes signed transactions
-- **Signer Extraction**: Handles both VersionedTransaction and legacy Transaction formats to prevent bypass
-- **Balance Caching**: 90-second TTL cache per wallet address to reduce RPC load
-- **Client Status**: `BetaStatusBanner` component shows unlock status with token balance
-- **Disabled UI**: Transaction buttons (swap, send, launch) disabled when beta is locked
-- **Gated Routes**: `/api/solana/send-transaction`, `/api/swaps/*`, `/api/launchpad/*`, `/api/liquidity-pool/build`
-- **Key File**: `server/middleware/requireBetaUnlock.ts`
-
-### Token Account Cleanup (Sol Incinerator-style)
-- **Reclaim SOL Rent**: Close empty SPL token accounts to reclaim rent deposits (~0.002 SOL per account)
-- **Endpoints**:
-  - `GET /api/cleanup/closeable-token-accounts?owner=<pubkey>` - List all closeable accounts (balance = 0)
-  - `POST /api/cleanup/build-close-tx` - Build unsigned close transaction(s)
-  - `POST /api/cleanup/send-close-tx` - Send signed transaction(s)
-- **Features**:
-  - Supports both SPL Token and Token-2022 programs
-  - Batches multiple close instructions per transaction (max 20 per tx)
-  - Rate-limited with Zod validation
-  - Client-side transaction signing (non-custodial)
-- **UI**: Accessible via Wallet Settings > Cleanup tab
-- **Key Files**: `server/services/tokenCleanup.ts`, `client/src/components/TokenCleanup.tsx`
-
-### Turbo Mode (Optional Fast Transactions)
-- **Feature**: Ultra-fast transaction processing via Helius Sender with Jito tips
-- **Optional**: Disabled by default - users can enable in Settings > Security tab
-- **Tip Amounts**: Configurable tip (0.0002 SOL minimum, 0.0005, or 0.001 SOL options)
-- **How It Works**: Adds a Jito tip instruction to transactions for priority validator processing
-- **Endpoint**: `GET /api/turbo/tip-account` - Returns random Jito tip account and default tip amount
-- **Helius Sender**: Uses `https://sender.helius-rpc.com/fast` (free, no API key required)
-- **Jito Tip Accounts**: 10 designated accounts in `JITO_TIP_ACCOUNTS` array
-- **Key Files**: `client/src/hooks/use-turbo-mode.ts`, `server/services/heliusSender.ts`
-
-### Token Swap Implementation (Jupiter)
-- **Jupiter API Integration**: Leverages Jupiter's API for server-side quote and swap transaction generation.
-- **Token Discovery**: Uses DexScreener API for comprehensive token data, prices, and trending information.
-- **Swap Flow**: Client-side transaction signing with server-side quote and transaction building.
-- **Advanced Features**: Includes priority fee tiers, paste-to-add token functionality, and direct DEX routing options (e.g., Orca, Raydium).
-- **RPC Manager**: Implements automatic RPC fallback across multiple endpoints with health tracking and latency-based routing.
-- **Helius Integrations**: Supports Helius Post-Trade Rebates and Helius Sender for ultra-low latency transaction broadcasting (optional, feature-flagged).
-- **Transaction Integrity Verification**: Client-side SHA256 message hash checks to prevent post-signing transaction mutations.
-- **Server-Only RPC Architecture**: ALL Solana RPC calls are routed through server endpoints (`/api/solana/*`). No client-side RPC connections to mainnet. This prevents exposure of API keys and provides centralized RPC control via Helius.
 
 ## External Dependencies
 
 ### Blockchain
-- **Solana Web3.js**: Core interaction with the Solana blockchain.
-- **@solana/spl-token**: For SPL token operations.
+- **Solana Web3.js**: Core interaction with Solana blockchain.
+- **@solana/spl-token**: SPL token operations.
 - **bs58**: Base58 encoding.
 - **Network**: Solana Mainnet (mainnet-beta).
 
 ### Authentication & Security
-- **Passkey Authentication**: Primary WebAuthn-based passwordless authentication.
-- **Replit Auth**: Alternative OpenID Connect authentication.
+- **Passkey Authentication**: WebAuthn-based passwordless authentication.
+- **Replit Auth**: OpenID Connect authentication.
 - **Passport.js**: Authentication middleware.
 - **express-session**: Session management.
-- **Zero-Trust Architecture**: JWT-based authentication with short-lived access tokens, HttpOnly refresh tokens, and per-request validation.
-- **WebAuthn**: For biometric unlock (Face ID / Biometric Unlock).
+- **WebAuthn**: For biometric unlock.
 
 ### UI Components
-- **shadcn/ui**: Comprehensive UI component library.
+- **shadcn/ui**: UI component library.
 - **Lucide React**: Icon library.
 - **qrcode.react**: QR code generation.
 
@@ -192,4 +69,4 @@ Key files: `client/src/components/WalletOnboarding.tsx`, `client/src/components/
 ### Development
 - **Vite**: Build tool.
 - **esbuild**: Production server bundling.
-- **TypeScript**: For type safety across the codebase.
+- **TypeScript**: Type safety.
