@@ -113,11 +113,11 @@ export function WalletSwitcher({
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors min-w-0 max-w-full"
         data-testid="button-wallet-switcher"
       >
         <Wallet className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+        <span className="text-sm font-medium text-foreground max-w-[80px] sm:max-w-[130px] truncate">
           {activeWallet?.name || "Select Wallet"}
         </span>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />

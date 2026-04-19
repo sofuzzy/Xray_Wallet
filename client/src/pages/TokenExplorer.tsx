@@ -72,68 +72,61 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
   onAddToWatchlist: (token: { mint: string; symbol: string; name: string; decimals?: number }) => void;
 }) {
   return (
-    <Card 
-      className="p-4 cursor-pointer hover-elevate active-elevate-2 transition-all border-border/50"
+    <div
+      className="p-4 cursor-pointer transition-all duration-200 rounded-xl border border-border/40 bg-card hover:border-border/80 hover:bg-card/80"
       onClick={onClick}
       data-testid={`token-card-${token.symbol}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {token.logoURI ? (
-            <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full" />
+            <img src={token.logoURI} alt={token.symbol} className="w-9 h-9 rounded-full flex-shrink-0" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
               {token.symbol?.charAt(0) || "?"}
             </div>
           )}
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-foreground">{token.symbol}</h3>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-semibold text-foreground text-sm leading-none">{token.symbol}</h3>
               {token.isTrending && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 opacity-70">
-                  <Flame className="w-2.5 h-2.5 mr-0.5 text-orange-400" />
-                  Hot
-                </Badge>
+                <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/15 font-semibold tracking-wide">
+                  <Flame className="w-2 h-2" />
+                  HOT
+                </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate max-w-[120px]">{token.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{token.name}</p>
           </div>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals });
-          }}
-          data-testid={`button-add-watchlist-${token.symbol}`}
-        >
-          <Star className="w-4 h-4" />
-        </Button>
+
+        <div className="flex items-center gap-1">
+          <div className="text-right mr-1">
+            <div className="font-semibold text-sm font-mono text-foreground leading-none">{formatPrice(token.priceUsd)}</div>
+            {token.priceChange24h !== undefined && (
+              <div className={`text-[11px] font-medium mt-0.5 ${token.priceChange24h >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                {token.priceChange24h >= 0 ? "+" : ""}{token.priceChange24h.toFixed(1)}%
+              </div>
+            )}
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToWatchlist({ mint: token.mint, symbol: token.symbol, name: token.name, decimals: token.decimals });
+            }}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+            data-testid={`button-add-watchlist-${token.symbol}`}
+          >
+            <Star className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-lg font-bold text-foreground">{formatPrice(token.priceUsd)}</span>
-          {token.priceChange24h !== undefined && (
-            <Badge variant="secondary" className="text-[11px]">
-              {token.priceChange24h >= 0 ? (
-                <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
-              ) : (
-                <TrendingDown className="w-3 h-3 mr-1 text-red-500" />
-              )}
-              <span className={token.priceChange24h >= 0 ? "text-green-500" : "text-red-500"}>
-                {Math.abs(token.priceChange24h).toFixed(1)}%
-              </span>
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>MCap: {formatMarketCap(token.marketCap)}</span>
-          <span>Vol: {formatVolume(token.volume24h)}</span>
-        </div>
+      <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground/60 font-mono">
+        <span>MC {formatMarketCap(token.marketCap)}</span>
+        <span>VOL {formatVolume(token.volume24h)}</span>
       </div>
-    </Card>
+    </div>
   );
 }
 

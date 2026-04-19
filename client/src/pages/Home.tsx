@@ -8,7 +8,6 @@ import { useCurrentUser } from "@/hooks/use-users";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useLocalTransactions } from "@/hooks/use-local-transactions";
 import { type ActivityLog } from "@shared/schema";
-import xrayLogo from "@/assets/xray-logo.png";
 import { WalletCard } from "@/components/WalletCard";
 import { Holdings } from "@/components/Holdings";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -19,7 +18,6 @@ import { ReceiveModal } from "@/components/ReceiveModal";
 import { SwapModal } from "@/components/SwapModal";
 import { LaunchpadModal } from "@/components/LaunchpadModal";
 import { SeedPhraseModal } from "@/components/SeedPhraseModal";
-import { WalletSwitcher } from "@/components/WalletSwitcher";
 import { TokenSearch } from "@/components/TokenSearch";
 import { TradingViewModal } from "@/components/TradingViewModal";
 import { Watchlist } from "@/components/Watchlist";
@@ -28,15 +26,15 @@ import { Footer } from "@/components/Footer";
 import { LegalAcknowledgmentModal, hasAcknowledgedLegal } from "@/components/LegalAcknowledgmentModal";
 import { BetaDisclaimerModal, hasBetaAcknowledged } from "@/components/BetaDisclaimerModal";
 import { OnboardingWalkthrough, hasCompletedWalkthrough } from "@/components/OnboardingWalkthrough";
-import { LogIn, Loader2, Sparkles, LogOut, Settings, KeyRound, Shield, Fingerprint, ExternalLink, Compass, Lock } from "lucide-react";
+import { LogIn, Loader2, Sparkles, Shield, KeyRound, Fingerprint, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { SiX, SiGithub } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { tokenManager } from "@/lib/tokenManager";
 import { useDegenMode } from "@/contexts/DegenModeContext";
-import { DegenModeToggle } from "@/components/degen/DegenModeToggle";
 import { DegenDashboard } from "@/components/degen/DegenDashboard";
+import { AppHeader } from "@/components/AppHeader";
 
 interface Token {
   mint: string;
@@ -389,52 +387,20 @@ export default function Home() {
       {/* Subtle gradient accent */}
       <div className="fixed inset-0 pointer-events-none bg-gradient-to-br from-primary/3 via-transparent to-accent/2" />
 
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <img src={xrayLogo} alt="XRAY" className="h-7 mix-blend-screen" />
-          <WalletSwitcher
-            wallets={wallets}
-            activeWallet={activeWallet}
-            onSwitch={switchWallet}
-            onAdd={addWallet}
-            onRemove={removeWallet}
-            onRename={editWalletName}
-            registeredWallets={registeredWallets}
-            isAuthenticated={isAuthenticated}
-          />
-          <span className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-medium tracking-wide rounded-full bg-amber-500/10 text-amber-500/70">BETA</span>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-          <DegenModeToggle />
-          {user?.profileImageUrl && (
-            <img src={user.profileImageUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-border/50 hidden sm:block" />
-          )}
-          <Link href="/explore" className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="link-explorer">
-            <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
-          </Link>
-          <button 
-            onClick={() => setIsSeedPhraseOpen(true)}
-            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="button-settings"
-          >
-            <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <button 
-            onClick={() => lockVault()}
-            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="button-lock-vault"
-            title="Lock Wallet"
-          >
-            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <button 
-            onClick={() => logout()}
-            className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        wallets={wallets}
+        activeWallet={activeWallet}
+        onSwitch={switchWallet}
+        onAdd={addWallet}
+        onRemove={removeWallet}
+        onRename={editWalletName}
+        registeredWallets={registeredWallets}
+        isAuthenticated={isAuthenticated}
+        profileImageUrl={user?.profileImageUrl}
+        onOpenSettings={() => setIsSeedPhraseOpen(true)}
+        onLock={() => lockVault()}
+        onLogout={() => logout()}
+      />
 
       {/* Degen Mode Dashboard — full page swap */}
       {isDegenMode && (

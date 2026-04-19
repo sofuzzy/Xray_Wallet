@@ -23,6 +23,13 @@ The UI adopts a premium, calmer aesthetic (Phantom-level polish):
 - **Visual Hierarchy**: Hero balance display, de-emphasized secondary labels, single BETA badge in header only.
 - **Action Buttons**: Large (w-16 h-16), Phantom-style, Send as primary green, others secondary.
 
+### App Header (Responsive)
+- **Component**: `client/src/components/AppHeader.tsx` — modular, replaces inline header in `Home.tsx`
+- **Desktop layout**: Logo | WalletSwitcher | BETA badge | DegenToggle | profile img | Compass | Settings | Lock | LogOut
+- **Mobile layout**: Logo | WalletSwitcher (max-w-80px truncated) | DegenToggle (compact) | ⋯ menu button
+- **Mobile ⋯ menu**: Bottom Sheet with Explore, Settings, Lock, Log Out — each with icon, label, description
+- WalletSwitcher name truncates at 80px mobile / 130px desktop to prevent overflow
+
 ### Degen Mode
 A toggleable alternate UI mode with a trader-terminal aesthetic, accessible from the header.
 - **Toggle**: `DegenModeToggle` button in the main header; preference persisted in `localStorage` (`xray_degen_mode`)
