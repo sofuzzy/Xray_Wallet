@@ -23,6 +23,25 @@ The UI adopts a premium, calmer aesthetic (Phantom-level polish):
 - **Visual Hierarchy**: Hero balance display, de-emphasized secondary labels, single BETA badge in header only.
 - **Action Buttons**: Large (w-16 h-16), Phantom-style, Send as primary green, others secondary.
 
+### Degen Mode
+A toggleable alternate UI mode with a trader-terminal aesthetic, accessible from the header.
+- **Toggle**: `DegenModeToggle` button in the main header; preference persisted in `localStorage` (`xray_degen_mode`)
+- **Context**: `client/src/contexts/DegenModeContext.tsx` — `useDegenMode()` hook provides `isDegenMode` + `toggle`
+- **Dashboard**: `client/src/components/degen/DegenDashboard.tsx` — full-page swap when degen is active
+  - Scrolling ticker strip with live prices
+  - Compact wallet balance bar
+  - Tab navigation: Trending / New & Low MC / Portfolio / Activity
+  - Trending tab: hot tokens sorted by price momentum with live data from `/api/swaps/trending`
+  - New/Low MC tab: tokens sorted by market cap ascending (early-stage opportunities)
+  - Portfolio tab: wraps existing `Holdings` component
+  - Activity tab: wraps existing `TransactionList` component
+- **Token Cards**: `client/src/components/degen/DegenTokenCard.tsx` — compact cards with:
+  - Automated badges: HOT, MOON, MOMENTUM, HIGH RISK, LOW LIQ, EARLY (based on live data)
+  - Stats grid: Vol 24h, Liquidity, Market Cap
+  - Quick actions: Chart (opens TradingViewModal), Swap (opens SwapModal), Solscan link, Copy contract
+- **All existing safety/risk logic is preserved**: risk checks, warnings, RiskShield, beta gating all remain active
+- **Data source**: reuses existing `/api/swaps/trending` and `/api/swaps/tokens` endpoints, no new backend routes needed
+
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript.
 - **Routing**: Wouter.

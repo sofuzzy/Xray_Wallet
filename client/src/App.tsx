@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultProvider, useVaultContext } from "@/contexts/VaultContext";
+import { DegenModeProvider } from "@/contexts/DegenModeContext";
 import { VaultUnlockModal } from "@/components/VaultUnlockModal";
 import { WalletOnboarding } from "@/components/WalletOnboarding";
 import { SyncDevicesBanner } from "@/components/SyncDevicesBanner";
@@ -120,12 +121,14 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <CursorGlow />
-        <VaultProvider>
-          <VaultGate>
-            <Toaster />
-            <Router />
-          </VaultGate>
-        </VaultProvider>
+        <DegenModeProvider>
+          <VaultProvider>
+            <VaultGate>
+              <Toaster />
+              <Router />
+            </VaultGate>
+          </VaultProvider>
+        </DegenModeProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

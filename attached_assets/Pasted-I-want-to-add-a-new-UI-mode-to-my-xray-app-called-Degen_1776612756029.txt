@@ -1,0 +1,52 @@
+I want to add a new UI mode to my xray app called Degen Mode.
+
+Important: do not remove the existing safety logic, token analysis, warnings, or risk checks. Keep all existing backend logic and risk data intact. This is a presentation and product-flow change, not a removal of protections.
+
+Build a mode toggle with two views:
+
+1) Safety Mode
+- existing safety-first experience
+- warnings and trust signals remain prominent
+- calmer layout and visual style
+
+2) Degen Mode
+- same token/risk data underneath
+- visually transform the app into an eye-catching trader dashboard
+- dark, high-contrast, modern crypto-terminal aesthetic
+- larger price action, momentum, volume, liquidity movement, wallet flow, trending signals
+- make the experience feel fast, exciting, and scan-friendly
+- keep risk indicators visible as badges or expandable drawers, but do not make them the dominant visual element unless risk is critical
+
+For Degen Mode, implement:
+- top-level toggle in header
+- persistent saved preference
+- redesigned homepage/dashboard
+- “trending now” section
+- “whale activity” section
+- “new pairs / hot tokens” section
+- compact token cards with price, 1h/24h change, volume, liquidity, buys/sells
+- live-feed visual styling
+- quick actions for chart, contract, socials, and swap
+- badges like HOT, EARLY, MOMENTUM, WHALE IN, HIGH RISK
+- subtle animations and hover states
+- mobile responsive layout
+
+Risk handling rules:
+- keep all warnings, contract risk checks, and red flags functional
+- show a clear risk badge on every token card
+- show strong red warning banners only for severe danger states
+- include expandable risk details panel for each token
+
+Technical requirements:
+- do not rewrite the backend unless necessary
+- reuse existing data models and APIs
+- isolate the new mode in reusable UI components
+- create a theme/config layer so both modes are easy to maintain
+- keep the code modular and easy to iterate on
+
+Then:
+1. inspect the current codebase
+2. identify the minimum files to change
+3. implement the mode toggle and theme system first
+4. then redesign the main dashboard/cards for Degen Mode
+5. finally polish responsiveness and animations

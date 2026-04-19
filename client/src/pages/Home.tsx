@@ -34,6 +34,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SiX, SiGithub } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { tokenManager } from "@/lib/tokenManager";
+import { useDegenMode } from "@/contexts/DegenModeContext";
+import { DegenModeToggle } from "@/components/degen/DegenModeToggle";
+import { DegenDashboard } from "@/components/degen/DegenDashboard";
 
 interface Token {
   mint: string;
@@ -48,6 +51,7 @@ interface Token {
 }
 
 export default function Home() {
+  const { isDegenMode } = useDegenMode();
   const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { 
@@ -401,6 +405,7 @@ export default function Home() {
           <span className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-medium tracking-wide rounded-full bg-amber-500/10 text-amber-500/70">BETA</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <DegenModeToggle />
           {user?.profileImageUrl && (
             <img src={user.profileImageUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-border/50 hidden sm:block" />
           )}
@@ -431,6 +436,36 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Degen Mode Dashboard — full page swap */}
+      {isDegenMode && (
+        <>
+          <DegenDashboard />
+          <AnimatePresence>
+            {isSeedPhraseOpen && <SeedPhraseModal isOpen={isSeedPhraseOpen} onClose={() => setIsSeedPhraseOpen(false)} />}
+          </AnimatePresence>
+          <BetaDisclaimerModal
+            open={showBetaModal}
+            onAccept={() => {
+              setShowBetaModal(false);
+              if (!hasAcknowledgedLegal()) setShowLegalModal(true);
+            }}
+          />
+          <LegalAcknowledgmentModal
+            open={showLegalModal && !showBetaModal}
+            onAcknowledge={() => {
+              setShowLegalModal(false);
+              if (!hasCompletedWalkthrough()) setShowWalkthrough(true);
+            }}
+          />
+          <OnboardingWalkthrough
+            open={showWalkthrough && !showBetaModal && !showLegalModal}
+            onComplete={() => setShowWalkthrough(false)}
+          />
+        </>
+      )}
+
+      {!isDegenMode && (
+      <>
       <main className="max-w-2xl mx-auto pt-8 space-y-10 relative z-10">
         <div className="px-6">
           <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
@@ -524,6 +559,8 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+      </>
+      )}
     </div>
   );
 }
