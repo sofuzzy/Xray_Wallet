@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Flame, Zap, Wallet, Activity,
   RefreshCw, Send, Download, ArrowRightLeft, Rocket,
-  TrendingUp, TrendingDown,
+  TrendingUp, TrendingDown, Search, X, Loader2,
 } from "lucide-react";
 import { DegenTokenCard, type DegenToken } from "./DegenTokenCard";
 import { TradingViewModal } from "@/components/TradingViewModal";
@@ -262,6 +262,175 @@ interface ModalToken {
   volume24h?: number;
 }
 
+/* ── Solana address validator ────────────────────────────────────────── */
+function isValidSolanaAddress(s: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s.trim());
+}
+
+/* ── Terminal search bar ─────────────────────────────────────────────── */
+interface SearchToken {
+  mint: string; name: string; symbol: string;
+  logoURI?: string; priceUsd?: number; priceChange24h?: number;
+}
+interface DegenSearchBarProps {
+  onSelect: (t: SearchToken) => void;
+}
+function DegenSearchBar({ onSelect }: DegenSearchBarProps) {
+  const [query, setQuery]         = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [open, setOpen]           = useState(false);
+  const containerRef              = useRef<HTMLDivElement>(null);
+
+  // Debounce
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Live search
+  const { data: results = [], isLoading } = useQuery<SearchToken[]>({
+    queryKey: ["/api/tokens/search/degen", debounced],
+    queryFn: async () => {
+      if (debounced.length < 2) return [];
+      const r = await fetch(`/api/tokens/search?q=${encodeURIComponent(debounced)}&limit=10`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: debounced.length >= 2 && !isValidSolanaAddress(debounced),
+    staleTime: 30_000,
+  });
+
+  // Mint lookup
+  const { data: mintResult, isLoading: mintLoading } = useQuery<SearchToken>({
+    queryKey: ["/api/swaps/tokens/degen", debounced],
+    queryFn: async () => {
+      const r = await fetch(`/api/swaps/tokens/${debounced}`, { credentials: "include" });
+      if (!r.ok) throw new Error("not found");
+      return r.json();
+    },
+    enabled: isValidSolanaAddress(debounced),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const displayResults: SearchToken[] = useMemo(() => {
+    if (isValidSolanaAddress(debounced)) return mintResult ? [mintResult] : [];
+    return results;
+  }, [debounced, results, mintResult]);
+
+  const isSearching = isLoading || mintLoading;
+  const hasQuery    = query.trim().length >= 2;
+
+  const handleSelect = (t: SearchToken) => {
+    onSelect(t);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative px-4 pt-3 pb-1 max-w-3xl mx-auto w-full">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500/60 pointer-events-none" />
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => { if (e.key === "Escape") { setQuery(""); setOpen(false); } }}
+          placeholder="Search tokens or paste address..."
+          data-testid="input-degen-search"
+          className={[
+            "w-full h-9 pl-9 pr-8 rounded-lg text-sm font-mono",
+            "bg-white/[0.04] border border-white/[0.08]",
+            "text-white placeholder:text-white/30",
+            "focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.06]",
+            "transition-all",
+          ].join(" ")}
+        />
+        {query && (
+          <button
+            onClick={() => { setQuery(""); setOpen(false); }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+            data-testid="button-degen-search-clear"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      <AnimatePresence>
+        {open && hasQuery && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.1 }}
+            className="absolute left-4 right-4 top-[calc(100%-2px)] z-50 rounded-xl border border-white/[0.1] bg-[#0d1117] shadow-2xl overflow-hidden"
+          >
+            {isSearching ? (
+              <div className="flex items-center gap-2 px-4 py-3 text-white/40 text-sm font-mono">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Searching...
+              </div>
+            ) : displayResults.length === 0 ? (
+              <div className="px-4 py-3 text-white/30 text-sm font-mono">No tokens found</div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-white/[0.05]">
+                {displayResults.map((t) => {
+                  const isUp = (t.priceChange24h ?? 0) >= 0;
+                  return (
+                    <button
+                      key={t.mint}
+                      onClick={() => handleSelect(t)}
+                      data-testid={`degen-search-result-${t.mint}`}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.05] transition-colors text-left"
+                    >
+                      {t.logoURI ? (
+                        <img src={t.logoURI} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 bg-white/10" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-orange-400 text-xs font-bold">{t.symbol?.[0]}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="font-mono font-semibold text-white text-sm">{t.symbol}</span>
+                          <span className="text-white/40 text-xs truncate">{t.name}</span>
+                        </div>
+                        {t.priceUsd != null && (
+                          <div className="text-xs font-mono text-white/50">
+                            ${t.priceUsd < 0.0001 ? t.priceUsd.toExponential(2) : t.priceUsd.toFixed(t.priceUsd < 0.01 ? 5 : 4)}
+                          </div>
+                        )}
+                      </div>
+                      {t.priceChange24h != null && (
+                        <span className={`text-xs font-mono font-semibold flex-shrink-0 ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+                          {isUp ? "+" : ""}{t.priceChange24h.toFixed(1)}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* ── Main dashboard ─────────────────────────────────────────────────── */
 export function DegenDashboard() {
   const [activeTab, setActiveTab] = useState<TabId>("trending");
@@ -336,8 +505,13 @@ export function DegenDashboard() {
       {/* Tabs */}
       <TabBar active={activeTab} onChange={setActiveTab} />
 
+      {/* Search */}
+      <DegenSearchBar
+        onSelect={(t) => setChartToken({ ...t, decimals: 9 })}
+      />
+
       {/* Content */}
-      <div className="relative z-10 flex-1 px-4 pt-5 pb-10 max-w-3xl w-full mx-auto">
+      <div className="relative z-10 flex-1 px-4 pt-3 pb-10 max-w-3xl w-full mx-auto">
         <AnimatePresence mode="wait">
           {activeTab === "trending" && (
             <motion.div
