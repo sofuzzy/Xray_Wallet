@@ -22,11 +22,13 @@ export interface ChartResponse {
 interface ChartCache  { data: ChartResponse; fetchedAt: number; }
 interface PoolCache   { poolAddr: string;    fetchedAt: number; }
 
-const chartCache = new Map<string, ChartCache>();
-const poolCache  = new Map<string, PoolCache>();
+const chartCache     = new Map<string, ChartCache>();
+const poolCache      = new Map<string, PoolCache>();
 
 // In-flight dedup: key → pending Promise so concurrent callers share one request
-const inFlight  = new Map<string, Promise<ChartResponse>>();
+const inFlight       = new Map<string, Promise<ChartResponse>>();
+// Pool lookup dedup: prevents concurrent identical pool lookups hammering GeckoTerminal
+const poolInFlight   = new Map<string, Promise<string | null>>();
 
 const GECKO_TIMEFRAME: Record<string, { tf: string; agg: number }> = {
   "1m":  { tf: "minute", agg: 1  },
@@ -79,16 +81,12 @@ function downsample(points: OHLCPoint[], max: number): OHLCPoint[] {
   return result;
 }
 
-async function getPoolAddress(mint: string): Promise<string | null> {
-  const cached = poolCache.get(mint);
-  if (cached && Date.now() - cached.fetchedAt < POOL_CACHE_TTL) {
-    return cached.poolAddr;
-  }
-
+async function _lookupPoolAddress(mint: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(
       `${GECKOTERMINAL_API}/networks/solana/tokens/${encodeURIComponent(mint)}/pools?page=1`,
       { headers: { Accept: "application/json;version=20230302" } },
+      8000, // give the pool lookup extra time
     );
     if (!res.ok) return null;
     const json  = await res.json();
@@ -101,6 +99,25 @@ async function getPoolAddress(mint: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function getPoolAddress(mint: string): Promise<string | null> {
+  // 1. Serve from cache
+  const cached = poolCache.get(mint);
+  if (cached && Date.now() - cached.fetchedAt < POOL_CACHE_TTL) {
+    return cached.poolAddr;
+  }
+
+  // 2. Deduplicate concurrent lookups for the same mint
+  if (poolInFlight.has(mint)) {
+    return poolInFlight.get(mint)!;
+  }
+
+  const promise = _lookupPoolAddress(mint).finally(() => {
+    poolInFlight.delete(mint);
+  });
+  poolInFlight.set(mint, promise);
+  return promise;
 }
 
 async function fetchFromBirdeye(mint: string, interval: string): Promise<OHLCPoint[] | null> {
@@ -139,6 +156,30 @@ async function fetchFromBirdeye(mint: string, interval: string): Promise<OHLCPoi
   }
 }
 
+async function fetchOhlcv(url: string, attempt = 0): Promise<any[] | null> {
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: { Accept: "application/json;version=20230302" },
+    }, 8000);
+
+    if (res.status === 429) {
+      // Rate limited — one retry after 2s backoff
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 2000));
+        return fetchOhlcv(url, 1);
+      }
+      return null;
+    }
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const raw: any[] = json?.data?.attributes?.ohlcv_list;
+    return Array.isArray(raw) && raw.length ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFromGeckoTerminal(mint: string, interval: string): Promise<OHLCPoint[] | null> {
   const cfg = GECKO_TIMEFRAME[interval];
   if (!cfg) return null;
@@ -151,14 +192,8 @@ async function fetchFromGeckoTerminal(mint: string, interval: string): Promise<O
     const limit = Math.min(cfg.tf === "day" ? 365 : 500, MAX_POINTS + 50);
     const url   = `${GECKOTERMINAL_API}/networks/solana/pools/${encodeURIComponent(poolAddr)}/ohlcv/${cfg.tf}?aggregate=${cfg.agg}&limit=${limit}&currency=usd`;
 
-    const res = await fetchWithTimeout(url, {
-      headers: { Accept: "application/json;version=20230302" },
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-
-    const raw: any[] = json?.data?.attributes?.ohlcv_list;
-    if (!Array.isArray(raw) || !raw.length) return null;
+    const raw = await fetchOhlcv(url);
+    if (!raw) return null;
 
     const points: OHLCPoint[] = raw
       .map((item: any[]) => ({
@@ -208,7 +243,11 @@ async function _fetchChartData(mint: string, interval: string): Promise<ChartRes
   const downsampled = points ? downsample(points, MAX_POINTS) : [];
 
   const result: ChartResponse = { mint, interval, points: downsampled };
-  chartCache.set(`${mint}:${interval}`, { data: result, fetchedAt: Date.now() });
+  // Only cache successful (non-empty) results — empty results must not block
+  // retries for 7 minutes. The client's "Try again" will get a fresh fetch.
+  if (downsampled.length > 0) {
+    chartCache.set(`${mint}:${interval}`, { data: result, fetchedAt: Date.now() });
+  }
   return result;
 }
 

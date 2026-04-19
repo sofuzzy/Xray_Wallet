@@ -16,14 +16,14 @@ const INTERVALS  = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 type  Interval   = typeof INTERVALS[number];
 const CHART_H    = 280;
 
-// Adjacent intervals to prefetch when the user opens a chart
-const PREFETCH_FOR: Record<Interval, Interval[]> = {
-  "1m":  ["5m", "15m"],
-  "5m":  ["1m", "15m", "1h"],
-  "15m": ["5m", "1h", "4h"],
-  "1h":  ["15m", "4h", "1d"],
-  "4h":  ["1h", "1d"],
-  "1d":  ["4h"],
+// One adjacent interval to prefetch after a delay — keeps GeckoTerminal under rate limit
+const PREFETCH_FOR: Record<Interval, Interval> = {
+  "1m":  "5m",
+  "5m":  "15m",
+  "15m": "1h",
+  "1h":  "4h",
+  "4h":  "1d",
+  "1d":  "4h",
 };
 
 // ─── Data processing (pure, memoised outside component) ──────────────────────
@@ -126,16 +126,18 @@ export function TokenChart({ mint, symbol, interval: initialInterval }: TokenCha
   // ── Memoised data processing — avoids re-sorting on every parent re-render
   const processed = useMemo(() => processPoints(data?.points ?? []), [data?.points]);
 
-  // ── Prefetch adjacent intervals silently when chart mounts or token changes
+  // ── Prefetch one adjacent interval 3s after mount — avoids rate-limit stacking
   useEffect(() => {
-    const adjacent = PREFETCH_FOR[activeInterval] ?? [];
-    adjacent.forEach(iv => {
+    const iv = PREFETCH_FOR[activeInterval];
+    if (!iv) return;
+    const timer = setTimeout(() => {
       queryClient.prefetchQuery({
         queryKey: ["/api/charts", mint, iv, 0],
         queryFn: () => fetchChart(iv),
         staleTime: 5 * 60 * 1000,
       });
-    });
+    }, 3000);
+    return () => clearTimeout(timer);
   }, [mint, activeInterval, fetchChart, queryClient]);
 
   // ── Chart initialisation — only when `mint` changes (not on interval change)
