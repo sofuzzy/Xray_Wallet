@@ -112,7 +112,7 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
 
   if (isLoading) {
     return (
-      <div className="rounded-md border border-border/40 p-6" data-testid="holdings-skeleton">
+      <div className="p-0" data-testid="holdings-skeleton">
         <div className="flex items-center justify-between mb-5">
           <div>
             <Skeleton className="h-5 w-20 mb-2" />
@@ -143,32 +143,32 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
 
   return (
     <>
-      <div className="rounded-md border border-border/40 p-6">
+      <div className="rounded-xl p-0">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger asChild>
             <button
-              className="flex items-center justify-between w-full text-left hover-elevate active-elevate-2 rounded-md p-2 -m-2"
+              className="flex items-center justify-between w-full text-left rounded-xl py-2 transition-opacity hover:opacity-80"
               data-testid="button-toggle-holdings"
             >
               <div>
-                <h3 className="text-lg font-semibold" data-testid="heading-holdings">
-                  Holdings
-                </h3>
-                <p className="text-2xl font-bold text-primary font-mono" data-testid="text-portfolio-value">
+                <p className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">
+                  Portfolio
+                </p>
+                <p className="text-2xl font-bold text-foreground font-mono" data-testid="text-portfolio-value">
                   {formatValue(totalPortfolioValue)}
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="text-sm">{assetCount} assets</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="text-xs">{assetCount} assets</span>
                 {isExpanded ? (
-                  <ChevronUp className="w-5 h-5" />
+                  <ChevronUp className="w-4 h-4" />
                 ) : (
-                  <ChevronDown className="w-5 h-5" />
+                  <ChevronDown className="w-4 h-4" />
                 )}
               </div>
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-5">
+          <CollapsibleContent className="mt-4">
             <div className="space-y-3">
               <div
                 className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-all duration-200"

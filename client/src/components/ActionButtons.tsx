@@ -44,26 +44,26 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
   ];
 
   return (
-    <div className="flex gap-8 justify-center py-8">
+    <div className="flex gap-6 justify-center py-6 px-6">
       {buttons.map((btn, idx) => (
         <motion.div
           key={btn.label}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: idx * 0.08, type: "spring", stiffness: 200 }}
-          className="flex flex-col items-center gap-3"
+          transition={{ delay: idx * 0.06, type: "spring", stiffness: 220, damping: 20 }}
+          className="flex flex-col items-center gap-2.5"
         >
           <Button
             size="icon"
             variant={btn.variant}
             onClick={btn.onClick}
             disabled={btn.disabled}
-            className={`w-16 h-16 rounded-2xl ${btn.className || ''}`}
+            className={`w-[60px] h-[60px] rounded-2xl shadow-sm ${btn.className || ''} disabled:opacity-40`}
             data-testid={btn.testId}
           >
-            <btn.icon className="w-6 h-6" strokeWidth={2} />
+            <btn.icon className="w-5 h-5" strokeWidth={2} />
           </Button>
-          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
             {btn.label}
           </span>
         </motion.div>

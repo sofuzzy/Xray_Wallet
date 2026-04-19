@@ -1177,6 +1177,81 @@ export async function registerRoutes(
     }
   });
 
+  // Fresh/new launches from DexScreener latest token profiles
+  const freshCache: { tokens: any[]; at: number } = { tokens: [], at: 0 };
+  app.get("/api/market/fresh", async (req, res) => {
+    try {
+      const now = Date.now();
+      if (now - freshCache.at < 90_000 && freshCache.tokens.length > 0) {
+        return res.json(freshCache.tokens);
+      }
+
+      // Fetch latest token profiles (newest coins)
+      const profilesRes = await fetch("https://api.dexscreener.com/token-profiles/latest/v1", {
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!profilesRes.ok) return res.json(freshCache.tokens);
+
+      const profiles: any[] = await profilesRes.json();
+      const solanaMints = profiles
+        .filter((p: any) => p.chainId === "solana" && p.tokenAddress)
+        .map((p: any) => p.tokenAddress)
+        .slice(0, 30);
+
+      if (!solanaMints.length) return res.json([]);
+
+      // Enrich with pair data
+      const pairRes = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${solanaMints.join(",")}`,
+        { signal: AbortSignal.timeout(6000) },
+      );
+      if (!pairRes.ok) return res.json([]);
+
+      const pairData = await pairRes.json();
+      const seen = new Set<string>();
+      const tokens: any[] = [];
+
+      for (const pair of (pairData.pairs || []).filter((p: any) => p.chainId === "solana")) {
+        const mint = pair.baseToken?.address;
+        if (!mint || seen.has(mint)) continue;
+        seen.add(mint);
+        tokens.push({
+          mint,
+          name:           pair.baseToken.name || "Unknown",
+          symbol:         pair.baseToken.symbol || "???",
+          decimals:       9,
+          logoURI:        pair.info?.imageUrl,
+          priceUsd:       parseFloat(pair.priceUsd) || undefined,
+          marketCap:      pair.marketCap || pair.fdv || undefined,
+          liquidity:      pair.liquidity?.usd || 0,
+          volume24h:      pair.volume?.h24 || 0,
+          volume1h:       pair.volume?.h1 || 0,
+          volume5m:       pair.volume?.m5 || 0,
+          priceChange24h: pair.priceChange?.h24 || 0,
+          priceChange1h:  pair.priceChange?.h1 || 0,
+          priceChange5m:  pair.priceChange?.m5 || 0,
+          buys24h:        pair.txns?.h24?.buys  || 0,
+          sells24h:       pair.txns?.h24?.sells || 0,
+          buys1h:         pair.txns?.h1?.buys   || 0,
+          sells1h:        pair.txns?.h1?.sells  || 0,
+          buys5m:         pair.txns?.m5?.buys   || 0,
+          sells5m:        pair.txns?.m5?.sells  || 0,
+          pairCreatedAt:  pair.pairCreatedAt || undefined,
+          isTrending:     false,
+        });
+      }
+
+      // Sort by newest pair
+      tokens.sort((a, b) => (b.pairCreatedAt || 0) - (a.pairCreatedAt || 0));
+      freshCache.tokens = tokens;
+      freshCache.at = now;
+      res.json(tokens);
+    } catch (err) {
+      console.error("[market/fresh] Error:", err);
+      res.json(freshCache.tokens);
+    }
+  });
+
   // Pre-swap balance validation with caching
   // Use optionalAuth - users can validate balance without being logged in (wallet-first approach)
   app.get("/api/swaps/validate-balance", optionalAuth, async (req, res) => {

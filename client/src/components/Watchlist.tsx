@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, Eye, Trash2, Plus, X } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Trash2, Plus, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TradingViewModal } from "./TradingViewModal";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -184,25 +183,22 @@ export function Watchlist() {
 
   return (
     <>
-      <Card className="p-4">
+      <div className="rounded-xl p-0">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger asChild>
             <button
-              className="flex items-center justify-between w-full text-left hover-elevate active-elevate-2 rounded-md p-2 -m-2"
+              className="flex items-center justify-between w-full text-left rounded-xl py-2 transition-opacity hover:opacity-80"
               data-testid="button-toggle-watchlist"
             >
-              <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-semibold" data-testid="heading-watchlist">
-                  Watchlist
-                </h3>
+              <div>
+                <p className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">Watchlist</p>
+                <p className="text-sm font-semibold text-foreground">{watchlist.length} token{watchlist.length !== 1 ? "s" : ""}</p>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="text-sm">{watchlist.length} tokens</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
                 {isExpanded ? (
-                  <ChevronUp className="w-5 h-5" />
+                  <ChevronUp className="w-4 h-4" />
                 ) : (
-                  <ChevronDown className="w-5 h-5" />
+                  <ChevronDown className="w-4 h-4" />
                 )}
               </div>
             </button>
@@ -339,7 +335,7 @@ export function Watchlist() {
             </div>
           </CollapsibleContent>
         </Collapsible>
-      </Card>
+      </div>
 
       {showChartModal && selectedToken && (
         <TradingViewModal

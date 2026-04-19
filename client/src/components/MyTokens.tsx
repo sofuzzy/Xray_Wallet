@@ -39,7 +39,7 @@ export function MyTokens() {
   if (!isAuthenticated) return null;
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border bg-card/50 p-6">
+      <div className="rounded-xl p-0">
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-muted-foreground" />
           <h3 className="font-semibold text-foreground">My Tokens</h3>
@@ -54,7 +54,7 @@ export function MyTokens() {
   if (launches.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card/50 p-6">
+    <div className="rounded-xl p-0">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-muted-foreground" />
         <h3 className="font-semibold text-foreground" data-testid="text-my-tokens-title">My Tokens</h3>

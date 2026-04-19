@@ -142,10 +142,10 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
       
       {/* Subtle mesh gradient overlay */}
-      <div className="absolute inset-0 opacity-30" style={{
+      <div className="absolute inset-0 opacity-20" style={{
         background: `
-          radial-gradient(ellipse at 20% 20%, hsl(165 85% 45% / 0.15) 0%, transparent 50%),
-          radial-gradient(ellipse at 80% 80%, hsl(270 80% 65% / 0.1) 0%, transparent 50%)
+          radial-gradient(ellipse at 20% 20%, hsl(165 85% 45% / 0.12) 0%, transparent 55%),
+          radial-gradient(ellipse at 80% 80%, hsl(270 80% 65% / 0.08) 0%, transparent 55%)
         `
       }} />
       
@@ -175,19 +175,14 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
               Solana
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-50"
-              data-testid="button-refresh-balance"
-            >
-              <RefreshCw className={`w-4 h-4 text-white/80 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <div className="px-2 py-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-white/40 text-[10px] font-medium tracking-wide">
-              Mainnet
-            </div>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-50"
+            data-testid="button-refresh-balance"
+          >
+            <RefreshCw className={`w-4 h-4 text-white/70 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
         <div className="space-y-1.5">

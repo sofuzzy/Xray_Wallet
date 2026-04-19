@@ -133,36 +133,43 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
           </div>
         </DialogHeader>
 
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-1">Price</div>
-              <div className="font-bold text-sm" data-testid="text-token-price">{formatPrice(currentToken.priceUsd)}</div>
+        <div className="p-5 space-y-5">
+          {/* Price hero row */}
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Price</p>
+              <p className="text-2xl font-bold font-mono" data-testid="text-token-price">
+                {formatPrice(currentToken.priceUsd)}
+              </p>
               {currentToken.priceChange24h !== undefined && (
-                <div className={`flex items-center gap-1 text-xs ${currentToken.priceChange24h >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {currentToken.priceChange24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {Math.abs(currentToken.priceChange24h).toFixed(2)}%
+                <div className={`flex items-center gap-1 text-sm mt-1 ${currentToken.priceChange24h >= 0 ? "text-emerald-500" : "text-red-400"}`}>
+                  {currentToken.priceChange24h >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                  {currentToken.priceChange24h >= 0 ? "+" : ""}{Math.abs(currentToken.priceChange24h).toFixed(2)}% (24h)
                 </div>
               )}
             </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
-              <div className="font-bold text-sm" data-testid="text-market-cap">{formatMarketCap(currentToken.marketCap)}</div>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-              <div className="font-bold text-sm" data-testid="text-volume">{formatVolume(currentToken.volume24h)}</div>
+            <div className="text-right space-y-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Market Cap</p>
+                <p className="font-semibold text-sm font-mono" data-testid="text-market-cap">{formatMarketCap(currentToken.marketCap)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">24h Volume</p>
+                <p className="font-semibold text-sm font-mono" data-testid="text-volume">{formatVolume(currentToken.volume24h)}</p>
+              </div>
             </div>
           </div>
 
           {!isSolToken && (
-            <TokenChart mint={token.mint} symbol={currentToken.symbol} />
+            <div className="rounded-xl overflow-hidden">
+              <TokenChart mint={token.mint} symbol={currentToken.symbol} />
+            </div>
           )}
 
           {!isSolToken && (
             <Button
               onClick={handleTradeClick}
-              className="w-full"
+              className="w-full h-11 text-base font-semibold"
               data-testid="button-trade-token"
             >
               <ArrowDownUp className="w-4 h-4 mr-2" />

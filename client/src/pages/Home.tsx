@@ -432,7 +432,7 @@ export default function Home() {
 
       {!isDegenMode && (
       <>
-      <main className="max-w-2xl mx-auto pt-8 space-y-10 relative z-10">
+      <main className="max-w-2xl mx-auto pt-6 space-y-8 relative z-10">
         <div className="px-6">
           <TokenSearch onSelectToken={(token) => setSelectedToken(token)} />
         </div>
@@ -453,7 +453,7 @@ export default function Home() {
           onLaunch={() => setIsLaunchOpen(true)}
         />
 
-        <div className="px-6">
+        <div className="px-6 space-y-8">
           <Holdings 
             solBalance={balance}
             onSwapToken={(token) => {
@@ -462,13 +462,9 @@ export default function Home() {
               setIsSwapOpen(true);
             }}
           />
-        </div>
 
-        <div className="px-6">
           <MyTokens />
-        </div>
 
-        <div className="px-6">
           <Watchlist />
         </div>
 

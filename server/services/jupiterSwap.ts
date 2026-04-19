@@ -39,12 +39,27 @@ export interface Token {
   symbol: string;
   decimals: number;
   logoURI?: string;
+  // 24h metrics
   volume24h?: number;
-  liquidity?: number;
   priceChange24h?: number;
+  buys24h?: number;
+  sells24h?: number;
+  // 1h metrics
+  volume1h?: number;
+  priceChange1h?: number;
+  buys1h?: number;
+  sells1h?: number;
+  // 5m metrics
+  volume5m?: number;
+  priceChange5m?: number;
+  buys5m?: number;
+  sells5m?: number;
+  // Other
+  liquidity?: number;
   isTrending?: boolean;
   priceUsd?: number;
   marketCap?: number;
+  pairCreatedAt?: number; // unix ms
 }
 
 interface TokenCache {
@@ -297,12 +312,27 @@ export async function fetchTrendingTokens(): Promise<Token[]> {
                 symbol: baseToken.symbol || "???",
                 decimals: 9,
                 logoURI: pair.info?.imageUrl,
-                volume24h: pair.volume?.h24 || 0,
-                liquidity: pair.liquidity?.usd || 0,
+                // 24h
+                volume24h:      pair.volume?.h24 || 0,
                 priceChange24h: pair.priceChange?.h24 || 0,
-                priceUsd: parseFloat(pair.priceUsd) || undefined,
-                marketCap: pair.marketCap || pair.fdv || undefined,
-                isTrending: true,
+                buys24h:        pair.txns?.h24?.buys  || 0,
+                sells24h:       pair.txns?.h24?.sells || 0,
+                // 1h
+                volume1h:       pair.volume?.h1 || 0,
+                priceChange1h:  pair.priceChange?.h1 || 0,
+                buys1h:         pair.txns?.h1?.buys  || 0,
+                sells1h:        pair.txns?.h1?.sells || 0,
+                // 5m
+                volume5m:       pair.volume?.m5 || 0,
+                priceChange5m:  pair.priceChange?.m5 || 0,
+                buys5m:         pair.txns?.m5?.buys  || 0,
+                sells5m:        pair.txns?.m5?.sells || 0,
+                // other
+                liquidity:      pair.liquidity?.usd || 0,
+                priceUsd:       parseFloat(pair.priceUsd) || undefined,
+                marketCap:      pair.marketCap || pair.fdv || undefined,
+                pairCreatedAt:  pair.pairCreatedAt || undefined,
+                isTrending:     true,
               });
             }
           }

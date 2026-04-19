@@ -73,7 +73,7 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
 }) {
   return (
     <div
-      className="p-4 cursor-pointer transition-all duration-200 rounded-xl border border-border/40 bg-card hover:border-border/80 hover:bg-card/80"
+      className="p-4 cursor-pointer transition-all duration-200 rounded-xl border border-border/25 bg-card/50 hover:border-border/50 hover:bg-card/80"
       onClick={onClick}
       data-testid={`token-card-${token.symbol}`}
     >
@@ -90,7 +90,7 @@ function TokenCard({ token, onClick, onAddToWatchlist }: {
             <div className="flex items-center gap-1.5">
               <h3 className="font-semibold text-foreground text-sm leading-none">{token.symbol}</h3>
               {token.isTrending && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/15 font-semibold tracking-wide">
+                <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-orange-500/8 text-orange-400/70 font-medium tracking-wide">
                   <Flame className="w-2 h-2" />
                   HOT
                 </span>
