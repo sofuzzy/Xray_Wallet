@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, Trash2, Plus, X } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Trash2, Plus, X, Eye } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TradingViewModal } from "./TradingViewModal";
 import { queryClient, apiRequest } from "@/lib/queryClient";
