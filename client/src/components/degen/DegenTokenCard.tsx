@@ -142,6 +142,7 @@ export function DegenTokenCard({ token, index = 0, onChart, onSwap }: DegenToken
       transition={{ duration: 0.18, delay: Math.min(index * 0.03, 0.3) }}
       className="group relative flex flex-col rounded-xl overflow-hidden border border-white/[0.07] bg-[#0d1117] hover:bg-[#111820] hover:border-white/[0.14] transition-all duration-150 cursor-pointer"
       data-testid={`degen-card-${token.mint}`}
+      onClick={() => onChart(token)}
     >
       {/* Left accent bar keyed to top badge */}
       {topBadge && (
