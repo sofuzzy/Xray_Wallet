@@ -2027,7 +2027,7 @@ export async function registerRoutes(
 
   // ========== Pump.fun Launchpad (via PumpPortal) ==========
   // Step 1: Upload image + metadata to pump.fun IPFS
-  app.post("/api/launchpad/pump/upload-ipfs", hybridAuth, strictRateLimiter, async (req, res) => {
+  app.post("/api/launchpad/pump/upload-ipfs", optionalAuth, strictRateLimiter, async (req, res) => {
     try {
       const inputSchema = z.object({
         name: z.string().min(1).max(50),
@@ -2057,7 +2057,7 @@ export async function registerRoutes(
   });
 
   // Step 2: Build unsigned pump.fun create transaction
-  app.post("/api/launchpad/pump/build-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+  app.post("/api/launchpad/pump/build-tx", optionalAuth, strictRateLimiter, async (req, res) => {
     try {
       const inputSchema = z.object({
         creatorPublicKey: z.string().min(32).max(64),
