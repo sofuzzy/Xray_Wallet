@@ -29,7 +29,8 @@ import { useBetaStatus } from "@/components/BetaStatusBanner";
 import { sendTransactionViaServer } from "@/lib/solana";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
-import { LAMPORTS_PER_SOL, VersionedTransaction, Transaction, Keypair } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, VersionedTransaction, Transaction, Keypair, SystemProgram, PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
 import { useUpload } from "@/hooks/use-upload";
 
 interface LaunchpadModalProps {
@@ -158,17 +159,20 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         toast({ title: "Invalid dev buy amount", description: "Dev buy amount must be greater than 0", variant: "destructive" });
         return;
       }
-      const requiredSol = 0.003 + devBuyAmountNum;
+      const jitoTipSol = turboMode.tipAmountSol || 0.0002;
+      const requiredSol = 0.003 + devBuyAmountNum + jitoTipSol;
       if (balance < requiredSol) {
-        toast({ title: "Insufficient Balance", description: `You need at least ${requiredSol.toFixed(3)} SOL (launch fee + ${devBuyAmountNum} SOL dev buy)`, variant: "destructive" });
+        toast({ title: "Insufficient Balance", description: `You need at least ${requiredSol.toFixed(4)} SOL (fees + ${devBuyAmountNum} SOL dev buy + Jito tip)`, variant: "destructive" });
         return;
       }
     }
 
     const authHeaders = await getAuthHeaders();
+    const pf = parseFloat(priorityFee) || 0.001;
+    const sl = parseFloat(slippage) || 10;
 
     try {
-      // Step 1: Upload image + metadata to pump.fun IPFS
+      // Step 1: Upload metadata to pump.fun IPFS
       setPumpStep("uploading");
       const arrayBuffer = await pumpImageFile.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -199,51 +203,130 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       }
       const { metadataUri } = await ipfsRes.json();
 
-      // Step 2: Generate mint keypair client-side
+      // Step 2: Generate mint keypair + build transaction(s)
       setPumpStep("building");
       const mintKeypair = Keypair.generate();
       const mintPublicKey = mintKeypair.publicKey.toBase58();
 
-      const buildRes = await fetch("/api/launchpad/pump/build-tx", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        credentials: "include",
-        body: JSON.stringify({
-          creatorPublicKey: address,
-          mintPublicKey,
-          name: pumpForm.name,
-          symbol: pumpForm.symbol.toUpperCase(),
-          metadataUri,
-          devBuySol: devBuyAmountNum,  // atomic — included in the single create tx
-          priorityFee: parseFloat(priorityFee) || 0.001,
-          slippage: parseFloat(slippage) || 10,
-        }),
-      });
+      if (devBuyEnabled && devBuyAmountNum > 0) {
+        // ── JITO BUNDLE PATH ──────────────────────────────────────────────────
+        // Build create + buy transactions in parallel (one server round-trip)
+        const bundleRes = await fetch("/api/launchpad/pump/build-bundle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          credentials: "include",
+          body: JSON.stringify({
+            creatorPublicKey: address,
+            mintPublicKey,
+            name: pumpForm.name,
+            symbol: pumpForm.symbol.toUpperCase(),
+            metadataUri,
+            devBuySol: devBuyAmountNum,
+            priorityFee: pf,
+            slippage: sl,
+          }),
+        });
 
-      if (!buildRes.ok) {
-        const err = await buildRes.json().catch(() => ({ error: "Transaction build failed" }));
-        throw new Error(err.error || "Failed to build transaction");
+        if (!bundleRes.ok) {
+          const err = await bundleRes.json().catch(() => ({ error: "Bundle build failed" }));
+          throw new Error(err.error || "Failed to build bundle transactions");
+        }
+
+        const { createTx: createTxB64, buyTx: buyTxB64, jitoTipAccount, jitoTipLamports } = await bundleRes.json();
+
+        // Step 3: Sign both transactions + build Jito tip tx (all client-side)
+        setPumpStep("signing");
+
+        const createTxBytes = Uint8Array.from(atob(createTxB64), (c) => c.charCodeAt(0));
+        const createTx = VersionedTransaction.deserialize(createTxBytes);
+        createTx.sign([keypair, mintKeypair]);
+
+        const buyTxBytes = Uint8Array.from(atob(buyTxB64), (c) => c.charCodeAt(0));
+        const buyTx = VersionedTransaction.deserialize(buyTxBytes);
+        buyTx.sign([keypair]);
+
+        // Build Jito tip legacy tx using the create tx's blockhash (same expiry window)
+        const recentBlockhash = createTx.message.recentBlockhash;
+        const tipTx = new Transaction();
+        tipTx.recentBlockhash = recentBlockhash;
+        tipTx.feePayer = new PublicKey(address);
+        const tipLamports = Math.max(jitoTipLamports, Math.floor((turboMode.tipAmountSol || 0.0002) * 1e9));
+        tipTx.add(SystemProgram.transfer({
+          fromPubkey: new PublicKey(address),
+          toPubkey: new PublicKey(jitoTipAccount),
+          lamports: tipLamports,
+        }));
+        tipTx.sign(keypair);
+
+        // Serialize all three for bundle submission
+        const toBase64 = (arr: Uint8Array) => btoa(String.fromCharCode(...arr));
+        const createTxBase64 = toBase64(createTx.serialize());
+        const buyTxBase64 = toBase64(buyTx.serialize());
+        const tipTxBase64 = btoa(String.fromCharCode(...tipTx.serialize()));
+
+        // Extract create tx signature for confirmation polling
+        const createSignature = bs58.encode(createTx.signatures[0]);
+
+        // Step 4: Submit Jito bundle (create + buy + tip all land in same block)
+        setPumpStep("confirming");
+        const submitRes = await fetch("/api/launchpad/pump/submit-bundle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          credentials: "include",
+          body: JSON.stringify({
+            transactions: [createTxBase64, buyTxBase64, tipTxBase64],
+            createSignature,
+          }),
+        });
+
+        if (!submitRes.ok) {
+          const err = await submitRes.json().catch(() => ({ error: "Bundle submission failed" }));
+          throw new Error(err.error || "Failed to submit Jito bundle");
+        }
+
+        setPumpMintAddress(mintPublicKey);
+        setPumpStep("success");
+
+      } else {
+        // ── SINGLE TX PATH (no dev buy) ───────────────────────────────────────
+        const buildRes = await fetch("/api/launchpad/pump/build-tx", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          credentials: "include",
+          body: JSON.stringify({
+            creatorPublicKey: address,
+            mintPublicKey,
+            name: pumpForm.name,
+            symbol: pumpForm.symbol.toUpperCase(),
+            metadataUri,
+            devBuySol: 0,
+            priorityFee: pf,
+            slippage: sl,
+          }),
+        });
+
+        if (!buildRes.ok) {
+          const err = await buildRes.json().catch(() => ({ error: "Transaction build failed" }));
+          throw new Error(err.error || "Failed to build transaction");
+        }
+        const { transaction: txBase64 } = await buildRes.json();
+
+        setPumpStep("signing");
+        const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
+        const tx = VersionedTransaction.deserialize(txBytes);
+        tx.sign([keypair, mintKeypair]);
+
+        setPumpStep("confirming");
+        await sendTransactionViaServer(tx.serialize(), {
+          turboMode: turboMode.enabled,
+          skipPreflight,
+        });
+
+        setPumpMintAddress(mintPublicKey);
+        setPumpStep("success");
       }
-      const { transaction: txBase64 } = await buildRes.json();
 
-      // Step 3: Deserialize and sign with wallet + mint keypair
-      setPumpStep("signing");
-      const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
-      const tx = VersionedTransaction.deserialize(txBytes);
-      tx.sign([keypair, mintKeypair]);
-
-      // Step 4: Broadcast — atomic create + dev buy in one transaction
-      setPumpStep("confirming");
-      await sendTransactionViaServer(tx.serialize(), {
-        turboMode: turboMode.enabled,
-        skipPreflight,
-      });
-
-      // Token is on-chain with dev buy included
-      setPumpMintAddress(mintPublicKey);
-      setPumpStep("success");
-
-      // Save to DB (best-effort — token is already live even if this fails)
+      // Save to DB (best-effort — token is already on-chain)
       try {
         await saveLaunchMutation.mutateAsync({
           name: pumpForm.name,

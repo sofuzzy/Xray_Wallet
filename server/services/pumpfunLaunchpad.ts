@@ -75,7 +75,7 @@ export async function buildPumpCreateTransaction(params: PumpBuildTxParams): Pro
     },
     mint: params.mintPublicKey,
     denominatedInSol: "true",
-    amount: params.devBuySol, // included atomically in the create transaction
+    amount: 0, // PumpPortal create action only supports amount:0; dev buy is handled separately
     slippage: params.slippage ?? 10,
     priorityFee: params.priorityFee ?? 0.0005,
     pool: "pump",

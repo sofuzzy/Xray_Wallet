@@ -2100,6 +2100,141 @@ export async function registerRoutes(
     }
   });
 
+  // Build both create + buy txs in parallel (for Jito bundle launch)
+  app.post("/api/launchpad/pump/build-bundle", strictRateLimiter, async (req, res) => {
+    try {
+      const inputSchema = z.object({
+        creatorPublicKey: z.string().min(32).max(64),
+        mintPublicKey: z.string().min(32).max(64),
+        name: z.string().min(1).max(50),
+        symbol: z.string().min(1).max(10),
+        metadataUri: z.string().url(),
+        devBuySol: z.number().min(0.001).max(100),
+        priorityFee: z.number().min(0).max(1).optional(),
+        slippage: z.number().min(0).max(50).optional(),
+      });
+
+      const parsed = inputSchema.parse(req.body);
+      const { buildPumpCreateTransaction, buildPumpBuyTransaction } = await import("./services/pumpfunLaunchpad");
+      const { getRandomTipAccount, DEFAULT_JITO_TIP_LAMPORTS } = await import("./services/heliusSender");
+
+      // Build create and buy transactions in parallel
+      const [createResult, buyResult] = await Promise.all([
+        buildPumpCreateTransaction({
+          creatorPublicKey: parsed.creatorPublicKey,
+          mintPublicKey: parsed.mintPublicKey,
+          name: parsed.name,
+          symbol: parsed.symbol,
+          metadataUri: parsed.metadataUri,
+          devBuySol: 0,
+          priorityFee: parsed.priorityFee,
+          slippage: parsed.slippage,
+        }),
+        buildPumpBuyTransaction({
+          buyerPublicKey: parsed.creatorPublicKey,
+          mintPublicKey: parsed.mintPublicKey,
+          solAmount: parsed.devBuySol,
+          slippage: parsed.slippage,
+          priorityFee: parsed.priorityFee,
+        }),
+      ]);
+
+      res.json({
+        createTx: createResult.transaction,
+        buyTx: buyResult.transaction,
+        jitoTipAccount: getRandomTipAccount(),
+        jitoTipLamports: DEFAULT_JITO_TIP_LAMPORTS,
+      });
+    } catch (error: any) {
+      console.error("[pump-launchpad] Build bundle error:", error);
+      res.status(500).json({ error: error.message || "Failed to build bundle" });
+    }
+  });
+
+  // Submit signed transactions as a Jito bundle (create + buy + tip land in same block)
+  app.post("/api/launchpad/pump/submit-bundle", strictRateLimiter, async (req, res) => {
+    try {
+      const inputSchema = z.object({
+        transactions: z.array(z.string()).min(2).max(5),
+        createSignature: z.string().min(40).max(100), // pre-extracted by client for polling
+      });
+
+      const { transactions, createSignature } = inputSchema.parse(req.body);
+
+      // Jito block engine endpoints (try in order)
+      const JITO_ENDPOINTS = [
+        "https://mainnet.block-engine.jito.labs.io/api/v1/bundles",
+        "https://ny.mainnet.block-engine.jito.labs.io/api/v1/bundles",
+        "https://frankfurt.mainnet.block-engine.jito.labs.io/api/v1/bundles",
+      ];
+
+      let bundleId: string | null = null;
+      let lastError: string = "";
+
+      for (const endpoint of JITO_ENDPOINTS) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "sendBundle",
+              params: [transactions],
+            }),
+          });
+
+          const result = await response.json();
+          if (result.error) {
+            lastError = result.error.message || JSON.stringify(result.error);
+            console.warn(`[jito-bundle] ${endpoint} error:`, lastError);
+            continue;
+          }
+          if (result.result) {
+            bundleId = result.result;
+            console.log(`[jito-bundle] Submitted to ${endpoint}, bundle ID: ${bundleId}`);
+            break;
+          }
+        } catch (err: any) {
+          lastError = err.message;
+          console.warn(`[jito-bundle] ${endpoint} failed:`, err.message);
+        }
+      }
+
+      if (!bundleId) {
+        throw new Error(`All Jito endpoints failed: ${lastError}`);
+      }
+
+      // Poll for the create transaction signature to confirm landing
+      const { getRpcService } = await import("./services/rpcService");
+      const rpc = getRpcService();
+      const maxAttempts = 90;
+
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          const statuses = await rpc.getSignatureStatuses([createSignature], { searchTransactionHistory: true });
+          const status = statuses?.value?.[0];
+          if (status) {
+            if (status.err) throw new Error(`Bundle transaction failed: ${JSON.stringify(status.err)}`);
+            if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+              console.log(`[jito-bundle] Confirmed: ${createSignature} (bundle: ${bundleId})`);
+              return res.json({ signature: createSignature, bundleId });
+            }
+          }
+        } catch (err: any) {
+          if (err.message?.includes("Bundle transaction failed")) throw err;
+          console.warn(`[jito-bundle] Status poll error:`, err.message);
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      throw new Error("Bundle confirmation timeout — check Solana explorer for status");
+    } catch (error: any) {
+      console.error("[pump-launchpad] Submit bundle error:", error);
+      res.status(500).json({ error: error.message || "Failed to submit bundle" });
+    }
+  });
+
   // Liquidity pool creation routes (Raydium CPMM)
   app.get("/api/liquidity-pool/cost", async (_req, res) => {
     try {

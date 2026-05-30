@@ -169,11 +169,8 @@ export function WalletCard({ balance, address, username, onRefresh }: WalletCard
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <Wallet className="w-4 h-4 text-white/80" />
+              <Wallet className="w-4 h-4 text-white/70" />
             </div>
-            <span className="text-white/40 text-[10px] font-medium tracking-widest uppercase">
-              Solana
-            </span>
           </div>
           <button
             onClick={handleRefresh}
