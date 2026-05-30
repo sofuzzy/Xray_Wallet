@@ -208,7 +208,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
           name: pumpForm.name,
           symbol: pumpForm.symbol.toUpperCase(),
           metadataUri,
-          devBuySol: devBuy,
+          devBuySol: 0,
         }),
       });
 
