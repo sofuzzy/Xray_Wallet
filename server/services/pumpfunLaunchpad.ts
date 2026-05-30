@@ -102,3 +102,45 @@ export async function buildPumpCreateTransaction(params: PumpBuildTxParams): Pro
 
   return { transaction: Buffer.from(txBytes).toString("base64") };
 }
+
+export interface PumpBuyTxParams {
+  buyerPublicKey: string;
+  mintPublicKey: string;
+  solAmount: number;
+  slippage?: number;
+  priorityFee?: number;
+}
+
+export async function buildPumpBuyTransaction(params: PumpBuyTxParams): Promise<{ transaction: string }> {
+  const requestBody = {
+    publicKey: params.buyerPublicKey,
+    action: "buy",
+    mint: params.mintPublicKey,
+    denominatedInSol: "true",
+    amount: params.solAmount,
+    slippage: params.slippage ?? 10,
+    priorityFee: params.priorityFee ?? 0.0005,
+    pool: "pump",
+  };
+  console.log("[pump] buy-local request:", JSON.stringify(requestBody));
+  const response = await fetch(`${PUMPPORTAL_API}/trade-local`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText);
+    const bodyPreview = errText.slice(0, 500);
+    console.error("[pump] buy-local error body:", bodyPreview);
+    throw new Error(`PumpPortal buy-local failed: ${response.status} — ${bodyPreview}`);
+  }
+
+  const txBytes = await response.arrayBuffer();
+  if (txBytes.byteLength < 100) {
+    const text = Buffer.from(txBytes).toString("utf-8");
+    throw new Error(`PumpPortal buy returned unexpected response: ${text}`);
+  }
+
+  return { transaction: Buffer.from(txBytes).toString("base64") };
+}

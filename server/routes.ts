@@ -2080,6 +2080,26 @@ export async function registerRoutes(
     }
   });
 
+  // Step 3 (optional): Build dev buy transaction for a freshly launched token
+  app.post("/api/launchpad/pump/buy-tx", strictRateLimiter, async (req, res) => {
+    try {
+      const inputSchema = z.object({
+        buyerPublicKey: z.string().min(32).max(64),
+        mintPublicKey: z.string().min(32).max(64),
+        solAmount: z.number().min(0.001).max(100),
+        slippage: z.number().min(0).max(50).optional(),
+        priorityFee: z.number().min(0).max(1).optional(),
+      });
+      const parsed = inputSchema.parse(req.body);
+      const { buildPumpBuyTransaction } = await import("./services/pumpfunLaunchpad");
+      const result = await buildPumpBuyTransaction(parsed);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[pump-launchpad] Buy tx error:", error);
+      res.status(500).json({ error: error.message || "Failed to build dev buy transaction" });
+    }
+  });
+
   // Liquidity pool creation routes (Raydium CPMM)
   app.get("/api/liquidity-pool/cost", async (_req, res) => {
     try {

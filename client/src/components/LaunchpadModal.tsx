@@ -38,7 +38,7 @@ interface LaunchpadModalProps {
 
 type LaunchMode = "pump" | "custom";
 
-type PumpStep = "form" | "uploading" | "building" | "signing" | "confirming" | "success" | "error";
+type PumpStep = "form" | "uploading" | "building" | "signing" | "confirming" | "buying" | "success" | "partial" | "error";
 
 interface PumpFormData {
   name: string;
@@ -84,6 +84,9 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   });
   const [pumpMintAddress, setPumpMintAddress] = useState("");
   const [pumpError, setPumpError] = useState("");
+  const [devBuyEnabled, setDevBuyEnabled] = useState(false);
+  const [devBuyAmount, setDevBuyAmount] = useState("0.1");
+  const [devBuyError, setDevBuyError] = useState("");
 
   // Custom SPL state
   const [customStep, setCustomStep] = useState<"form" | "creating" | "addingLiquidity" | "success" | "error">("form");
@@ -143,10 +146,17 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       toast({ title: "Error", description: "Please upload a token image", variant: "destructive" });
       return;
     }
-    const devBuy = parseFloat(pumpForm.devBuySol) || 0;
-    if (devBuy > 0 && balance < devBuy + 0.01) {
-      toast({ title: "Insufficient Balance", description: `You need at least ${(devBuy + 0.01).toFixed(3)} SOL`, variant: "destructive" });
-      return;
+    const devBuyAmountNum = devBuyEnabled ? (parseFloat(devBuyAmount) || 0) : 0;
+    if (devBuyEnabled) {
+      if (devBuyAmountNum <= 0) {
+        toast({ title: "Invalid dev buy amount", description: "Dev buy amount must be greater than 0", variant: "destructive" });
+        return;
+      }
+      const requiredSol = 0.003 + devBuyAmountNum;
+      if (balance < requiredSol) {
+        toast({ title: "Insufficient Balance", description: `You need at least ${requiredSol.toFixed(3)} SOL (launch fee + ${devBuyAmountNum} SOL dev buy)`, variant: "destructive" });
+        return;
+      }
     }
 
     const authHeaders = await getAuthHeaders();
@@ -214,11 +224,14 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       const tx = VersionedTransaction.deserialize(txBytes);
       tx.sign([keypair, mintKeypair]);
 
-      // Step 4: Submit
+      // Step 4: Submit create transaction
       setPumpStep("confirming");
       await sendTransactionViaServer(tx.serialize());
 
-      // Save to DB (best-effort — token is already on-chain if this fails)
+      // Token is now on-chain — record mint address for success/partial screens
+      setPumpMintAddress(mintPublicKey);
+
+      // Save to DB (best-effort — token is already live even if this fails)
       try {
         await saveLaunchMutation.mutateAsync({
           name: pumpForm.name,
@@ -232,8 +245,40 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         console.warn("[pump-launch] DB save failed (token is still live):", dbErr);
       }
 
-      setPumpMintAddress(mintPublicKey);
-      setPumpStep("success");
+      // Step 5 (optional): Dev buy — separate transaction after token exists on-chain
+      if (devBuyEnabled && devBuyAmountNum > 0) {
+        setPumpStep("buying");
+        setDevBuyError("");
+        try {
+          const buyRes = await fetch("/api/launchpad/pump/buy-tx", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            credentials: "include",
+            body: JSON.stringify({
+              buyerPublicKey: address,
+              mintPublicKey,
+              solAmount: devBuyAmountNum,
+            }),
+          });
+          if (!buyRes.ok) {
+            const err = await buyRes.json().catch(() => ({ error: "Dev buy build failed" }));
+            throw new Error(err.error || "Failed to build dev buy transaction");
+          }
+          const { transaction: buyTxBase64 } = await buyRes.json();
+          const buyTxBytes = Uint8Array.from(atob(buyTxBase64), (c) => c.charCodeAt(0));
+          const buyTx = VersionedTransaction.deserialize(buyTxBytes);
+          buyTx.sign([keypair]);
+          await sendTransactionViaServer(buyTx.serialize());
+          setPumpStep("success");
+        } catch (buyErr: any) {
+          console.warn("[pump-launch] Dev buy failed (token IS live):", buyErr);
+          setDevBuyError(buyErr.message || "Dev buy transaction failed");
+          setPumpStep("partial");
+        }
+      } else {
+        setPumpStep("success");
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/token-balances"] });
       queryClient.invalidateQueries({ queryKey: ["wallet-tokens", address] });
 
@@ -394,6 +439,9 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     setPumpImagePreview(null);
     setPumpMintAddress("");
     setPumpError("");
+    setDevBuyEnabled(false);
+    setDevBuyAmount("0.1");
+    setDevBuyError("");
     setShowSocials(false);
     setCustomStep("form");
     setCustomForm({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "", addLiquidity: false, liquiditySol: "1", liquidityPercent: "50" });
@@ -418,9 +466,15 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     building: "Building transaction...",
     signing: "Signing...",
     confirming: "Submitting to Solana...",
+    buying: "Submitting dev buy...",
     success: "",
+    partial: "",
     error: "",
   };
+
+  const progressSteps: PumpStep[] = devBuyEnabled
+    ? ["uploading", "building", "signing", "confirming", "buying"]
+    : ["uploading", "building", "signing", "confirming"];
 
   return (
     <AnimatePresence>
@@ -565,10 +619,50 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     </div>
                   )}
 
+                  {/* Dev Buy Toggle */}
+                  <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm font-medium">Dev buy on launch</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Buy tokens immediately after creation</p>
+                      </div>
+                      <Switch
+                        checked={devBuyEnabled}
+                        onCheckedChange={setDevBuyEnabled}
+                        data-testid="toggle-dev-buy"
+                      />
+                    </div>
+                    {devBuyEnabled && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Amount to spend</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min="0.001"
+                            step="0.01"
+                            placeholder="0.1"
+                            value={devBuyAmount}
+                            onChange={(e) => setDevBuyAmount(e.target.value)}
+                            className="bg-muted border-border pr-12"
+                            data-testid="input-dev-buy-amount"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">SOL</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground/60">
+                          Sent as a separate transaction · 10% slippage
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Cost */}
                   <div className="flex items-center justify-between px-1">
                     <span className="text-sm text-muted-foreground">Estimated cost</span>
-                    <span className="text-sm font-bold text-foreground">~0.002 SOL</span>
+                    <span className="text-sm font-bold text-foreground">
+                      ~{devBuyEnabled && parseFloat(devBuyAmount) > 0
+                        ? (0.002 + (parseFloat(devBuyAmount) || 0)).toFixed(3)
+                        : "0.002"} SOL
+                    </span>
                   </div>
 
                   <Button
@@ -587,25 +681,27 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
               )}
 
               {/* Pump loading states */}
-              {["uploading", "building", "signing", "confirming"].includes(pumpStep) && (
+              {(["uploading", "building", "signing", "confirming", "buying"] as PumpStep[]).includes(pumpStep) && (
                 <div className="py-14 text-center space-y-4">
                   <div className="relative mx-auto w-16 h-16">
-                    <div className="w-16 h-16 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
+                    <div className={`w-16 h-16 rounded-full border-4 animate-spin ${pumpStep === "buying" ? "border-emerald-500/20 border-t-emerald-500" : "border-purple-500/20 border-t-purple-500"}`} />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <PumpFunLogo className="w-7 h-7 object-contain rounded" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-foreground">Launching your token...</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {pumpStep === "buying" ? "Dev buying..." : "Launching your token..."}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">{pumpStepLabel[pumpStep]}</p>
                   </div>
                   <div className="flex justify-center gap-2 pt-2">
-                    {(["uploading", "building", "signing", "confirming"] as PumpStep[]).map((s, i) => (
+                    {progressSteps.map((s, i) => (
                       <div
                         key={s}
                         className={`h-1.5 rounded-full transition-all ${
-                          ["uploading", "building", "signing", "confirming"].indexOf(pumpStep) >= i
-                            ? "w-8 bg-purple-500"
+                          progressSteps.indexOf(pumpStep) >= i
+                            ? `w-8 ${pumpStep === "buying" ? "bg-emerald-500" : "bg-purple-500"}`
                             : "w-3 bg-muted"
                         }`}
                       />
@@ -623,6 +719,11 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   <div>
                     <p className="text-xl font-bold text-foreground">Token Launched! 🎉</p>
                     <p className="text-sm text-muted-foreground mt-1">Your token is live on pump.fun</p>
+                    {devBuyEnabled && devBuyError === "" && (
+                      <p className="text-xs text-emerald-500 mt-1.5 font-medium">
+                        + {devBuyAmount} SOL dev buy completed
+                      </p>
+                    )}
                   </div>
                   <div className="bg-muted rounded-xl p-4 space-y-2 text-left">
                     <p className="text-xs text-muted-foreground">Mint Address</p>
@@ -642,6 +743,43 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   >
                     <ExternalLink className="w-4 h-4" />
                     View on Pump.fun
+                  </a>
+                  <Button variant="outline" onClick={handleClose} className="w-full">Done</Button>
+                </div>
+              )}
+
+              {/* Partial success — token launched but dev buy failed */}
+              {pumpStep === "partial" && (
+                <div className="py-8 text-center space-y-5">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-9 h-9 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-foreground">Token Launched!</p>
+                    <p className="text-sm text-amber-400 mt-1 font-medium">Dev buy failed</p>
+                    <p className="text-xs text-muted-foreground mt-2 px-4">{devBuyError}</p>
+                  </div>
+                  <div className="bg-muted rounded-xl p-4 space-y-2 text-left">
+                    <p className="text-xs text-muted-foreground">Mint Address (token is live)</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-mono text-foreground truncate flex-1">{pumpMintAddress}</p>
+                      <button onClick={() => copyToClipboard(pumpMintAddress)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 px-2">
+                    Your token is live on-chain. You can buy it manually on pump.fun.
+                  </p>
+                  <a
+                    href={`https://pump.fun/${pumpMintAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:from-purple-600 hover:to-pink-600 transition-all"
+                    data-testid="link-view-on-pumpfun-partial"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Buy on Pump.fun
                   </a>
                   <Button variant="outline" onClick={handleClose} className="w-full">Done</Button>
                 </div>
