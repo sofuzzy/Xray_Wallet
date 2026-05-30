@@ -548,46 +548,10 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     </div>
                   )}
 
-                  {/* Dev buy */}
-                  <div className="bg-muted rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Dev Buy (optional)</p>
-                        <p className="text-xs text-muted-foreground">Buy tokens at launch to show conviction</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        placeholder="0"
-                        value={pumpForm.devBuySol}
-                        onChange={(e) => setPumpForm((p) => ({ ...p, devBuySol: e.target.value }))}
-                        className="bg-background border-border flex-1"
-                        data-testid="input-dev-buy-sol"
-                      />
-                      <span className="text-sm text-muted-foreground font-medium">SOL</span>
-                    </div>
-                    <div className="flex gap-2">
-                      {["0", "0.5", "1", "2"].map((v) => (
-                        <button
-                          key={v}
-                          onClick={() => setPumpForm((p) => ({ ...p, devBuySol: v }))}
-                          className={`flex-1 py-1 px-2 rounded-lg text-xs font-medium transition-colors border ${pumpForm.devBuySol === v ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
-                        >
-                          {v === "0" ? "None" : `${v} SOL`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* Cost */}
                   <div className="flex items-center justify-between px-1">
                     <span className="text-sm text-muted-foreground">Estimated cost</span>
-                    <span className="text-sm font-bold text-foreground">
-                      ~{(0.002 + (parseFloat(pumpForm.devBuySol) || 0)).toFixed(3)} SOL
-                    </span>
+                    <span className="text-sm font-bold text-foreground">~0.002 SOL</span>
                   </div>
 
                   <Button

@@ -65,29 +65,33 @@ export interface PumpBuildTxParams {
 }
 
 export async function buildPumpCreateTransaction(params: PumpBuildTxParams): Promise<{ transaction: string }> {
+  const requestBody = {
+    publicKey: params.creatorPublicKey,
+    action: "create",
+    tokenMetadata: {
+      name: params.name,
+      symbol: params.symbol,
+      uri: params.metadataUri,
+    },
+    mint: params.mintPublicKey,
+    denominatedInSol: "true",
+    amount: 0, // PumpPortal trade-local create does not support inline dev buys
+    slippage: params.slippage ?? 10,
+    priorityFee: params.priorityFee ?? 0.0005,
+    pool: "pump",
+  };
+  console.log("[pump] trade-local request:", JSON.stringify(requestBody));
   const response = await fetch(`${PUMPPORTAL_API}/trade-local`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      publicKey: params.creatorPublicKey,
-      action: "create",
-      tokenMetadata: {
-        name: params.name,
-        symbol: params.symbol,
-        uri: params.metadataUri,
-      },
-      mint: params.mintPublicKey,
-      denominatedInSol: "true",
-      amount: params.devBuySol,
-      slippage: params.slippage ?? 10,
-      priorityFee: params.priorityFee ?? 0.0005,
-      pool: "pump",
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const errText = await response.text().catch(() => response.statusText);
-    throw new Error(`PumpPortal create-local failed: ${response.status} — ${errText}`);
+    const bodyPreview = errText.slice(0, 500);
+    console.error("[pump] trade-local 400 body:", bodyPreview);
+    throw new Error(`PumpPortal create-local failed: ${response.status} — ${bodyPreview}`);
   }
 
   const txBytes = await response.arrayBuffer();

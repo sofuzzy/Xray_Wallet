@@ -290,9 +290,6 @@ export function VaultUnlockModal({
             </Link>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground/50">
-            XRAY Wallet v0.9.9
-          </p>
         </div>
       </motion.div>
     </div>
