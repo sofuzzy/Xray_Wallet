@@ -204,15 +204,19 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       setPumpStep("confirming");
       await sendTransactionViaServer(tx.serialize());
 
-      // Save to DB
-      await saveLaunchMutation.mutateAsync({
-        name: pumpForm.name,
-        symbol: pumpForm.symbol.toUpperCase(),
-        mintAddress: mintPublicKey,
-        decimals: 6,
-        totalSupply: "1000000000",
-        creatorAddress: address,
-      });
+      // Save to DB (best-effort — token is already on-chain if this fails)
+      try {
+        await saveLaunchMutation.mutateAsync({
+          name: pumpForm.name,
+          symbol: pumpForm.symbol.toUpperCase(),
+          mintAddress: mintPublicKey,
+          decimals: 6,
+          totalSupply: "1000000000",
+          creatorAddress: address,
+        });
+      } catch (dbErr) {
+        console.warn("[pump-launch] DB save failed (token is still live):", dbErr);
+      }
 
       setPumpMintAddress(mintPublicKey);
       setPumpStep("success");
