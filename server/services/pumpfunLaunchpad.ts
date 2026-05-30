@@ -1,3 +1,4 @@
+const PUMP_IPFS_URL = "https://pump.fun/api/ipfs";
 const PUMPPORTAL_API = "https://pumpportal.fun/api";
 
 export interface PumpIPFSParams {
@@ -31,7 +32,7 @@ export async function uploadMetadataToPumpIPFS(params: PumpIPFSParams): Promise<
   if (params.website) formData.append("website", params.website);
   formData.append("file", blob, params.imageFileName);
 
-  const response = await fetch(`${PUMPPORTAL_API}/ipfs`, {
+  const response = await fetch(PUMP_IPFS_URL, {
     method: "POST",
     body: formData,
   });
@@ -64,7 +65,7 @@ export interface PumpBuildTxParams {
 }
 
 export async function buildPumpCreateTransaction(params: PumpBuildTxParams): Promise<{ transaction: string }> {
-  const response = await fetch(`${PUMPPORTAL_API}/create-local`, {
+  const response = await fetch(`${PUMPPORTAL_API}/trade-local`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

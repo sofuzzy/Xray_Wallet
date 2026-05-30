@@ -14,7 +14,7 @@ interface TokenChartProps { mint: string; symbol?: string; interval?: string; }
 
 const INTERVALS  = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 type  Interval   = typeof INTERVALS[number];
-const CHART_H    = 320;
+const CHART_H    = 350;
 
 // One adjacent interval to prefetch after a delay — keeps GeckoTerminal under rate limit
 const PREFETCH_FOR: Record<Interval, Interval> = {
