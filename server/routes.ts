@@ -2025,6 +2025,61 @@ export async function registerRoutes(
     }
   });
 
+  // ========== Pump.fun Launchpad (via PumpPortal) ==========
+  // Step 1: Upload image + metadata to pump.fun IPFS
+  app.post("/api/launchpad/pump/upload-ipfs", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const inputSchema = z.object({
+        name: z.string().min(1).max(50),
+        symbol: z.string().min(1).max(10),
+        description: z.string().max(500).default(""),
+        twitter: z.string().url().optional().or(z.literal("")),
+        telegram: z.string().url().optional().or(z.literal("")),
+        website: z.string().url().optional().or(z.literal("")),
+        imageBase64: z.string().min(1),
+        imageMimeType: z.string().default("image/png"),
+        imageFileName: z.string().default("token.png"),
+      });
+
+      const parsed = inputSchema.parse(req.body);
+      const { uploadMetadataToPumpIPFS } = await import("./services/pumpfunLaunchpad");
+      const result = await uploadMetadataToPumpIPFS({
+        ...parsed,
+        twitter: parsed.twitter || undefined,
+        telegram: parsed.telegram || undefined,
+        website: parsed.website || undefined,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("[pump-launchpad] IPFS upload error:", error);
+      res.status(500).json({ error: error.message || "Failed to upload metadata" });
+    }
+  });
+
+  // Step 2: Build unsigned pump.fun create transaction
+  app.post("/api/launchpad/pump/build-tx", hybridAuth, strictRateLimiter, async (req, res) => {
+    try {
+      const inputSchema = z.object({
+        creatorPublicKey: z.string().min(32).max(64),
+        mintPublicKey: z.string().min(32).max(64),
+        name: z.string().min(1).max(50),
+        symbol: z.string().min(1).max(10),
+        metadataUri: z.string().url(),
+        devBuySol: z.number().min(0).max(100),
+        priorityFee: z.number().min(0).max(1).optional(),
+        slippage: z.number().min(0).max(50).optional(),
+      });
+
+      const parsed = inputSchema.parse(req.body);
+      const { buildPumpCreateTransaction } = await import("./services/pumpfunLaunchpad");
+      const result = await buildPumpCreateTransaction(parsed);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[pump-launchpad] Build tx error:", error);
+      res.status(500).json({ error: error.message || "Failed to build transaction" });
+    }
+  });
+
   // Liquidity pool creation routes (Raydium CPMM)
   app.get("/api/liquidity-pool/cost", async (_req, res) => {
     try {

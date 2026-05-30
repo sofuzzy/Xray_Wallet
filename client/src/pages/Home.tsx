@@ -396,7 +396,7 @@ export default function Home() {
         onRename={editWalletName}
         registeredWallets={registeredWallets}
         isAuthenticated={isAuthenticated}
-        profileImageUrl={user?.profileImageUrl}
+        profileImageUrl={user?.profileImageUrl ?? undefined}
         onOpenSettings={() => setIsSeedPhraseOpen(true)}
         onLock={() => lockVault()}
         onLogout={() => logout()}
