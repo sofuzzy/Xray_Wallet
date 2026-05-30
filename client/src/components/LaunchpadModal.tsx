@@ -1,9 +1,23 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Rocket, Loader2, CheckCircle, AlertCircle, ImageIcon,
+  X, Loader2, CheckCircle, AlertCircle, ImageIcon,
   ExternalLink, Lock, Copy, ChevronDown, ChevronUp, Droplets, Info, Coins
 } from "lucide-react";
+
+function PumpFunLogo({ className }: { className?: string }) {
+  return (
+    <img
+      src="https://pump.fun/logo.png"
+      alt="pump.fun"
+      className={className}
+      onError={(e) => {
+        const img = e.currentTarget;
+        if (!img.src.includes("favicon")) img.src = "https://pump.fun/favicon.ico";
+      }}
+    />
+  );
+}
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -428,8 +442,8 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Rocket className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center overflow-hidden">
+                <PumpFunLogo className="w-7 h-7 object-contain rounded" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">Token Launchpad</h2>
@@ -449,7 +463,10 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${mode === "pump" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
                 data-testid="tab-pump-mode"
               >
-                🚀 Pump.fun
+                <span className="flex items-center gap-1.5">
+                  <PumpFunLogo className="w-4 h-4 object-contain rounded" />
+                  Pump.fun
+                </span>
               </button>
               <button
                 onClick={() => setMode("custom")}
@@ -563,7 +580,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     {isBetaLocked ? (
                       <><Lock className="w-5 h-5 mr-2" />Beta Locked</>
                     ) : (
-                      <><Rocket className="w-5 h-5 mr-2" />Launch on Pump.fun</>
+                      <><PumpFunLogo className="w-5 h-5 mr-2 object-contain rounded" />Launch on Pump.fun</>
                     )}
                   </Button>
                 </div>
@@ -575,7 +592,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   <div className="relative mx-auto w-16 h-16">
                     <div className="w-16 h-16 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Rocket className="w-6 h-6 text-purple-400" />
+                      <PumpFunLogo className="w-7 h-7 object-contain rounded" />
                     </div>
                   </div>
                   <div>

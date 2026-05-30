@@ -1,6 +1,20 @@
-import { ArrowUpRight, ArrowDownLeft, Shuffle, Rocket } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Shuffle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+
+function PumpFunLogo({ className }: { className?: string }) {
+  return (
+    <img
+      src="https://pump.fun/logo.png"
+      alt="pump.fun"
+      className={className}
+      onError={(e) => {
+        const img = e.currentTarget;
+        if (!img.src.includes("favicon")) img.src = "https://pump.fun/favicon.ico";
+      }}
+    />
+  );
+}
 
 interface ActionButtonsProps {
   onSend: () => void;
@@ -9,8 +23,19 @@ interface ActionButtonsProps {
   onLaunch?: () => void;
 }
 
+type ActionButton = {
+  label: string;
+  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  customIcon?: React.ReactNode;
+  onClick: () => void;
+  variant: "default" | "secondary";
+  className?: string;
+  testId: string;
+  disabled?: boolean;
+};
+
 export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionButtonsProps) {
-  const buttons = [
+  const buttons: ActionButton[] = [
     { 
       label: "Send", 
       icon: ArrowUpRight, 
@@ -35,7 +60,7 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
     },
     { 
       label: "Launch", 
-      icon: Rocket, 
+      customIcon: <PumpFunLogo className="w-6 h-6 object-contain rounded" />,
       onClick: onLaunch || (() => {}), 
       variant: "secondary" as const,
       testId: "button-launch",
@@ -61,7 +86,7 @@ export function ActionButtons({ onSend, onReceive, onSwap, onLaunch }: ActionBut
             className={`w-[60px] h-[60px] rounded-2xl shadow-sm ${btn.className || ''} disabled:opacity-40`}
             data-testid={btn.testId}
           >
-            <btn.icon className="w-5 h-5" strokeWidth={2} />
+            {btn.customIcon ?? (btn.icon && <btn.icon className="w-5 h-5" strokeWidth={2} />)}
           </Button>
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
             {btn.label}
