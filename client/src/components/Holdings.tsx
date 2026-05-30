@@ -56,6 +56,21 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
     refetchInterval: 60000,
   });
 
+  const { data: solChange24h } = useQuery<number | null>({
+    queryKey: ["sol-change-24h"],
+    queryFn: async () => {
+      try {
+        const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true");
+        const data = await response.json();
+        return data.solana?.usd_24h_change ?? null;
+      } catch {
+        return null;
+      }
+    },
+    staleTime: 60000,
+    refetchInterval: 60000,
+  });
+
   const { data: tokens = [], isLoading } = useQuery<Token[]>({
     queryKey: ["wallet-tokens", address],
     queryFn: async () => {
@@ -179,7 +194,7 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                   decimals: 9,
                   logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
                   priceUsd: solPrice || 0,
-                  priceChange24h: undefined,
+                  priceChange24h: solChange24h ?? undefined,
                 })}
                 data-testid="holding-SOL"
               >
@@ -191,9 +206,9 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                   />
                   <div className="min-w-0">
                     <div className="font-medium">Solana</div>
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground">
                       <span>SOL</span>
-                      <span className="text-xs">{formatPrice(solPrice || 0)}</span>
+                      <span className="text-xs ml-2">{formatPrice(solPrice || 0)}</span>
                     </div>
                   </div>
                 </div>
@@ -202,6 +217,11 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                     {solBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                   </div>
                   <div className="text-sm text-muted-foreground">{formatValue(solUsdValue)}</div>
+                  {solChange24h != null && (
+                    <div className={`text-xs font-medium mt-0.5 ${solChange24h > 0 ? "text-emerald-500" : solChange24h < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                      {solChange24h > 0 ? "+" : ""}{solChange24h.toFixed(2)}%
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -252,16 +272,6 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                             {token.price && (
                               <span className="text-xs">{formatPrice(token.price)}</span>
                             )}
-                            {priceChange !== null && priceChange !== undefined && (
-                              <span className={`text-xs flex items-center gap-0.5 ${priceChangeColor}`}>
-                                {priceChange > 0 ? (
-                                  <TrendingUp className="w-3 h-3" />
-                                ) : priceChange < 0 ? (
-                                  <TrendingDown className="w-3 h-3" />
-                                ) : null}
-                                {priceChange > 0 ? "+" : ""}{priceChange.toFixed(1)}%
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -271,6 +281,11 @@ export function Holdings({ solBalance, onSwapToken }: HoldingsProps) {
                         </div>
                         {token.usdValue > 0 && (
                           <div className="text-sm text-muted-foreground">{formatValue(token.usdValue)}</div>
+                        )}
+                        {priceChange !== null && priceChange !== undefined && (
+                          <div className={`text-xs font-medium mt-0.5 ${priceChangeColor}`}>
+                            {priceChange > 0 ? "+" : ""}{priceChange.toFixed(2)}%
+                          </div>
                         )}
                       </div>
                     </div>
