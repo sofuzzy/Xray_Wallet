@@ -1,0 +1,59 @@
+The dev buy was getting sniped/front-run because it appears to be happening after the token launch instead of atomically with the launch.
+
+Please update the pump.fun launch flow so the dev buy is not a separate delayed post-launch buy unless there is absolutely no other option.
+
+Goal:
+Make the dev buy happen as fast as possible and preferably atomically with token creation.
+
+Required changes:
+
+1. Inspect the current pump.fun/PumpPortal launch implementation.
+
+2. If we are using PumpPortal, use the supported create flow with:
+   - action: "create"
+   - tokenMetadata
+   - mint
+   - denominatedInSol: "true"
+   - amount: <devBuySolAmount>
+   - slippage: <configured slippage>
+   - priorityFee: <configured priority fee>
+   - pool: "pump"
+
+The dev buy amount should be included in the create transaction itself, not sent as a separate buy after the launch.
+
+3. If using the local transaction API, generate the create transaction with the dev buy amount included, sign it immediately, and submit it immediately.
+
+4. Add advanced speed options:
+   - priorityFee input/config
+   - optional jitoOnly mode if supported by the API
+   - optional skipPreflight mode for advanced users, with a warning that it is faster but riskier
+   - use a fast RPC endpoint from environment variables
+   - avoid waiting for confirmation before submitting any required bundled transaction
+
+5. If the app needs multiple transactions, use a Jito bundle:
+   - transaction 1: create token with dev buy
+   - optional transaction 2+: additional buy wallets
+   - submit the signed bundle to Jito
+   - do not do “launch, wait for confirmation, then buy”
+
+6. Pre-compute everything possible before the user clicks launch:
+   - upload metadata/IPFS before final submit if possible
+   - generate mint keypair before submit
+   - validate SOL balance before submit
+   - avoid extra API calls between signing and sending
+
+7. Add clear UI labels:
+   - Dev buy amount in SOL
+   - Priority fee / Jito tip
+   - Slippage
+   - Fast mode / Jito-only mode
+
+8. Add status messages:
+   - Preparing metadata
+   - Building atomic launch + dev buy transaction
+   - Signing transaction
+   - Submitting with priority fee/Jito
+   - Launch complete
+
+Important:
+Do not restore the old broken buy feature. The previous separate buy flow was removed because it did not work correctly and is too slow. The correct fix is to include the dev buy in the create transaction or bundle it with the create transaction.

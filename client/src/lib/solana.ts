@@ -42,13 +42,20 @@ export async function confirmTransactionViaServer(signature: string, maxAttempts
 }
 
 // Send transaction through server (uses Helius RPC)
-export async function sendTransactionViaServer(serializedTx: Uint8Array): Promise<string> {
+export async function sendTransactionViaServer(
+  serializedTx: Uint8Array,
+  options?: { turboMode?: boolean; skipPreflight?: boolean }
+): Promise<string> {
   const base64Tx = btoa(String.fromCharCode.apply(null, Array.from(serializedTx)));
   const response = await fetch("/api/solana/send-transaction", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ serializedTransaction: base64Tx }),
+    body: JSON.stringify({
+      serializedTransaction: base64Tx,
+      turboMode: options?.turboMode,
+      skipPreflight: options?.skipPreflight,
+    }),
   });
   if (!response.ok) {
     const err = await response.json();

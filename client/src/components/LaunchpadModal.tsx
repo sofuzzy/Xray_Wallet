@@ -2,8 +2,9 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Loader2, CheckCircle, AlertCircle, ImageIcon,
-  ExternalLink, Lock, Copy, ChevronDown, ChevronUp, Droplets, Info, Coins
+  ExternalLink, Lock, Copy, ChevronDown, ChevronUp, Droplets, Info, Coins, Zap, Settings2
 } from "lucide-react";
+import { useTurboMode } from "@/hooks/use-turbo-mode";
 
 function PumpFunLogo({ className }: { className?: string }) {
   return (
@@ -38,7 +39,7 @@ interface LaunchpadModalProps {
 
 type LaunchMode = "pump" | "custom";
 
-type PumpStep = "form" | "uploading" | "building" | "signing" | "confirming" | "buying" | "success" | "partial" | "error";
+type PumpStep = "form" | "uploading" | "building" | "signing" | "confirming" | "success" | "error";
 
 interface PumpFormData {
   name: string;
@@ -86,7 +87,12 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   const [pumpError, setPumpError] = useState("");
   const [devBuyEnabled, setDevBuyEnabled] = useState(false);
   const [devBuyAmount, setDevBuyAmount] = useState("0.1");
-  const [devBuyError, setDevBuyError] = useState("");
+  // Advanced launch options
+  const [priorityFee, setPriorityFee] = useState("0.001");
+  const [slippage, setSlippage] = useState("10");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [skipPreflight, setSkipPreflight] = useState(false);
+  const turboMode = useTurboMode();
 
   // Custom SPL state
   const [customStep, setCustomStep] = useState<"form" | "creating" | "addingLiquidity" | "success" | "error">("form");
@@ -208,7 +214,9 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
           name: pumpForm.name,
           symbol: pumpForm.symbol.toUpperCase(),
           metadataUri,
-          devBuySol: 0,
+          devBuySol: devBuyAmountNum,  // atomic — included in the single create tx
+          priorityFee: parseFloat(priorityFee) || 0.001,
+          slippage: parseFloat(slippage) || 10,
         }),
       });
 
@@ -224,12 +232,16 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
       const tx = VersionedTransaction.deserialize(txBytes);
       tx.sign([keypair, mintKeypair]);
 
-      // Step 4: Submit create transaction
+      // Step 4: Broadcast — atomic create + dev buy in one transaction
       setPumpStep("confirming");
-      await sendTransactionViaServer(tx.serialize());
+      await sendTransactionViaServer(tx.serialize(), {
+        turboMode: turboMode.enabled,
+        skipPreflight,
+      });
 
-      // Token is now on-chain — record mint address for success/partial screens
+      // Token is on-chain with dev buy included
       setPumpMintAddress(mintPublicKey);
+      setPumpStep("success");
 
       // Save to DB (best-effort — token is already live even if this fails)
       try {
@@ -243,40 +255,6 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
         });
       } catch (dbErr) {
         console.warn("[pump-launch] DB save failed (token is still live):", dbErr);
-      }
-
-      // Step 5 (optional): Dev buy — separate transaction after token exists on-chain
-      if (devBuyEnabled && devBuyAmountNum > 0) {
-        setPumpStep("buying");
-        setDevBuyError("");
-        try {
-          const buyRes = await fetch("/api/launchpad/pump/buy-tx", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders },
-            credentials: "include",
-            body: JSON.stringify({
-              buyerPublicKey: address,
-              mintPublicKey,
-              solAmount: devBuyAmountNum,
-            }),
-          });
-          if (!buyRes.ok) {
-            const err = await buyRes.json().catch(() => ({ error: "Dev buy build failed" }));
-            throw new Error(err.error || "Failed to build dev buy transaction");
-          }
-          const { transaction: buyTxBase64 } = await buyRes.json();
-          const buyTxBytes = Uint8Array.from(atob(buyTxBase64), (c) => c.charCodeAt(0));
-          const buyTx = VersionedTransaction.deserialize(buyTxBytes);
-          buyTx.sign([keypair]);
-          await sendTransactionViaServer(buyTx.serialize());
-          setPumpStep("success");
-        } catch (buyErr: any) {
-          console.warn("[pump-launch] Dev buy failed (token IS live):", buyErr);
-          setDevBuyError(buyErr.message || "Dev buy transaction failed");
-          setPumpStep("partial");
-        }
-      } else {
-        setPumpStep("success");
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/token-balances"] });
@@ -441,7 +419,10 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
     setPumpError("");
     setDevBuyEnabled(false);
     setDevBuyAmount("0.1");
-    setDevBuyError("");
+    setPriorityFee("0.001");
+    setSlippage("10");
+    setShowAdvanced(false);
+    setSkipPreflight(false);
     setShowSocials(false);
     setCustomStep("form");
     setCustomForm({ name: "", symbol: "", decimals: 9, totalSupply: "1000000", imageUrl: "", addLiquidity: false, liquiditySol: "1", liquidityPercent: "50" });
@@ -463,18 +444,14 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
   const pumpStepLabel: Record<PumpStep, string> = {
     form: "",
     uploading: "Uploading metadata to IPFS...",
-    building: "Building transaction...",
-    signing: "Signing...",
-    confirming: "Submitting to Solana...",
-    buying: "Submitting dev buy...",
+    building: "Building atomic launch transaction...",
+    signing: "Signing with wallet + mint keypair...",
+    confirming: "Broadcasting with priority fee...",
     success: "",
-    partial: "",
     error: "",
   };
 
-  const progressSteps: PumpStep[] = devBuyEnabled
-    ? ["uploading", "building", "signing", "confirming", "buying"]
-    : ["uploading", "building", "signing", "confirming"];
+  const progressSteps: PumpStep[] = ["uploading", "building", "signing", "confirming"];
 
   return (
     <AnimatePresence>
@@ -624,7 +601,7 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <Label className="text-sm font-medium">Dev buy on launch</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">Buy tokens immediately after creation</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Atomic — bundled in the same transaction</p>
                       </div>
                       <Switch
                         checked={devBuyEnabled}
@@ -648,9 +625,74 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">SOL</span>
                         </div>
-                        <p className="text-xs text-muted-foreground/60">
-                          Sent as a separate transaction · 10% slippage
-                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Advanced Options */}
+                  <div className="border border-border/40 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced((v) => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/30 transition-colors"
+                      data-testid="toggle-advanced-options"
+                    >
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Settings2 className="w-4 h-4" />
+                        Advanced
+                        {turboMode.enabled && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                            <Zap className="w-2.5 h-2.5" />TURBO
+                          </span>
+                        )}
+                      </div>
+                      {showAdvanced ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </button>
+                    {showAdvanced && (
+                      <div className="px-4 pb-4 pt-3 space-y-4 bg-muted/10">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Priority fee (SOL)</Label>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={priorityFee}
+                                onChange={(e) => setPriorityFee(e.target.value)}
+                                className="bg-muted border-border text-sm pr-10"
+                                data-testid="input-priority-fee"
+                              />
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">SOL</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Slippage</Label>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="1"
+                                max="50"
+                                value={slippage}
+                                onChange={(e) => setSlippage(e.target.value)}
+                                className="bg-muted border-border text-sm pr-6"
+                                data-testid="input-slippage"
+                              />
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-xs font-medium">Skip preflight</Label>
+                            <p className="text-[10px] text-muted-foreground/70 mt-0.5">Faster · higher risk of failed tx</p>
+                          </div>
+                          <Switch
+                            checked={skipPreflight}
+                            onCheckedChange={setSkipPreflight}
+                            data-testid="toggle-skip-preflight"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -681,18 +723,16 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
               )}
 
               {/* Pump loading states */}
-              {(["uploading", "building", "signing", "confirming", "buying"] as PumpStep[]).includes(pumpStep) && (
+              {(["uploading", "building", "signing", "confirming"] as PumpStep[]).includes(pumpStep) && (
                 <div className="py-14 text-center space-y-4">
                   <div className="relative mx-auto w-16 h-16">
-                    <div className={`w-16 h-16 rounded-full border-4 animate-spin ${pumpStep === "buying" ? "border-emerald-500/20 border-t-emerald-500" : "border-purple-500/20 border-t-purple-500"}`} />
+                    <div className="w-16 h-16 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <PumpFunLogo className="w-7 h-7 object-contain rounded" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-foreground">
-                      {pumpStep === "buying" ? "Dev buying..." : "Launching your token..."}
-                    </p>
+                    <p className="text-lg font-semibold text-foreground">Launching your token...</p>
                     <p className="text-sm text-muted-foreground mt-1">{pumpStepLabel[pumpStep]}</p>
                   </div>
                   <div className="flex justify-center gap-2 pt-2">
@@ -700,13 +740,16 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                       <div
                         key={s}
                         className={`h-1.5 rounded-full transition-all ${
-                          progressSteps.indexOf(pumpStep) >= i
-                            ? `w-8 ${pumpStep === "buying" ? "bg-emerald-500" : "bg-purple-500"}`
-                            : "w-3 bg-muted"
+                          progressSteps.indexOf(pumpStep) >= i ? "w-8 bg-purple-500" : "w-3 bg-muted"
                         }`}
                       />
                     ))}
                   </div>
+                  {turboMode.enabled && (
+                    <p className="text-xs text-amber-400 flex items-center justify-center gap-1">
+                      <Zap className="w-3 h-3" /> Turbo mode active
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -719,9 +762,9 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   <div>
                     <p className="text-xl font-bold text-foreground">Token Launched! 🎉</p>
                     <p className="text-sm text-muted-foreground mt-1">Your token is live on pump.fun</p>
-                    {devBuyEnabled && devBuyError === "" && (
+                    {devBuyEnabled && parseFloat(devBuyAmount) > 0 && (
                       <p className="text-xs text-emerald-500 mt-1.5 font-medium">
-                        + {devBuyAmount} SOL dev buy completed
+                        + {devBuyAmount} SOL dev buy · atomic
                       </p>
                     )}
                   </div>
@@ -743,43 +786,6 @@ export function LaunchpadModal({ isOpen, onClose }: LaunchpadModalProps) {
                   >
                     <ExternalLink className="w-4 h-4" />
                     View on Pump.fun
-                  </a>
-                  <Button variant="outline" onClick={handleClose} className="w-full">Done</Button>
-                </div>
-              )}
-
-              {/* Partial success — token launched but dev buy failed */}
-              {pumpStep === "partial" && (
-                <div className="py-8 text-center space-y-5">
-                  <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto">
-                    <AlertCircle className="w-9 h-9 text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-foreground">Token Launched!</p>
-                    <p className="text-sm text-amber-400 mt-1 font-medium">Dev buy failed</p>
-                    <p className="text-xs text-muted-foreground mt-2 px-4">{devBuyError}</p>
-                  </div>
-                  <div className="bg-muted rounded-xl p-4 space-y-2 text-left">
-                    <p className="text-xs text-muted-foreground">Mint Address (token is live)</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-mono text-foreground truncate flex-1">{pumpMintAddress}</p>
-                      <button onClick={() => copyToClipboard(pumpMintAddress)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground/70 px-2">
-                    Your token is live on-chain. You can buy it manually on pump.fun.
-                  </p>
-                  <a
-                    href={`https://pump.fun/${pumpMintAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:from-purple-600 hover:to-pink-600 transition-all"
-                    data-testid="link-view-on-pumpfun-partial"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Buy on Pump.fun
                   </a>
                   <Button variant="outline" onClick={handleClose} className="w-full">Done</Button>
                 </div>

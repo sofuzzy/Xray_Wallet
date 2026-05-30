@@ -731,7 +731,7 @@ export async function registerRoutes(
   // Send signed transaction (beta-gated)
   app.post("/api/solana/send-transaction", requireBetaUnlock, async (req, res) => {
     try {
-      const { serializedTransaction, turboMode } = req.body;
+      const { serializedTransaction, turboMode, skipPreflight } = req.body;
       if (!serializedTransaction) {
         return res.status(400).json({ error: "Missing serializedTransaction" });
       }
@@ -759,7 +759,7 @@ export async function registerRoutes(
         }
       }
       
-      const signature = await sendRawTransaction(serializedTransaction);
+      const signature = await sendRawTransaction(serializedTransaction, undefined, skipPreflight === true);
       res.json({ signature });
     } catch (error: any) {
       console.error("Error sending transaction:", error);

@@ -121,7 +121,8 @@ function parseTransactionError(error: any): { code: string; message: string } {
 
 export async function sendRawTransaction(
   serializedTransaction: string,
-  userRpc?: string
+  userRpc?: string,
+  skipPreflight?: boolean
 ): Promise<string> {
   try {
     // Use Helius Sender for ultra-low latency if enabled
@@ -135,7 +136,7 @@ export async function sendRawTransaction(
     const rpc = userRpc ? createUserRpcService(userRpc) || getRpcService() : getRpcService();
     const buffer = Buffer.from(serializedTransaction, "base64");
     const signature = await rpc.sendRawTransaction(buffer, {
-      skipPreflight: false,
+      skipPreflight: skipPreflight ?? false,
       preflightCommitment: "confirmed",
     });
     
