@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowDownUp, Loader2, Search, X, Plus, TrendingUp, Zap, Check, AlertCircle, HelpCircle, AlertTriangle, Clock, Info, ShieldAlert, Wallet, Lock, ChevronDown, Settings } from "lucide-react";
@@ -883,6 +883,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Select Token</DialogTitle>
+            <DialogDescription className="sr-only">Search and select a token to swap</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -1083,6 +1084,7 @@ export function SwapModal({ isOpen, onClose, initialOutputToken, initialInputTok
                 Jupiter
               </Badge>
             </DialogTitle>
+            <DialogDescription className="sr-only">Swap tokens using Jupiter aggregator</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

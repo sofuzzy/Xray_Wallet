@@ -110,6 +110,7 @@ export function OnboardingWalkthrough({ open, onComplete }: OnboardingWalkthroug
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
         className="sm:max-w-md border-primary/20"
+        aria-describedby={undefined}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >

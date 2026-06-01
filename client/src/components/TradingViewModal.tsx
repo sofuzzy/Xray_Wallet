@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, TrendingDown, ExternalLink, Copy, Check, 
@@ -103,6 +103,7 @@ export function TradingViewModal({ isOpen, onClose, token, onTrade }: TradingVie
               <div>
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-lg font-bold">{currentToken.name}</DialogTitle>
+                  <DialogDescription className="sr-only">{currentToken.symbol} price chart and trading info</DialogDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{currentToken.symbol}</span>
